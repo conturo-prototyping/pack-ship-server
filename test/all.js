@@ -97,34 +97,27 @@ describe('Mocha tests', () => {
       const [workOrder, customer] = [await WorkOrder.findOne(), await Customer.findOne()];
       const { orderNumber } = workOrder;
       
-      const r = randomInt(150);
+      const r = randomInt(50);
 
-      const arr = [];
+      const promises = [];
       for (let i=0; i < r; i++) {
-        arr.push({
-          orderNumber,
-          customer: customer._id,
-          packingSlipId: ''+i,
-          items: [{
-            item: workOrder._id,
-            qty: 1
-          }]
-        });
+
+        await
+          chai.request(app)
+          .put('/packingSlips')
+          .send({
+            items: [{
+              item: workOrder._id,
+              qty: 1
+            }],
+            customer: customer._id,
+            orderNumber,
+          });
+
       }
-      await PackingSlip.create(arr);
 
-      const res = await chai.request(app)
-        .put('/packingSlips')
-        .send({
-          items: [{
-            item: workOrder._id,
-            qty: 1
-          }],
-          customer: customer._id,
-          orderNumber,
-        });
-
-      expect( res.body.packingSlip.packingSlipId ).to.equal(`${orderNumber}-PS${r+1}`);
+      const packingSlip = await PackingSlip.findOne({ packingSlipId: `${orderNumber}-PS${r}` }).lean();
+      expect( packingSlip ).to.not.equal(null);
     });
 
     it('All quantities should show up in history', async () => {
