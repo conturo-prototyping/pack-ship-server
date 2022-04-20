@@ -98,8 +98,6 @@ describe('Mocha tests', () => {
       const { orderNumber } = workOrder;
       
       const r = randomInt(50);
-
-      const promises = [];
       for (let i=0; i < r; i++) {
 
         await
