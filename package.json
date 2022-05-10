@@ -13,7 +13,9 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.17.1",
-    "mongoose": "^6.0.13"
+    "mongoose": "^6.0.13",
+    "passport": "^0.5.2",
+    "passport-google-oauth2": "^0.2.0"
   },
   "scripts": {
     "dev": "nodemon ./src/app.js",
