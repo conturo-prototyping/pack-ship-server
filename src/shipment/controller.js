@@ -84,7 +84,7 @@ async function searchShipments(req, res) {
       const sortFunc = (a, b) => {
         let testVal;
         if (sortBy === "CUSTOMER") {
-          testVal = a.customer.customerTag.localeCompare(b.customer.customerTag);
+          testVal = a.customer.tag.localeCompare(b.customer.tag);
         }
         else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
         
@@ -163,9 +163,9 @@ async function createOne(req, res) {
       } = req.body;
 
       const customerDoc = await Customer.findOne({ _id: customer });
-      const { customerTag, numShipments } = customerDoc;
+      const { tag, numShipments } = customerDoc;
 
-      const shipmentId = `${customerTag}-SH${numShipments + 1}`;
+      const shipmentId = `${tag}-SH${numShipments + 1}`;
 
       const shipment = new Shipment({
         customer,
