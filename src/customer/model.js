@@ -19,5 +19,5 @@ const schema = new Schema({
   },
 });
 
-const Model = model('customer', schema);
+const Model = model('oldClient-v2', schema, 'oldClients-v2');
 module.exports = Model;
