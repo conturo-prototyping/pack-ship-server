@@ -26,7 +26,7 @@ describe('Mocha tests', () => {
       WorkOrder.deleteMany()
     ]);
   
-    const customerOne = await Customer.create({ customerTag: 'ABC' });
+    const customerOne = await Customer.create({ tag: 'ABC' });
   
     await WorkOrder.create(
       {

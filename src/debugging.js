@@ -33,8 +33,8 @@ async function resetData(_req, res) {
   const tags = ["ABC", "DEF", "GHI"];
 
   const customers = await Promise.all(
-    tags.map(async (customerTag) => {
-      const newCustomer = new Customer({ customerTag });
+    tags.map(async (tag) => {
+      const newCustomer = new Customer({ tag });
       await newCustomer.save();
       return newCustomer;
     })
@@ -47,7 +47,7 @@ async function resetData(_req, res) {
     for (let i = 0; i < 50; i++) {
       const newWorkOrder = new WorkOrder({
         customer: c._id,
-        orderNumber: `${c.customerTag}${1001 + i}`,
+        orderNumber: `${c.tag}${1001 + i}`,
         batch: randomInt(1, 3),
         partNumber: `PN-00${randomInt(1, 9)}`,
         partDescription: "Dummy part for testing",
@@ -59,7 +59,7 @@ async function resetData(_req, res) {
       if (i == 0) {
         const newWorkOrder = new WorkOrder({
           customer: c._id,
-          orderNumber: `${c.customerTag}${1001 + i}`,
+          orderNumber: `${c.tag}${1001 + i}`,
           batch: randomInt(1, 3),
           partNumber: `PN-00${randomInt(1, 9)}`,
           partDescription: "Dummy part for testing",

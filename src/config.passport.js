@@ -3,12 +3,13 @@
  */
 
 const UserModel = require('../src/user/model');
+const GoogleStrategy = require('passport-google-oauth2').Strategy;
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL } = process.env;
 
 module.exports = function(passport) {
   
   passport.serializeUser( function(user, done) {
-    done(null, user.id);
+    done(null, user._id);
   } );
 
   passport.deserializeUser( async function(id, done) {
@@ -27,13 +28,13 @@ module.exports = function(passport) {
     }
   } );
 
-  const clientId = GOOGLE_CLIENT_ID;
+  const clientID = GOOGLE_CLIENT_ID;
   const clientSecret = GOOGLE_CLIENT_SECRET;
   const callbackURL = GOOGLE_CALLBACK_URL;
 
   passport.use( new GoogleStrategy(
     // Credentials
-    { clientId, clientSecret, callbackURL },
+    { clientID, clientSecret, callbackURL },
 
     // Google data
     (accessToken, refreshToken, profile, done) => process.nextTick(() => {
