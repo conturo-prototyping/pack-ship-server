@@ -5,11 +5,6 @@ const cookieParser = require('cookie-parser');
 const passport = require('passport');
 const cookieSession = require('cookie-session');
 
-const packingSlipsController = require("./packingSlip/controller");
-const shipmentsController = require("./shipment/controller");
-const workOrdersController = require("./workOrder/controller");
-const User = require('./user/model');
-
 require("dotenv").config();
 require('./config.passport')(passport);
 
@@ -19,7 +14,7 @@ const app = express();
 app.use
 app.use(cors({
   origin: [
-    'http://localhost',
+    'http://localhost:3001',
   ],
   credentials: true
 }));
@@ -33,58 +28,16 @@ app.use( cookieSession({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// -------------------------------------
-// SETUP GOOGLE AUTH2.0 session blocking
-// -------------------------------------
-
-app.all('*', (req, res, next) => {
-  console.log(req.method, req.url);
-  next();
-});
-
-// Google OAuth2.0 login route
-// managed from google dev console
-app.get("/auth/google",
-
-  // @ts-ignore
-  passport.authenticate("google", {
-    scope: [
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/drive',
-      'https://www.googleapis.com/auth/drive.file'
-    ],
-    accessType: 'offline'
-  })
-);
-
-// Google OAuth2.0 callback
-// managed from google dev console
-app.get("/auth/google/callback",
-  passport.authenticate("google", {
-    failureMessage:   'Error logging in to Google. Please try again later.',
-    failureRedirect:  'http://localhost:3001/loginError',
-    successRedirect:  'http://localhost:3001/loginSuccess'
-  }), (_req, res) => res.sendStatus(200)
-);
-
+// This handles authentication
+app.use('/auth', require('./auth.router'));
 app.all("*", function(req, res, next) {
   if (req.isAuthenticated()) return next();
   else res.redirect(req.baseUrl + "/auth/google");
 });
 
-app.get('/users/me', async (req, res) => {
-  const user = await User.findOne(req.user._id);
-  res.send({ user });
-})
-
-// -------------------------------------
-// -------------------------------------
-// -------------------------------------
-
-app.use("/packingSlips", packingSlipsController);
-app.use("/shipments", shipmentsController);
-app.use("/workOrders", workOrdersController);
+app.use("/packingSlips",  require("./packingSlip/controller") );
+app.use("/workOrders",    require("./workOrder/controller") );
+app.use("/shipments",     require("./shipment/controller") );
 
 if( process.env.NODE_ENV === 'DEBUG' ) {
   app.use('/debugging', require('./debugging'));
