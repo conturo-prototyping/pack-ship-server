@@ -42,6 +42,8 @@ if( process.env.NODE_ENV === 'DEBUG' ) {
   app.use('/debugging', require('./debugging'));
 }
 
+app.all('*', (_req, res) => res.sendStatus(404));
+
 // -----------------------------------------
 // -----------------------------------------
 // Initialized server
