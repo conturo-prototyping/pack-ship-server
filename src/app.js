@@ -10,11 +10,9 @@ require('./config.passport')(passport);
 
 const app = express();
 
-
-app.use
 app.use(cors({
   origin: [
-    'http://localhost:3001',
+    process.env.CORS_CLIENT_URL,
   ],
   credentials: true
 }));
@@ -22,7 +20,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use( cookieSession({
-  name: 'CPsession',
+  name: process.env.SESSION_NAME,
   keys: [ process.env.SESSION_SECRET ]
 }));
 app.use(passport.initialize());
