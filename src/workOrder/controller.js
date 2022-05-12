@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const router = Router();
 const WorkOrder = require('./model');
+const Customer = require('../customer/model');
 
 router.get('/packingQueue', getPackingQueue);
 router.get('/', getAll);
@@ -31,6 +32,11 @@ async function getPackingQueue(_req, res) {
  * @param {Boolean} showFulfilled should query show fulfilled qties? 
  */
 async function getAllWithPackedQties(showFulfilled) {
+  const _customerTagFromOrderNumber = on => {
+    const match = on.match(/([A-Z]+)(?:[0-9]+)/);
+    return match[1];
+  };
+
   const agg = [
     { $unwind: '$Items' },
     // Fetch the packing slips each work order has appeared in
@@ -68,7 +74,6 @@ async function getAllWithPackedQties(showFulfilled) {
 
       batch:            { $first: '$Items.batchNumber' },
       partRev:          { $first: '$Items.Revision' },
-      // customer:         { $first: '$customer' },
       partNumber:       { $first: '$Items.PartNumber' },
       orderNumber:      { $first: '$Items.OrderNumber' },
       partDescription:  { $first: '$Items.PartName' },
@@ -85,6 +90,19 @@ async function getAllWithPackedQties(showFulfilled) {
 
   try {
     const data = await WorkOrder.aggregate(agg);
+
+    const customerTags = new Set();
+    data.forEach(x => customerTags.add( _customerTagFromOrderNumber(x.orderNumber) ));
+    
+    const p_customerData = Array.from(customerTags).map(tag => Customer.findOne({ tag }).lean().exec());
+    const customerData = await Promise.all(p_customerData);
+
+    data.forEach(x => {
+      x.customer = customerData.find(y => y.tag === _customerTagFromOrderNumber(x.orderNumber))._id
+    });
+
+    console.log(data);
+
     return [null, data];
   }
   catch (e) {
