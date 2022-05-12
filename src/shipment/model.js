@@ -11,7 +11,7 @@ const { ObjectId } = Schema.Types;
 const schema = new Schema({
   customer: {
     type: ObjectId,
-    ref: "customer",
+    ref: "oldClient-v2",
   },
 
   shipmentId: {
