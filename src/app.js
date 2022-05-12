@@ -36,6 +36,7 @@ app.all("*", function(req, res, next) {
 app.use("/packingSlips",  require("./packingSlip/controller") );
 app.use("/workOrders",    require("./workOrder/controller") );
 app.use("/shipments",     require("./shipment/controller") );
+app.use('/users',         require('./user/controller'));
 
 if( process.env.NODE_ENV === 'DEBUG' ) {
   app.use('/debugging', require('./debugging'));
