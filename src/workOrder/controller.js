@@ -32,10 +32,11 @@ async function getPackingQueue(_req, res) {
  */
 async function getAllWithPackedQties(showFulfilled) {
   const agg = [
+    { $unwind: '$Items' },
     // Fetch the packing slips each work order has appeared in
     { $lookup: {
       from: 'packingSlips',
-      localField: '_id',
+      localField: 'Items._id',
       foreignField: 'items.item',
       as: 'packingSlips'
     } },
@@ -54,7 +55,7 @@ async function getAllWithPackedQties(showFulfilled) {
     // AND keep work orders with no packing slips
     { $match: {
       $or: [
-        { $expr: { $eq: ['$packingSlips.items.item', '$_id'] } },
+        { $expr: { $eq: ['$packingSlips.items.item', '$Items._id'] } },
         { 'packingSlips': { $exists: false } }
       ]
     } },
@@ -63,14 +64,14 @@ async function getAllWithPackedQties(showFulfilled) {
     { $group: {
       _id: '$_id',
       packedQty:        { $sum: '$packingSlips.items.qty' },
-      batchQty:         { $first: '$quantity' },
+      batchQty:         { $first: '$Items.Quantity' },
 
-      batch:            { $first: '$batch' },
-      partRev:          { $first: '$partRev' },
-      customer:         { $first: '$customer' },
-      partNumber:       { $first: '$partNumber' },
-      orderNumber:      { $first: '$orderNumber' },
-      partDescription:  { $first: '$partDescription' },
+      batch:            { $first: '$Items.batchNumber' },
+      partRev:          { $first: '$Items.Revision' },
+      // customer:         { $first: '$customer' },
+      partNumber:       { $first: '$Items.PartNumber' },
+      orderNumber:      { $first: '$Items.OrderNumber' },
+      partDescription:  { $first: '$Items.PartName' },
     } },
   ];
 
