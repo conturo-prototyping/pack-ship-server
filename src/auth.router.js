@@ -25,7 +25,7 @@ router.get("/google",
 router.get("/google/callback",
   passport.authenticate("google", {
     failureMessage:   'Error logging in to Google. Please try again later.',
-    failureRedirect:  'http://localhost:3001/loginError',
-    successRedirect:  'http://localhost:3001/loginSuccess'
+    failureRedirect:  process.env.LOGIN_FAILURE_REDIRECT,
+    successRedirect:  process.env.LOGIN_SUCCESS_REDIRECT
   }), (_req, res) => res.sendStatus(200)
 );
