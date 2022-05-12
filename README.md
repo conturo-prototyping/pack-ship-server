@@ -13,7 +13,7 @@ For the time being this is meant to be loaded via an iframe from the ShopQ proje
   - `LOGIN_FAILURE_REDIRECT` URL to redirect browser to upon login success
   - `LOGIN_SUCCESS_REDIRECT` URL to redirect brwoser to upon login failure
 * CORS Allowed Origin
-  - `CORS_CLIENT_DOMAIN` Allowed origin domain
+  - `CORS_CLIENT_URL` Allowed origin domain
 * Session Cookie
   - `SESSION_NAME` Cookie name
   - `SESSION_SECRET` Cookie secret string
