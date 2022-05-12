@@ -24,12 +24,10 @@ const schema = new Schema({
   },
 
   items: [{
-    // ref to work order item
+    // ObjectId of the workorder.Items[] item that is packed here
     // which should give us part details (number, description, batch, qty)
-    item: {
-      type: ObjectId,
-      ref: 'workOrder'
-    },
+    // NOTE: (jarrilla) this doesn't use ref b/c currently these objects are nested
+    item: ObjectId,
     
     // quantity in the packing slip
     qty: Number,
