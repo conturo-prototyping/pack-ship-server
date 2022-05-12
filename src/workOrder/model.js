@@ -1,21 +1,29 @@
-const { Schema, model } = require("mongoose");
+// m_WorkOrder.js
+// Model for work orders.
+// These documents are permanent and don't get removed.
 
-const schema = new Schema({
-  orderNumber: String,
+const mongoose = require("mongoose");
+const itemSchema = require('./itemSchema');
 
-  batch: String,
+/**
+ * Work Order schema
+ */
+const schema = new mongoose.Schema({
+  OrderNumber: String,
+  DateDue: Date,
 
-  partNumber: String,
-  partDescription: String,
-  partRev: String,
+  Items: [ itemSchema ],
 
-  quantity: Number,
+  certs: {
+    material:                   Boolean,
+    conformance:                Boolean,
+    ITAR_EAR_Restricted:        Boolean,
+    DFARS_MaterialRequired:     Boolean,
+    firstArticleInspection:     Boolean,
+    domesticMaterialRequired:   Boolean,
+    EPPCertificationsRequired:  Boolean,
+  },
 
-  customer: {
-    type: Schema.Types.ObjectId,
-    ref: 'customer'
-  }
 });
 
-const Model = model('workOrder', schema, 'workOrders');
-module.exports = Model;
+module.exports = mongoose.model("workOrder", schema, "workorders");
