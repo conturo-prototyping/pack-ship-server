@@ -55,66 +55,7 @@ async function searchShipments(req, res) {
       }
       if (isNaN(+pageNumber) || pageNumber < 1) pageNumber = 1;
 
-      const allShipments = await Shipment.aggregate([
-        { $lookup: {
-          from: 'packingSlips',
-          as: 'manifest',
-          let: { 'manifest': '$manifest' },
-          pipeline: [
-            { $match: {
-              $expr: { $in: [ '$_id', '$$manifest' ] }
-            } },
-            { $lookup: {
-              from: 'workorders',
-              let: { itemId: '$items.item', rowId: '$items._id', rowQty: '$items.qty' },
-              pipeline: [
-                { $unwind: '$Items' },
-                { $match: {
-                  $expr: { $in: [ '$Items._id', '$$itemId' ] }
-                } },
-                { $group: {
-                  _id: '$Items._id',
-                  item: {
-                    $first: {
-                      orderNumber:      '$Items.OrderNumber',
-                      partNumber:       '$Items.PartNumber',
-                      partDescription:  '$Items.PartName',
-                      partRev:          '$Items.Revision',
-                      batch:            '$Items.batchNumber',
-                      quantity:         '$Items.Quantity', // batchQty    
-                    }
-                  },
-                  qty:  { $first: { $arrayElemAt: [ '$$rowQty', 0 ] } },
-                  rowId: { $first: { $arrayElemAt: [ '$$rowId', 0 ] } }
-                } },
-                { $addFields: {
-                  _id: '$rowId'
-                } }
-              ],
-              as: 'items'
-            } }
-          ],
-          as: 'manifest'
-        } },
-        { $lookup: {
-          from: 'oldClients-v2',
-          localField: 'customer',
-          foreignField: '_id',
-          as: 'customer'
-        } },
-        { $addFields: {
-          customer: { $arrayElemAt: [ '$customer', 0 ] }
-        } }
-      ]);
-
-      // const allShipments = await Shipment.find()
-      //   .populate("customer")
-      //   .populate({
-      //     path: "manifest",
-      //     populate: "items.item",
-      //   })
-      //   .lean()
-      //   .exec();
+      const [_, { allShipments }] = await getPopulatedShipmentData();
 
       let matchShipments;
       if (!matchOrder && !matchPart) {
@@ -255,14 +196,8 @@ async function getOne(req, res) {
   handler(
     async () => {
       const { sid } = req.params;
-      const shipment = await Shipment.findById(sid)
-        .populate("customer")
-        .populate({
-          path: "manifest",
-          populate: "items.item",
-        })
-        .lean()
-        .exec();
+      const [_, { allShipments }] = await getPopulatedShipmentData(sid);
+      const shipment = allShipments[0];
 
       return [null, { shipment }];
     },
@@ -380,4 +315,77 @@ async function unassignPackingSlipFromShipment(packingSlipId) {
     { _id: packingSlipId },
     { $unset: { shipment: 1 } }
   );
+}
+
+/**
+ * Get shipment documents with manifest.items.item populated
+ * 
+ * @param {(String | mongoose.Schema.Types.ObjectId)?} shipmentId 
+ */
+async function getPopulatedShipmentData(shipmentId=undefined) {
+  try {
+    const pipeline = [
+      { $lookup: {
+        from: 'packingSlips',
+        as: 'manifest',
+        let: { 'manifest': '$manifest' },
+        pipeline: [
+          { $match: {
+            $expr: { $in: [ '$_id', '$$manifest' ] }
+          } },
+          { $lookup: {
+            from: 'workorders',
+            let: { itemId: '$items.item', rowId: '$items._id', rowQty: '$items.qty' },
+            pipeline: [
+              { $unwind: '$Items' },
+              { $match: {
+                $expr: { $in: [ '$Items._id', '$$itemId' ] }
+              } },
+              { $group: {
+                _id: '$Items._id',
+                item: {
+                  $first: {
+                    orderNumber:      '$Items.OrderNumber',
+                    partNumber:       '$Items.PartNumber',
+                    partDescription:  '$Items.PartName',
+                    partRev:          '$Items.Revision',
+                    batch:            '$Items.batchNumber',
+                    quantity:         '$Items.Quantity', // batchQty    
+                  }
+                },
+                qty:  { $first: { $arrayElemAt: [ '$$rowQty', 0 ] } },
+                rowId: { $first: { $arrayElemAt: [ '$$rowId', 0 ] } }
+              } },
+              { $addFields: {
+                _id: '$rowId'
+              } }
+            ],
+            as: 'items'
+          } }
+        ],
+        as: 'manifest'
+      } },
+      { $lookup: {
+        from: 'oldClients-v2',
+        localField: 'customer',
+        foreignField: '_id',
+        as: 'customer'
+      } },
+      { $addFields: {
+        customer: { $arrayElemAt: [ '$customer', 0 ] }
+      } }
+    ];
+
+    if (shipmentId) {
+      pipeline.splice(0, 0, {
+        $match: { _id: shipmentId }
+      });
+    }
+
+    const allShipments = await Shipment.aggregate(pipeline);
+    return [null, { allShipments }];
+  }
+  catch (e) {
+    throw e;
+  }
 }
