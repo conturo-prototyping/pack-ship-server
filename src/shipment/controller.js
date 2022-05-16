@@ -114,6 +114,9 @@ async function getQueue(_req, res) {
   handler(
     async () => {
       const packingSlips = await PackingSlip.aggregate([
+        { $match: {
+          shipment: null
+        } },
         { $unwind: '$items' },
         { $lookup: {
           from: 'workorders',
