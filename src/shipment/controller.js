@@ -4,6 +4,7 @@ const Shipment = require("./model");
 const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
 const handler = require("../handler");
+const { GetPackingSlips } = require("../packingSlip/controller");
 var ObjectId = require("mongodb").ObjectId;
 
 module.exports = router;
@@ -54,14 +55,66 @@ async function searchShipments(req, res) {
       }
       if (isNaN(+pageNumber) || pageNumber < 1) pageNumber = 1;
 
-      const allShipments = await Shipment.find()
-        .populate("customer")
-        .populate({
-          path: "manifest",
-          populate: "items.item",
-        })
-        .lean()
-        .exec();
+      const allShipments = await Shipment.aggregate([
+        { $lookup: {
+          from: 'packingSlips',
+          as: 'manifest',
+          let: { 'manifest': '$manifest' },
+          pipeline: [
+            { $match: {
+              $expr: { $in: [ '$_id', '$$manifest' ] }
+            } },
+            { $lookup: {
+              from: 'workorders',
+              let: { itemId: '$items.item', rowId: '$items._id', rowQty: '$items.qty' },
+              pipeline: [
+                { $unwind: '$Items' },
+                { $match: {
+                  $expr: { $in: [ '$Items._id', '$$itemId' ] }
+                } },
+                { $group: {
+                  _id: '$Items._id',
+                  item: {
+                    $first: {
+                      orderNumber:      '$Items.OrderNumber',
+                      partNumber:       '$Items.PartNumber',
+                      partDescription:  '$Items.PartName',
+                      partRev:          '$Items.Revision',
+                      batch:            '$Items.batchNumber',
+                      quantity:         '$Items.Quantity', // batchQty    
+                    }
+                  },
+                  qty:  { $first: { $arrayElemAt: [ '$$rowQty', 0 ] } },
+                  rowId: { $first: { $arrayElemAt: [ '$$rowId', 0 ] } }
+                } },
+                { $addFields: {
+                  _id: '$rowId'
+                } }
+              ],
+              as: 'items'
+            } }
+          ],
+          as: 'manifest'
+        } },
+        { $lookup: {
+          from: 'oldClients-v2',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer'
+        } },
+        { $addFields: {
+          customer: { $arrayElemAt: [ '$customer', 0 ] }
+        } }
+      ]);
+
+      // const allShipments = await Shipment.find()
+      //   .populate("customer")
+      //   .populate({
+      //     path: "manifest",
+      //     populate: "items.item",
+      //   })
+      //   .lean()
+      //   .exec();
 
       let matchShipments;
       if (!matchOrder && !matchPart) {
@@ -113,61 +166,7 @@ async function searchShipments(req, res) {
 async function getQueue(_req, res) {
   handler(
     async () => {
-      const packingSlips = await PackingSlip.aggregate([
-        { $match: {
-          shipment: null
-        } },
-        { $unwind: '$items' },
-        { $lookup: {
-          from: 'workorders',
-          // localField: 'items.item',
-          // foreignField: 'Items._id',
-          let: { workOrderItemId: '$items.item' },
-          pipeline: [
-            { $unwind: '$Items' },
-            { $match: {
-              $expr: {
-                $eq: [ '$Items._id', '$$workOrderItemId' ]
-              }
-            } },
-            { $group: {
-              _id: '$Items._id',
-              orderNumber:      { $first: '$Items.OrderNumber' },
-              partNumber:       { $first: '$Items.PartNumber' },
-              partDescription:  { $first: '$Items.PartName' },
-              partRev:          { $first: '$Items.Revision' },
-              batch:            { $first: '$Items.batchNumber' },
-              quantity:         { $first: '$Items.Quantity'  }, // batchQty
-            } },
-          ],
-          as: 'workOrderItem',
-        } },
-        { $group: {
-          _id: '$_id',
-          orderNumber: { $first: { $arrayElemAt: ['$workOrderItem.orderNumber', 0 ] } },
-          items: { $push: {
-            item: { $arrayElemAt: ['$workOrderItem', 0 ] },
-            qty:  '$items.qty'
-          } },
-          packingSlipId:  { $first: '$packingSlipId' },
-          customer:       { $first: '$customer' },
-          dateCreated:    { $first: '$dateCreated' },
-          shipment:       { $first: '$shipment' }
-        } },
-        { $lookup: {
-          from: 'oldClients-v2',
-          localField: 'customer',
-          foreignField: '_id',
-          as: 'customer'
-        } },
-      ]);
-
-      // const packingSlips = await PackingSlip.find({ shipment: null })
-      //   .populate("customer items.item")
-      //   .lean()
-      //   .exec();
-
-      return [null, { packingSlips }];
+      return GetPackingSlips(true);
     },
     "fetching shipping queue",
     res
