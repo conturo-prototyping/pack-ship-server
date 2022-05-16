@@ -388,8 +388,6 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
 
     const allShipments = await Shipment.aggregate(pipeline);
 
-    console.log(allShipments[0].manifest[0].items);
-
     return [null, { allShipments }];
   }
   catch (e) {
