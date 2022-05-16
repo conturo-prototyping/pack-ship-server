@@ -113,10 +113,56 @@ async function searchShipments(req, res) {
 async function getQueue(_req, res) {
   handler(
     async () => {
-      const packingSlips = await PackingSlip.find({ shipment: null })
-        .populate("customer items.item")
-        .lean()
-        .exec();
+      const packingSlips = await PackingSlip.aggregate([
+        { $unwind: '$items' },
+        { $lookup: {
+          from: 'workorders',
+          // localField: 'items.item',
+          // foreignField: 'Items._id',
+          let: { workOrderItemId: '$items.item' },
+          pipeline: [
+            { $unwind: '$Items' },
+            { $match: {
+              $expr: {
+                $eq: [ '$Items._id', '$$workOrderItemId' ]
+              }
+            } },
+            { $group: {
+              _id: '$Items._id',
+              orderNumber:      { $first: '$Items.OrderNumber' },
+              partNumber:       { $first: '$Items.PartNumber' },
+              partDescription:  { $first: '$Items.PartName' },
+              partRev:          { $first: '$Items.Revision' },
+              batch:            { $first: '$Items.batchNumber' },
+              quantity:         { $first: '$Items.Quantity'  }, // batchQty
+            } },
+          ],
+          as: 'workOrderItem',
+        } },
+        { $group: {
+          _id: '$_id',
+          orderNumber: { $first: { $arrayElemAt: ['$workOrderItem.orderNumber', 0 ] } },
+          items: { $push: {
+            item: { $arrayElemAt: ['$workOrderItem', 0 ] },
+            qty:  '$items.qty'
+          } },
+          packingSlipId:  { $first: '$packingSlipId' },
+          customer:       { $first: '$customer' },
+          dateCreated:    { $first: '$dateCreated' },
+          shipment:       { $first: '$shipment' }
+        } },
+        { $lookup: {
+          from: 'oldClients-v2',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer'
+        } },
+      ]);
+
+      // const packingSlips = await PackingSlip.find({ shipment: null })
+      //   .populate("customer items.item")
+      //   .lean()
+      //   .exec();
 
       return [null, { packingSlips }];
     },
