@@ -68,7 +68,7 @@ async function getAllWithPackedQties(showFulfilled) {
 
     // sum quantities
     { $group: {
-      _id: '$_id',
+      _id: '$Items._id',
       packedQty:        { $sum: '$packingSlips.items.qty' },
       batchQty:         { $first: '$Items.Quantity' },
 
@@ -100,8 +100,6 @@ async function getAllWithPackedQties(showFulfilled) {
     data.forEach(x => {
       x.customer = customerData.find(y => y.tag === _customerTagFromOrderNumber(x.orderNumber))._id
     });
-
-    console.log(data);
 
     return [null, data];
   }
