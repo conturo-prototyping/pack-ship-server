@@ -328,7 +328,7 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
       { $lookup: {
         from: 'packingSlips',
         as: 'manifest',
-        let: { 'manifest': '$manifest' },
+        let: { manifest: '$manifest' },
         pipeline: [
           { $match: {
             $expr: { $in: [ '$_id', '$$manifest' ] }
@@ -345,6 +345,7 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
                 _id: '$Items._id',
                 item: {
                   $first: {
+                    _id:              '$Items._id',
                     orderNumber:      '$Items.OrderNumber',
                     partNumber:       '$Items.PartNumber',
                     partDescription:  '$Items.PartName',
@@ -361,7 +362,10 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
               } }
             ],
             as: 'items'
-          } }
+          } },
+          // { $addFields: {
+          //   _id: '$manifest._id'
+          // } }
         ],
         as: 'manifest'
       } },
@@ -378,11 +382,14 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
 
     if (shipmentId) {
       pipeline.splice(0, 0, {
-        $match: { _id: shipmentId }
+        $match: { _id: ObjectId(shipmentId) }
       });
     }
 
     const allShipments = await Shipment.aggregate(pipeline);
+
+    console.log(allShipments[0].manifest[0].items);
+
     return [null, { allShipments }];
   }
   catch (e) {
