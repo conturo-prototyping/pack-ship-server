@@ -5,7 +5,10 @@ const handler = require("../handler");
 var ObjectId = require("mongodb").ObjectId;
 const Customer = require('../customer/model');
 
-module.exports = router;
+module.exports = {
+  router,
+  GetPackingSlips
+};
 
 router.get("/", getAllPackingSlips);
 router.put("/", createPackingSlip);
@@ -17,6 +20,77 @@ router.post("/merge", mergePackingSlips);
 router.get("/:pid", getPackingSlip);
 router.patch("/:pid", editPackingSlip);
 router.delete("/:pid", deletePackingSlip);
+
+/**
+ * Get all packing slips with an option to hide shipped.
+ * @param {Boolean} hideShipped Hide packing slips that have already shipped?
+ */
+async function GetPackingSlips(hideShipped=false) {
+  try {
+    const pipeline = [
+      { $unwind: '$items' },
+      { $lookup: {
+        from: 'workorders',
+        let: { workOrderItemId: '$items.item', rowId: '$items._id' },
+        pipeline: [
+          { $unwind: '$Items' },
+          { $match: {
+            $expr: {
+              $eq: [ '$Items._id', '$$workOrderItemId' ]
+            }
+          } },
+          { $group: {
+            _id: '$Items._id',
+            orderNumber:      { $first: '$Items.OrderNumber' },
+            partNumber:       { $first: '$Items.PartNumber' },
+            partDescription:  { $first: '$Items.PartName' },
+            partRev:          { $first: '$Items.Revision' },
+            batch:            { $first: '$Items.batchNumber' },
+            quantity:         { $first: '$Items.Quantity'  }, // batchQty
+            rowId:            { $first: '$$rowId' },
+          } },
+        ],
+        as: 'workOrderItem',
+      } },
+      { $group: {
+        _id: '$_id',
+        orderNumber: { $first: { $arrayElemAt: ['$workOrderItem.orderNumber', 0 ] } },
+        items: { $push: {
+          item: { $arrayElemAt: ['$workOrderItem', 0 ] },
+          _id:  { $arrayElemAt: ['$workOrderItem.rowId', 0] },
+          qty:  '$items.qty',
+        } },
+        packingSlipId:  { $first: '$packingSlipId' },
+        customer:       { $first: '$customer' },
+        dateCreated:    { $first: '$dateCreated' },
+        shipment:       { $first: '$shipment' }
+      } },
+      { $lookup: {
+        from: 'oldClients-v2',
+        localField: 'customer',
+        foreignField: '_id',
+        as: 'customer'
+      } },
+      { $addFields: {
+        customer: { $arrayElemAt: ['$customer', 0] }
+      } }
+    ];
+
+    if (hideShipped) {
+      pipeline.splice(0, 0,
+        { $match: {
+          shipment: null
+        } }
+      );
+    }
+
+    const packingSlips = await PackingSlip.aggregate(pipeline);
+    return [null, { packingSlips }];
+  }
+  catch (e) {
+    throw e;
+  }
+}
 
 /**
  * search packing slips
@@ -49,56 +123,7 @@ async function searchPackingSlips(req, res) {
 async function getAllPackingSlips(_req, res) {
   handler(
     async () => {
-      const packingSlips = await PackingSlip.aggregate([
-        // { $match: {
-        //   shipment: null
-        // } },
-        { $unwind: '$items' },
-        { $lookup: {
-          from: 'workorders',
-          // localField: 'items.item',
-          // foreignField: 'Items._id',
-          let: { workOrderItemId: '$items.item' },
-          pipeline: [
-            { $unwind: '$Items' },
-            { $match: {
-              $expr: {
-                $eq: [ '$Items._id', '$$workOrderItemId' ]
-              }
-            } },
-            { $group: {
-              _id: '$Items._id',
-              orderNumber:      { $first: '$Items.OrderNumber' },
-              partNumber:       { $first: '$Items.PartNumber' },
-              partDescription:  { $first: '$Items.PartName' },
-              partRev:          { $first: '$Items.Revision' },
-              batch:            { $first: '$Items.batchNumber' },
-              quantity:         { $first: '$Items.Quantity'  }, // batchQty
-            } },
-          ],
-          as: 'workOrderItem',
-        } },
-        { $group: {
-          _id: '$_id',
-          orderNumber: { $first: { $arrayElemAt: ['$workOrderItem.orderNumber', 0 ] } },
-          items: { $push: {
-            item: { $arrayElemAt: ['$workOrderItem', 0 ] },
-            qty:  '$items.qty'
-          } },
-          packingSlipId:  { $first: '$packingSlipId' },
-          customer:       { $first: '$customer' },
-          dateCreated:    { $first: '$dateCreated' },
-          shipment:       { $first: '$shipment' }
-        } },
-        { $lookup: {
-          from: 'oldClients-v2',
-          localField: 'customer',
-          foreignField: '_id',
-          as: 'customer'
-        } },
-      ]);
-
-      return [null, { packingSlips }];
+      return GetPackingSlips();
     },
     "fetching packing slips",
     res

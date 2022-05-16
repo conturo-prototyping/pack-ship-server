@@ -33,7 +33,7 @@ app.all("*", function(req, res, next) {
   else res.redirect(req.baseUrl + "/auth/google");
 });
 
-app.use("/packingSlips",  require("./packingSlip/controller") );
+app.use("/packingSlips",  require("./packingSlip/controller").router );
 app.use("/workOrders",    require("./workOrder/controller") );
 app.use("/shipments",     require("./shipment/controller") );
 app.use('/users',         require('./user/controller'));
