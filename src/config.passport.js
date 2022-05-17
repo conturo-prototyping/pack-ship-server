@@ -4,7 +4,7 @@
 
 const UserModel = require('../src/user/model');
 const GoogleStrategy = require('passport-google-oauth2').Strategy;
-const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL } = process.env;
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL, ALLOWED_LOGIN_DOMAIN } = process.env;
 
 module.exports = function(passport) {
   
@@ -39,7 +39,7 @@ module.exports = function(passport) {
     // Google data
     (accessToken, refreshToken, profile, done) => process.nextTick(() => {
       // Reject logins outside our domain
-      if ( profile._json.domain !== 'conturoprototyping.com' ) {
+      if ( profile._json.domain !== ALLOWED_LOGIN_DOMAIN ) {
         done(new Error('You need a Conturo Prototyping login to access this page.'));
       }
       else {

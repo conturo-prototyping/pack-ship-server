@@ -12,6 +12,7 @@ For the time being this is meant to be loaded via an iframe from the ShopQ proje
   - `GOOGLE_CALLBACK_URL` Server endpoint to hit after successful google OAuth
   - `LOGIN_FAILURE_REDIRECT` URL to redirect browser to upon login success
   - `LOGIN_SUCCESS_REDIRECT` URL to redirect brwoser to upon login failure
+  - `ALLOWED_LOGIN_DOMAIN` The web domain that is allowed access
 * CORS Allowed Origin
   - `CORS_CLIENT_URL` Allowed origin domain
 * Session Cookie
