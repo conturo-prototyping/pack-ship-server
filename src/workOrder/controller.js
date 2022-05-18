@@ -23,6 +23,9 @@ async function getAll(_req, res) {
  */
 async function getPackingQueue(_req, res) {
   const [err, data] = await getAllWithPackedQties(false);
+
+  console.debug(data);
+
   if (err) res.status(err.status).send(err.message);
   else res.send(data);
 }
