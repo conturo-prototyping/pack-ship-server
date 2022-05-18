@@ -1,3 +1,5 @@
+const { createTransport } = require("nodemailer");
+
 // Maximum number of times to attempt the MyRetry function before giving up.
 const MAX_ATTEMPTS = 100;
 
@@ -135,6 +137,14 @@ async function sendMailTo(toAddr, subject, text, html) {
 }
 
 async function sendMailP(mailOptions) {
+  const transporter = createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.MAILER_ADDR,
+      pass: process.env.MAILER_PASS
+    }
+  });
+
   return new Promise( (resolve, reject) => {
     transporter.sendMail(mailOptions, function(err, info) {
       if (err) reject(err);

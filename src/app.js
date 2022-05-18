@@ -27,7 +27,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 if( process.env.NODE_ENV === 'DEBUG' ) {
-  app.use('/debugging', require('./router.debug'));
+  app.use('/debug', require('./router.debug'));
 }
 
 // This handles authentication

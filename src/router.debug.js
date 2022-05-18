@@ -34,7 +34,7 @@ async function resetData(_req, res) {
 
   const customers = await Promise.all(
     tags.map(async (tag) => {
-      const newCustomer = new Customer({ tag });
+      const newCustomer = new Customer({ tag, title: tag+' Corp' });
       await newCustomer.save();
       return newCustomer;
     })
@@ -44,31 +44,26 @@ async function resetData(_req, res) {
 
   for (const c of customers) {
     // work order pool
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < randomInt(20); i++) {
+      const Items = [];
+
+      for (let j = 0; j < randomInt(10); j++) {
+        Items.push({
+          OrderNumber:  `${c.tag}${1001 + i}`,
+          PartNumber:   `PN-00${randomInt(1, 9)}`,
+          PartName:     'Dummy part for testing...',
+          Revision:     ['A', 'B', 'C'][randomInt(0,2)],
+          Quantity:     randomInt(1, 50)
+        });
+      }
+
       const newWorkOrder = new WorkOrder({
-        customer: c._id,
-        orderNumber: `${c.tag}${1001 + i}`,
-        batch: randomInt(1, 3),
-        partNumber: `PN-00${randomInt(1, 9)}`,
-        partDescription: "Dummy part for testing",
-        partRev: ["A", "B", "C"][randomInt(0, 2)],
-        quantity: randomInt(1, 50),
+        OrderNumber:  `${c.tag}${1001 + i}`,
+        DateDue:      new Date(),
+        Items
       });
 
-      promises.push(newWorkOrder.save());
-      if (i == 0) {
-        const newWorkOrder = new WorkOrder({
-          customer: c._id,
-          orderNumber: `${c.tag}${1001 + i}`,
-          batch: randomInt(1, 3),
-          partNumber: `PN-00${randomInt(1, 9)}`,
-          partDescription: "Dummy part for testing",
-          partRev: ["A", "B", "C"][randomInt(0, 2)],
-          quantity: randomInt(1, 50),
-        });
-
-        promises.push(newWorkOrder.save());
-      }
+      promises.push( newWorkOrder.save() );
     }
   }
 
