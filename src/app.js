@@ -27,6 +27,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 if( process.env.NODE_ENV === 'DEBUG' ) {
+  console.debug('DEBUGGING ROUTES ARE ON !!!');
+
   app.use('/debug', require('./router.debug'));
 }
 
