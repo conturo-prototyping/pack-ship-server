@@ -3,8 +3,8 @@ const router = Router();
 const Shipment = require("./model");
 const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
-const handler = require("../handler");
 const { GetPackingSlips } = require("../packingSlip/controller");
+const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 
 module.exports = router;
@@ -30,7 +30,7 @@ router.delete("/:sid", deleteOne);
  *    but for testing, we're just pulling all docs and having the server truncate.
  */
 async function searchShipments(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       let {
         sortBy,
@@ -41,10 +41,9 @@ async function searchShipments(req, res) {
         pageNumber,
       } = req.query;
 
-      if (isNaN(+resultsPerPage) || resultsPerPage <= 0)
-        return [
-          { status: 400, data: "resultsPerPage must be a positive integer." },
-        ];
+      if (isNaN(+resultsPerPage) || resultsPerPage <= 0) {
+        return HTTPError('resultsPerPage must be a positive integer.', 400);
+      }
         
       if (sortBy !== "CUSTOMER" && sortBy !== "DATE") sortBy = "DATE";
       if (sortOrder === "-1" || sortOrder === "1") {
@@ -93,10 +92,16 @@ async function searchShipments(req, res) {
 
       const shipments = matchShipments.slice(start, end);
 
-      return [null, { data: { shipments, totalCount: matchShipments.length } }];
+      return {
+        data: {
+          shipments,
+          totalCount: matchShipments.length
+        }
+      };
+
     },
+    res,
     "searching shipments",
-    res
   );
 }
 
@@ -105,12 +110,19 @@ async function searchShipments(req, res) {
  * This essentially means we just want packing slips that have not yet been assigned to a shipment.
  */
 async function getQueue(_req, res) {
-  handler(
+  ExpressHandler(
     async () => {
-      return GetPackingSlips(true);
+      const [e, { packingSlips }] = await GetPackingSlips(true);
+      if (e) return HTTPError('Error fetching shipping queue.');
+
+      return {
+        data: {
+          packingSlips
+        }
+      };
     },
-    "fetching shipping queue",
-    res
+    res,
+    "fetching shipping queue"
   );
 }
 
@@ -118,7 +130,7 @@ async function getQueue(_req, res) {
  * Get a list of all shipments
  */
 async function getAll(_req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const shipments = await Shipment.find()
         .populate("customer")
@@ -127,8 +139,8 @@ async function getAll(_req, res) {
 
       return [null, { shipments }];
     },
-    "fetching shipments",
-    res
+    res,
+    "fetching shipments"
   );
 }
 
@@ -137,7 +149,7 @@ async function getAll(_req, res) {
  * trackingNumber & cost are optional at this stage
  */
 async function createOne(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const {
         manifest,
@@ -182,10 +194,14 @@ async function createOne(req, res) {
 
       await Promise.all(promises);
 
-      return [null, { shipment }];
+      return {
+        data: {
+          shipment
+        }
+      };
     },
+    res,
     "creating shipment",
-    res
   );
 }
 
@@ -193,16 +209,20 @@ async function createOne(req, res) {
  * Get a specified shipment by mongo _id
  */
 async function getOne(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { sid } = req.params;
       const [_, { allShipments }] = await getPopulatedShipmentData(sid);
       const shipment = allShipments[0];
 
-      return [null, { shipment }];
+      return {
+        data: {
+          shipment
+        }
+      };
     },
+    res,
     "fetching shipment",
-    res
   );
 }
 
@@ -210,7 +230,7 @@ async function getOne(req, res) {
  * Edit a specified shipment given its mongo _id & its new array items[]
  */
 async function editOne(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { sid } = req.params;
       let {
@@ -265,11 +285,9 @@ async function editOne(req, res) {
 
       const promises = p_deleted.concat(p_added);
       await Promise.all(promises);
-
-      return [null];
     },
+    res,
     "editing shipment",
-    res
   );
 }
 
@@ -277,7 +295,7 @@ async function editOne(req, res) {
  * Delete a specified shipment given its mongo _id
  */
 async function deleteOne(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { sid } = req.params;
 
@@ -291,10 +309,9 @@ async function deleteOne(req, res) {
       );
 
       await Promise.all([p_delete, p_updatePackingSlips]);
-      return [null];
     },
+    res,
     "deleting shipment",
-    res
   );
 }
 
@@ -391,6 +408,7 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
     return [null, { allShipments }];
   }
   catch (e) {
-    throw e;
+    LogError(e);
+    return [e];
   }
 }

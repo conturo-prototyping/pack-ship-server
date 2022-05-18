@@ -1,9 +1,9 @@
 const { Router } = require("express");
 const router = Router();
 const PackingSlip = require("./model.js");
-const handler = require("../handler");
 var ObjectId = require("mongodb").ObjectId;
 const Customer = require('../customer/model');
+const { LogError, ExpressHandler, HTTPError } = require("../utils");
 
 module.exports = {
   router,
@@ -88,7 +88,8 @@ async function GetPackingSlips(hideShipped=false) {
     return [null, { packingSlips }];
   }
   catch (e) {
-    throw e;
+    LogError(e);
+    return [e];
   }
 }
 
@@ -96,7 +97,7 @@ async function GetPackingSlips(hideShipped=false) {
  * search packing slips
  */
 async function searchPackingSlips(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       let { customer, shipment } = req.query;
 
@@ -112,8 +113,8 @@ async function searchPackingSlips(req, res) {
 
       return [null, { packingSlips }];
     },
+    res,
     "fetching packing slips",
-    res
   );
 }
 
@@ -121,12 +122,19 @@ async function searchPackingSlips(req, res) {
  * Get a list of all packing slips
  */
 async function getAllPackingSlips(_req, res) {
-  handler(
+  ExpressHandler(
     async () => {
-      return GetPackingSlips();
+      const [e, { packingSlips }] = await GetPackingSlips();
+      if (e) return HTTPError('Error fetching packing slip history.');
+
+      return {
+        data: {
+          packingSlips
+        }
+      };
     },
+    res,
     "fetching packing slips",
-    res
   );
 }
 
@@ -134,7 +142,7 @@ async function getAllPackingSlips(_req, res) {
  * Create a new packing slip given an orderNumber &
  */
 async function createPackingSlip(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { items, orderNumber, customer } = req.body;
       
@@ -155,10 +163,14 @@ async function createPackingSlip(req, res) {
       customerDoc.numPackingSlips = numPackingSlips+1;
       await customerDoc.save();
 
-      return [null, { packingSlip }];
+      return {
+        data: {
+          packingSlip
+        }
+      };
     },
+    res,
     "creating packing slip",
-    res
   );
 }
 
@@ -166,16 +178,20 @@ async function createPackingSlip(req, res) {
  * Get a specified packing slip by mongo _id
  */
 async function getPackingSlip(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { pid } = req.params;
 
       const packingSlip = await PackingSlip.findById(pid).lean().exec();
 
-      return [null, { packingSlip }];
+      return {
+        data: {
+          packingSlip
+        }
+      };
     },
+    res,
     "fetching packing slip",
-    res
   );
 }
 
@@ -183,7 +199,7 @@ async function getPackingSlip(req, res) {
  * Edit a specified packing slip given its mongo _id & its new array items[]
  */
 async function editPackingSlip(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { pid } = req.params;
       const { items } = req.body;
@@ -196,11 +212,9 @@ async function editPackingSlip(req, res) {
           },
         }
       );
-
-      return [null];
     },
+    res,
     "editing packing slip",
-    res
   );
 }
 
@@ -208,18 +222,19 @@ async function editPackingSlip(req, res) {
  * Delete a specified packing slip given its mongo _id
  */
 async function deletePackingSlip(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { pid } = req.params;
       const doc = await PackingSlip.findOne({ _id: pid }).lean();
 
-      if (doc.shipment) return [{ status: 405, message: 'That packing slip has already been shipped.' }];
+      if (doc.shipment) {
+        return HTTPError('That packing slip has already been shipped.', 400);
+      }
 
       await PackingSlip.deleteOne({ _id: pid });
-      return [null];
     },
+    res,
     "deleting packing slip",
-    res
   );
 }
 
@@ -227,7 +242,7 @@ async function deletePackingSlip(req, res) {
  * Merge an arbitrary number of packing slips given an array of mongo _ids
  */
 async function mergePackingSlips(req, res) {
-  handler(
+  ExpressHandler(
     async () => {
       const { pids, orderNumber } = req.body;
 
@@ -236,8 +251,9 @@ async function mergePackingSlips(req, res) {
         .lean()
         .exec();
 
-      if (!packingSlips?.length)
-        return [{ status: 400, message: "Packing slips not found." }];
+      if (!packingSlips?.length) {
+        return HTTPError('Packing slips not found.', 400);
+      }
 
       const packingSlipId = `${orderNumber}-PS${
         numPackingSlips - pids.length + 1
@@ -261,9 +277,13 @@ async function mergePackingSlips(req, res) {
       await PackingSlip.deleteMany({ _id: { $in: pids } });
       await packingSlip.save();
 
-      return [null, { packingSlip }];
+      return {
+        data: {
+          packingSlip
+        }
+      };
     },
-    "merging packing slips",
-    res
+    res,
+    "merging packing slips"
   );
 }

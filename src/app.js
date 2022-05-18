@@ -26,8 +26,12 @@ app.use( cookieSession({
 app.use(passport.initialize());
 app.use(passport.session());
 
+if( process.env.NODE_ENV === 'DEBUG' ) {
+  app.use('/debugging', require('./router.debug'));
+}
+
 // This handles authentication
-app.use('/auth', require('./auth.router'));
+app.use('/auth', require('./router.auth'));
 app.all("*", function(req, res, next) {
   if (req.isAuthenticated()) return next();
   else res.redirect(req.baseUrl + "/auth/google");
@@ -37,10 +41,6 @@ app.use("/packingSlips",  require("./packingSlip/controller").router );
 app.use("/workOrders",    require("./workOrder/controller") );
 app.use("/shipments",     require("./shipment/controller") );
 app.use('/users',         require('./user/controller'));
-
-if( process.env.NODE_ENV === 'DEBUG' ) {
-  app.use('/debugging', require('./debugging'));
-}
 
 app.all('*', (_req, res) => res.sendStatus(404));
 
