@@ -23,6 +23,7 @@ router.post('/drop', dropData);
 async function resetData(_req, res) {
   const Customer = require("./customer/model");
   const WorkOrder = require("./workOrder/model");
+  const ShopQueue = require('./workOrder/shopQueue.model');
   const { randomInt } = require("crypto");
 
   console.debug("Resetting collections...");
@@ -41,6 +42,7 @@ async function resetData(_req, res) {
   );
 
   const promises = [];
+  const workOrderIds = [];
 
   for (const c of customers) {
     // work order pool
@@ -62,12 +64,20 @@ async function resetData(_req, res) {
         DateDue:      new Date(),
         Items
       });
+      workOrderIds.push(newWorkOrder._id);
 
       promises.push( newWorkOrder.save() );
     }
   }
 
   await Promise.all(promises);
+
+  console.log(workOrderIds);
+
+  const sq = new ShopQueue({
+    Items: workOrderIds
+  });
+  await sq.save();
 
   console.debug("Collections reset!");
   res.sendStatus(200);
@@ -81,6 +91,7 @@ async function dropAllCollections() {
   const Shipment = require("./shipment/model");
   const PackingSlip = require("./packingSlip/model");
   const Customer = require("./customer/model");
+  const ShopQueue = require('./workOrder/shopQueue.model');
 
   const _dropCollection = async (model) => {
     try {
@@ -102,6 +113,7 @@ async function dropAllCollections() {
     await _dropCollection(PackingSlip),
     await _dropCollection(Shipment),
     await _dropCollection(Customer),
+    await _dropCollection(ShopQueue),
   ];
 
   if (ok.some((x) => !x)) return [new Error("Error dropping collections")];

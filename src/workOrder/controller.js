@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const router = Router();
-const WorkOrder = require('./model');
+// const WorkOrder = require('./model');
+const ShopQueue = require('./shopQueue.model');
 const Customer = require('../customer/model');
 
 router.get('/packingQueue', getPackingQueue);
@@ -24,8 +25,6 @@ async function getAll(_req, res) {
 async function getPackingQueue(_req, res) {
   const [err, data] = await getAllWithPackedQties(false);
 
-  console.debug(data);
-
   if (err) res.status(err.status).send(err.message);
   else res.send(data);
 }
@@ -35,56 +34,70 @@ async function getPackingQueue(_req, res) {
  * @param {Boolean} showFulfilled should query show fulfilled qties? 
  */
 async function getAllWithPackedQties(showFulfilled) {
-  const _customerTagFromOrderNumber = on => {
-    const match = on.match(/([A-Z]+)(?:[0-9]+)/);
+  const _customerTagFromOrderNumber = orderNum => {
+    const match = orderNum.match(/([A-Z]+)(?:[0-9]+)/);
     return match[1];
   };
 
+  // ShopQ aggregate
   const agg = [
-    { $unwind: '$Items' },
-    // Fetch the packing slips each work order has appeared in
     { $lookup: {
-      from: 'packingSlips',
-      localField: 'Items._id',
-      foreignField: 'items.item',
-      as: 'packingSlips'
-    } },
+      from: 'workorders',
+      // localField: 'Items',
+      // foreignField: '_id',
+      as: 'activeWorkOrders',
+      let: { activeWorkOrderIds: '$Items' },
+      pipeline: [
+        { $match: {
+          $expr: {
+            $in: [ '$_id', '$$activeWorkOrderIds' ]
+          }
+        } },
+        { $unwind: '$Items' },
+        { $lookup: {
+          from: 'packingSlips',
+          localField: 'Items._id',
+          foreignField: 'items.item',
+          as: 'packingSlips'
+        } },
 
-    // unwind
-    { $unwind: {
-      path: '$packingSlips',
-      preserveNullAndEmptyArrays: true
-    } },
-    { $unwind: {
-      path: '$packingSlips.items',
-      preserveNullAndEmptyArrays: true
-    } },
+        // unwind
+        { $unwind: {
+          path: '$packingSlips',
+          preserveNullAndEmptyArrays: true
+        } },
+        { $unwind: {
+          path: '$packingSlips.items',
+          preserveNullAndEmptyArrays: true
+        } },
 
-    // get rid of duplicates
-    // AND keep work orders with no packing slips
-    { $match: {
-      $or: [
-        { $expr: { $eq: ['$packingSlips.items.item', '$Items._id'] } },
-        { 'packingSlips': { $exists: false } }
+        // get rid of duplicates
+        // AND keep work orders with no packing slips
+        { $match: {
+          $or: [
+            { $expr: { $eq: ['$packingSlips.items.item', '$Items._id'] } },
+            { 'packingSlips': { $exists: false } }
+          ]
+        } },
+
+        // sum quantities
+        { $group: {
+          _id: '$Items._id',
+          packedQty:        { $sum: '$packingSlips.items.qty' },
+          batchQty:         { $first: '$Items.Quantity' },
+
+          batch:            { $first: '$Items.batchNumber' },
+          partRev:          { $first: '$Items.Revision' },
+          partNumber:       { $first: '$Items.PartNumber' },
+          orderNumber:      { $first: '$Items.OrderNumber' },
+          partDescription:  { $first: '$Items.PartName' },
+        } },
       ]
-    } },
-
-    // sum quantities
-    { $group: {
-      _id: '$Items._id',
-      packedQty:        { $sum: '$packingSlips.items.qty' },
-      batchQty:         { $first: '$Items.Quantity' },
-
-      batch:            { $first: '$Items.batchNumber' },
-      partRev:          { $first: '$Items.Revision' },
-      partNumber:       { $first: '$Items.PartNumber' },
-      orderNumber:      { $first: '$Items.OrderNumber' },
-      partDescription:  { $first: '$Items.PartName' },
     } },
   ];
 
   if (!showFulfilled) {
-    agg.push(
+    (agg[0].pipeline).push(
       { $match: {
         $expr: { $gt: ['$batchQty', '$packedQty'] }
       } }
@@ -92,16 +105,22 @@ async function getAllWithPackedQties(showFulfilled) {
   }
 
   try {
-    const data = await WorkOrder.aggregate(agg);
+    const data = (await ShopQueue.aggregate(agg))[0]?.activeWorkOrders;
 
     const customerTags = new Set();
-    data.forEach(x => customerTags.add( _customerTagFromOrderNumber(x.orderNumber) ));
+    data.forEach(x => {
+      if ( !x?.orderNumber ) {
+        return;
+      }
+      customerTags.add( _customerTagFromOrderNumber(x.orderNumber) );
+    });
     
     const p_customerData = Array.from(customerTags).map(tag => Customer.findOne({ tag }).lean().exec());
-    const customerData = await Promise.all(p_customerData);
+    const customerData = (await Promise.all(p_customerData)).filter(x => !!x);
 
     data.forEach(x => {
-      x.customer = customerData.find(y => y.tag === _customerTagFromOrderNumber(x.orderNumber))._id
+      const tagToMatch = _customerTagFromOrderNumber(x.orderNumber);
+      x.customer = customerData.find(y => y.tag === tagToMatch)?._id;
     });
 
     return [null, data];
