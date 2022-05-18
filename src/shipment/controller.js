@@ -137,7 +137,11 @@ async function getAll(_req, res) {
         .lean()
         .exec();
 
-      return [null, { shipments }];
+      return {
+        data: {
+          shipments
+        }
+      };
     },
     res,
     "fetching shipments"
