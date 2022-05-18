@@ -39,4 +39,7 @@ For the time being this is meant to be loaded via an iframe from the ShopQ proje
   - Authorized redirect URIs 'http://localhost:3000/auth/google/callback'
 * Get the Client ID & Client Secret from this set of credentials and use them to set your env vars.
 * Make sure the project is setup as an Internal app.
+
+## Run
+* `> yarn dev`
 * To create dummy data use `POST /debug/reset`
