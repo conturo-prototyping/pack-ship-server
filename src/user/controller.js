@@ -6,7 +6,7 @@ module.exports = router;
 
 router.get('/me', async (req, res) => {
   try {
-    const user = await User.findOne({ _id: req.user._id }).lean();
+    const user = await User.findOne({ _id: req.user._id, IsActive: true }).lean();
     res.send({ user });
   }
   catch (e) {
