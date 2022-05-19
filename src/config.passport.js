@@ -38,15 +38,18 @@ module.exports = function(passport) {
 
     // Google data
     (accessToken, refreshToken, profile, done) => process.nextTick(() => {
+      
       // Reject logins outside our domain
       if ( profile._json.domain !== ALLOWED_LOGIN_DOMAIN ) {
-        done(new Error('You need a Conturo Prototyping login to access this page.'));
+        done(new Error(`You need a @${ALLOWED_LOGIN_DOMAIN} login to access this page.`));
       }
       else {
-        const update = { $set: { google: { accessToken } } };
+        const update = {
+          $set: { 'google.accessToken': accessToken }
+        };
 
         if (refreshToken) {
-          update.$set.google.refreshToken = refreshToken;
+          update.$set['google.refreshToken'] = refreshToken;
         }
 
         UserModel.findOneAndUpdate(
