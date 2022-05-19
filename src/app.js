@@ -30,6 +30,7 @@ if( process.env.NODE_ENV === 'DEBUG' ) {
   console.debug('DEBUGGING ROUTES ARE ON !!!');
 
   app.use('/debug', require('./router.debug'));
+  app.use('/migrations', require('./migrate.delivery'));
 }
 
 // This handles authentication

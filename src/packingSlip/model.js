@@ -38,6 +38,11 @@ const schema = new Schema({
     default: Date.now,
   },
 
+  createdBy: {
+    type: ObjectId,
+    ref: 'user'
+  },
+
   // ref to the shipment ID that contains this packing slip
   // empty until it is assigned to a shipment
   shipment: ObjectId,

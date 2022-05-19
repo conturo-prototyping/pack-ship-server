@@ -27,6 +27,8 @@ const schema = new Schema({
     },
   ],
 
+  destination: String, // HQ, CUSTOMER, VENDOR
+
   deliveryMethod: String, // PICKUP, DROPOFF, CARRIER
 
   customerHandoffName: String, // For PICKUP or DROPOFF
@@ -42,6 +44,11 @@ const schema = new Schema({
     type: Date,
     default: Date.now,
   },
+
+  createdBy: {
+    type: ObjectId,
+    ref: 'users'
+  }
 });
 
 const Model = model("shipment", schema, "shipments");
