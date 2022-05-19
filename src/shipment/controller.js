@@ -360,8 +360,11 @@ async function getPopulatedShipmentData(shipmentId=undefined) {
           } },
           { $lookup: {
             from: 'workorders',
-            let: { itemId: '$items.item', rowId: '$items._id', rowQty: '$items.qty' },
+            let: { itemId: '$items.item', rowId: '$items._id', rowQty: '$items.qty', orderNumber: '$orderNumber' },
             pipeline: [
+              { $match: {
+                $expr: { $eq: [ '$OrderNumber', '$$orderNumber' ] }
+              } },
               { $unwind: '$Items' },
               { $match: {
                 $expr: { $in: [ '$Items._id', '$$itemId' ] }

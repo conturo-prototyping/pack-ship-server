@@ -28,15 +28,24 @@ router.delete("/:pid", deletePackingSlip);
 async function GetPackingSlips(hideShipped=false) {
   try {
     const pipeline = [
+      // unwind packing slip items[]
       { $unwind: '$items' },
+      
+      // for each one, lookup the work order item
       { $lookup: {
         from: 'workorders',
-        let: { workOrderItemId: '$items.item', rowId: '$items._id' },
+        let: { workOrderItemId: '$items.item', rowId: '$items._id', orderNumber: '$orderNumber' },
         pipeline: [
+          // first narrow down by order number so we don't unwind entire DB
+          { $match: {
+            $expr: {
+              $eq: [ '$OrderNumber', '$$orderNumber' ],
+            }
+          } },
           { $unwind: '$Items' },
           { $match: {
             $expr: {
-              $eq: [ '$Items._id', '$$workOrderItemId' ]
+              $eq: [ '$Items._id', '$$workOrderItemId' ],
             }
           } },
           { $group: {
