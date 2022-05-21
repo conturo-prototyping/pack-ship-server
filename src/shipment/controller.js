@@ -3,7 +3,7 @@ const router = Router();
 const Shipment = require("./model");
 const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
-const { GetPackingSlips } = require("../packingSlip/controller");
+const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 
@@ -114,7 +114,7 @@ async function getQueue(_req, res) {
     async () => {
       console.time();
 
-      const [e, { packingSlips }] = await GetPackingSlips(true);
+      const [e, { packingSlips }] = await GetPopulatedPackingSlips(true);
       if (e) return HTTPError('Error fetching shipping queue.');
 
       console.timeEnd();
