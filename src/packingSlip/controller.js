@@ -213,7 +213,7 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer, destination } = req.body;
+      const { items, orderNumber, customer } = req.body;
       
       const customerDoc = await Customer.findOne({ _id: customer });
       const { numPackingSlips } = customerDoc;
@@ -225,7 +225,6 @@ async function createPackingSlip(req, res) {
         orderNumber,
         packingSlipId,
         items,
-        destination,
         createdBy: req.user._id
       });
 
@@ -273,14 +272,13 @@ async function editPackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
-      const { items, destination } = req.body;
+      const { items } = req.body;
 
       await PackingSlip.updateOne(
         { _id: pid },
         {
           $set: {
             items,
-            destination
           },
         }
       );
@@ -361,11 +359,11 @@ async function mergePackingSlips(req, res) {
 }
 
 function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {
-  const { orderNumber, packingSlipId, items, dateCreated, createdBy, destination } = packingSlipDoc;
+  const { orderNumber, packingSlipId, items, dateCreated, createdBy } = packingSlipDoc;
   const { clientTitle, shippingContact, purchaseOrderNumber } = shopQOrderInfo;
 
   const bannerBlock     = _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber);
-  const shipToBlock     = _pdf_makeShipToBlock(clientTitle, shippingContact, destination);
+  const shipToBlock     = _pdf_makeShipToBlock(clientTitle, shippingContact);
   const manifestBlock   = _pdf_makeManifestBlock(items, 'Items In Package');
   const signaturesBlock = _pdf_makeSignaturesBlock(createdBy);
 
@@ -444,34 +442,29 @@ function _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber) {
  * Make the "SHIP TO:" block
  * @param {string} clientTitle 
  * @param {*} shippingContact 
- * @param {string} destination 
  * @returns 
  */
-function _pdf_makeShipToBlock(clientTitle, shippingContact, destination) {
-  if ( destination === 'CUSTOMER' && !shipTo) {
+function _pdf_makeShipToBlock(clientTitle, shippingContact) {
+  if (!shipTo) {
     return HTTPError('Shipping contact not set! Please contact sales rep.', 400);
   }
 
   const body = [
     [{ text: 'SHIP TO', bold: true }],
   ];
-  if (destination !== 'CUSTOMER') {
-    body.push(['CP - ' + destination]);
-  }
-  else {
-    const { address, name } = shippingContact;
-    const { line1, line2, line3, line4 } = address || {};
+  
+  const { address, name } = shippingContact;
+  const { line1, line2, line3, line4 } = address || {};
 
-    body.push(
-      [clientTitle],
-      [line1]
-    );
+  body.push(
+    [clientTitle],
+    [line1]
+  );
 
-    if (line2) body.push([line2]);
-    if (line3) body.push([line3]);
-    if (line4) body.push([line4]);
-    body.push([ 'ATTN: ' + name ]);
-  }
+  if (line2) body.push([line2]);
+  if (line3) body.push([line3]);
+  if (line4) body.push([line4]);
+  body.push([ 'ATTN: ' + name ]);
 
   const ret = {
     table: { body },

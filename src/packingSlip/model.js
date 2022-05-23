@@ -17,12 +17,6 @@ const schema = new Schema({
     ref: 'oldClient-v2'
   },
 
-  destination: {
-    type: String,
-    required: true,
-    // options are CUSTOMER, or <WORKSITE NAME>
-  },
-
   packingSlipId: {
     type: String,
     required: true,

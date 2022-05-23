@@ -27,8 +27,6 @@ const schema = new Schema({
     },
   ],
 
-  destination: String, // HQ, CUSTOMER, VENDOR
-
   deliveryMethod: String, // PICKUP, DROPOFF, CARRIER
 
   customerHandoffName: String, // For PICKUP or DROPOFF
