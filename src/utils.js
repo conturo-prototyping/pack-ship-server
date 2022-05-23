@@ -153,6 +153,10 @@ async function sendMailP(mailOptions) {
   });
 }
 
+function stackToDivs(stack) {
+  return stack?.split('\n').map(line => `<div>${line}</div>`).join('');
+}
+
 module.exports = {
   ExpressHandler,
   HTTPError,
