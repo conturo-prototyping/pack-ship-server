@@ -188,6 +188,8 @@ async function createOne(req, res) {
         customerAccount,
         trackingNumber,
         cost,
+
+        createdBy: req.user._id,
       });
 
       await shipment.save();
