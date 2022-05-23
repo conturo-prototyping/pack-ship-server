@@ -213,7 +213,7 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer } = req.body;
+      const { items, orderNumber, customer, destination } = req.body;
       
       const customerDoc = await Customer.findOne({ _id: customer });
       const { numPackingSlips } = customerDoc;
@@ -225,6 +225,8 @@ async function createPackingSlip(req, res) {
         orderNumber,
         packingSlipId,
         items,
+        destination,
+        createdBy: req.user._id
       });
 
       await packingSlip.save();
