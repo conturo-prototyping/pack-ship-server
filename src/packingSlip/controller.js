@@ -273,13 +273,14 @@ async function editPackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
-      const { items } = req.body;
+      const { items, destination } = req.body;
 
       await PackingSlip.updateOne(
         { _id: pid },
         {
           $set: {
             items,
+            destination
           },
         }
       );
