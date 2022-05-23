@@ -97,7 +97,7 @@ async function getAllWithPackedQties(showFulfilled) {
   ];
 
   if (!showFulfilled) {
-    (agg[0].pipeline).push(
+    (agg[0].$lookup.pipeline).push(
       { $match: {
         $expr: { $gt: ['$batchQty', '$packedQty'] }
       } }
