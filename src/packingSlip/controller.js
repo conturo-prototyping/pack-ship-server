@@ -30,7 +30,7 @@ router.post('/pdf', getAsPDF);
  * @param {Boolean?} hideShipped Hide packing slips that have already shipped?
  * @param {mongoose.Schema.Types.ObjectId?} matchId If specified, only populate the specified packingSlipId
  */
-async function GetPopulatedPackingSlips(hideShipped=false, matchOrder=undefined) {
+async function GetPopulatedPackingSlips(hideShipped=false, matchOrder=undefined, onlyAfterDate=undefined) {
   try {
     const pipeline = [
       // unwind packing slip items[]
@@ -90,6 +90,14 @@ async function GetPopulatedPackingSlips(hideShipped=false, matchOrder=undefined)
       } }
     ];
 
+    if (onlyAfterDate) {
+      pipeline.splice(0, 0,
+        { $match: {
+          dateCreated: { $lte: new Date(onlyAfterDate) }
+        } }
+      );
+    }
+
     if (hideShipped) {
       pipeline.splice(0, 0,
         { $match: {
@@ -121,33 +129,33 @@ async function GetPopulatedPackingSlips(hideShipped=false, matchOrder=undefined)
 function getAsPDF(req, res) {
   ExpressHandler(
     async () => {
-      const { orderNumber, packingSlipId } = req.body;
+      const { orderNumber, packingSlipId, dateCreated } = req.body;
 
       const [ packingSlipsRes, shopQOrderInfoRes ] = [
-        await GetPopulatedPackingSlips(false, orderNumber),
-        await GetOrderInfo(orderNumber)
+        await GetPopulatedPackingSlips(false, orderNumber, dateCreated),
+        await GetOrderInfo(orderNumber, req.headers.cookie)
       ];
 
       const [packingSlipsErr, { packingSlips }] = packingSlipsRes;
       const [shopQErr, shopQOrderInfo] = shopQOrderInfoRes;
 
       if (packingSlipsErr) return packingSlipsErr;
-      if (shopQErr) return shopQErr;
-
       if (!packingSlips?.length) return HTTPError('Packing slip not found.', 404);
 
-      // console.debug({
-      //   packingSlipsErr, packingSlips,
-      //   shopQErr, shopQOrderInfo
-      // });
+      if (shopQErr) return shopQErr;
 
-      const fulfilledBlock = _pdf_makeFulfilledBlock(packingSlips.map(x => x.items).flat());
+      const fulfilledBlock = _pdf_makeFulfilledBlock(
+        packingSlips.map(x => x.items).flat(),
+        shopQOrderInfo.itemsInOrder
+      );
 
-      return _pdf_MakeDocDef(
-        packingSlips.find(x => x._id === packingSlipId),
+      const data = _pdf_MakeDocDef(
+        packingSlips.find(x => String(x._id) === packingSlipId),
         fulfilledBlock,
         shopQOrderInfo
       );
+
+      return { data };
     },
     res,
     'making packing slip pdf.'
@@ -351,11 +359,11 @@ async function mergePackingSlips(req, res) {
 
 function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {
   const { orderNumber, packingSlipId, items, dateCreated, createdBy, destination } = packingSlipDoc;
-  const { clientTitle, shippingContact, purchaseOrderNumber, itemsInOrder } = shopQOrderInfo;
+  const { clientTitle, shippingContact, purchaseOrderNumber } = shopQOrderInfo;
 
   const bannerBlock     = _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber);
   const shipToBlock     = _pdf_makeShipToBlock(clientTitle, shippingContact, destination);
-  const manifestBlock   = _pdf_makeManifestBlock(items, itemsInOrder);
+  const manifestBlock   = _pdf_makeManifestBlock(items, 'Items In Package');
   const signaturesBlock = _pdf_makeSignaturesBlock(createdBy);
 
   const docDefinition = {
@@ -379,6 +387,8 @@ function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {
       bold: true
     }
   };
+
+  const filename = packingSlipId + '.pdf';
 
   return { docDefinition, filename };
 }
@@ -474,16 +484,22 @@ function _pdf_makeShipToBlock(clientTitle, shippingContact, destination) {
  * This includes only the line items in the 
  * @param {any[]} items Items in the packing slip
  */
-function _pdf_makeManifestBlock(items) {
+function _pdf_makeManifestBlock(items, tableTitle) {
 
-  const body = [[
-    { text: 'LINE' },
-    { text: 'ITEM' },
-    { text: 'ORDER QTY' },
-    { text: 'SHIP QTY' },
-  ]];
+  const body = [
+    [
+      { colSpan: 4, text: tableTitle, fillColor: '#cccccc', bold: true, alignment: 'center' },
+      {}, {}, {}
+    ],
+    [
+      { text: 'LINE' },
+      { text: 'ITEM' },
+      { text: 'ORDER QTY' },
+      { text: 'SHIP QTY' },
+    ],
+];
 
-  body[0].forEach( x => { x.fillColor = '#cccccc'; x.bold = true; x.alignment = 'center'; });
+  body[1].forEach( x => { x.fillColor = '#cccccc'; x.bold = true; x.alignment = 'center'; });
 
   let totalOrdered = 0;
   let totalShipped = 0;
@@ -492,10 +508,12 @@ function _pdf_makeManifestBlock(items) {
     // this is the item in the packing slip & the qty of that item that was packed
     // as specified in the packing slip
     const { item, qty } = items[i];
+    const qtyShipped = qty;
 
     // these are the details/description of the item above
     // here, 'quantity' refers to the quantity ordered in the PO
     const { partNumber, partDescription, partRev, quantity } = item;
+    const qtyOrdered = quantity;
 
     const row = [
       { text: i+1, alignment: 'center' },
@@ -504,8 +522,8 @@ function _pdf_makeManifestBlock(items) {
       // - (line 1: partNumber - rev)
       // - (line 2: partDescription)
       { text: partNumber || partDescription },
-      { text: qty, alignment: 'right' },
-      { text: quantity, alignment: 'right' }
+      { text: qtyOrdered, alignment: 'right' },
+      { text: qtyShipped, alignment: 'right' }
     ];
     
     if (i%2) row.forEach(x => x.fillColor = '#e1e1e1');
@@ -550,14 +568,16 @@ function _pdf_makeSignaturesBlock(packedByUsername) {
       body: [
         [
           { text: 'Packed by: ', bold: true, border: [false, false, false, false] },
-          { text: packedByUsername, border: [false, false, false, false], alignment: 'left' }
+          { text: packedByUsername || '', border: [false, false, false, false], alignment: 'left' }
         ],
         [
           { colSpan:2, text: 'X __________________________', border: [false, false, false, false] },
           {}
         ]
       ]
-    }
+    },
+    pageBreak: 'after',
+    unbreakable: true,
   };
 }
 
@@ -565,9 +585,8 @@ function _pdf_makeSignaturesBlock(packedByUsername) {
  * 
  */
 function _pdf_makeFulfilledBlock( allPackingSlipItems ) {
-  console.debug(allPackingSlipItems);
 
-  const items = allPackingSlipItems.reduce( (prev, curr) => {
+  let items = allPackingSlipItems.reduce( (prev, curr) => {
     const { item, qty } = curr;
     const id = String(item._id);
 
@@ -579,9 +598,7 @@ function _pdf_makeFulfilledBlock( allPackingSlipItems ) {
     return prev;
   }, {});
 
-  console.debug(items);
-
-  return _pdf_makeManifestBlock(items);
+  return _pdf_makeManifestBlock( Object.values(items), 'Items Shipped To Date (Including Above)' );
 }
 
 /**
