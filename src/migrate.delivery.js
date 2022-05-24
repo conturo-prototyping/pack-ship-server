@@ -79,10 +79,10 @@ router.post('/first', async (_req, res) => {
           newShipment.shipmentId = newPackingSlip.packingSlipId.replace('-PS', '-SH');
         }
       }
-
-      newPackingSlip.shipmentId = newShipment._id;
   
       await newShipment.save();
+      newPackingSlip.shipment = newShipment._id;
+      await newPackingSlip.save();
 
       const customerUpdates = Object.entries(customerShipmentCounts).map( ([tag, count]) => {
         return {
