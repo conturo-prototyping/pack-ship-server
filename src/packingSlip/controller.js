@@ -455,8 +455,6 @@ function _pdf_makeShipToBlock(customerTitle, shippingContact) {
   const body = [
     [{ text: 'SHIP TO', bold: true }],
   ];
-  
-  console.debug(customerTitle, shippingContact);
 
   const { address, name } = shippingContact;
   const { line1, line2, line3, line4 } = address || {};
