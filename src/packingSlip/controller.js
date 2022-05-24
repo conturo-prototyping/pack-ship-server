@@ -360,10 +360,11 @@ async function mergePackingSlips(req, res) {
 
 function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {
   const { orderNumber, packingSlipId, items, dateCreated, createdBy } = packingSlipDoc;
-  const { clientTitle, shippingContact, purchaseOrderNumber } = shopQOrderInfo;
+  const { shippingContact, purchaseOrderNumber } = shopQOrderInfo;
+  const customerTitle = packingSlipDoc.customer.title;
 
   const bannerBlock     = _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber);
-  const shipToBlock     = _pdf_makeShipToBlock(clientTitle, shippingContact);
+  const shipToBlock     = _pdf_makeShipToBlock(customerTitle, shippingContact);
   const manifestBlock   = _pdf_makeManifestBlock(items, 'Items In Package');
   const signaturesBlock = _pdf_makeSignaturesBlock(createdBy);
 
@@ -444,8 +445,10 @@ function _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber) {
  * @param {*} shippingContact 
  * @returns 
  */
-function _pdf_makeShipToBlock(clientTitle, shippingContact) {
-  if (!shipTo) {
+function _pdf_makeShipToBlock(customerTitle, shippingContact) {
+  const bypassShipToCheck = !(process.env.SHOPQ_URL) && (process.env.NODE_ENV === 'DEBUG')
+  
+  if (!shippingContact && !bypassShipToCheck) {
     return HTTPError('Shipping contact not set! Please contact sales rep.', 400);
   }
 
@@ -453,11 +456,13 @@ function _pdf_makeShipToBlock(clientTitle, shippingContact) {
     [{ text: 'SHIP TO', bold: true }],
   ];
   
+  console.debug(customerTitle, shippingContact);
+
   const { address, name } = shippingContact;
   const { line1, line2, line3, line4 } = address || {};
 
   body.push(
-    [clientTitle],
+    [customerTitle],
     [line1]
   );
 
