@@ -516,13 +516,19 @@ function _pdf_makeManifestBlock(items, tableTitle) {
     const { partNumber, partDescription, partRev, quantity } = item;
     const qtyOrdered = quantity;
 
+    let lineText = '';
+    if (partNumber && partNumber?.trim() !== '-') lineText = partNumber;
+    if (partDescription && partDescription?.trim() !== '-') lineText += ' ' + partDescription;
+    if (partRev && partRev?.trim() !== '-') lineText += ` Rev ${partRev}`;
+    lineText = lineText.trim();
+
     const row = [
       { text: i+1, alignment: 'center' },
 
       // TODO: display as 2 lines:
       // - (line 1: partNumber - rev)
       // - (line 2: partDescription)
-      { text: partNumber || partDescription },
+      { text: lineText },
       { text: qtyOrdered, alignment: 'right' },
       { text: qtyShipped, alignment: 'right' }
     ];
