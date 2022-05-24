@@ -1,7 +1,7 @@
 const { Router } = require("express");
 const router = Router();
 // const WorkOrder = require('./model');
-const ShopQueue = require('./shopQueue.model');
+const ShopQueue = require('../shopQ/shopQueue.model');
 const Customer = require('../customer/model');
 
 router.get('/packingQueue', getPackingQueue);

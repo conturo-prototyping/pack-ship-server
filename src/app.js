@@ -60,7 +60,7 @@ app.all('*', (_req, res) => res.sendStatus(404));
   try {
     await mongoose.connect(MONGO_DB_URI, {
       useNewUrlParser: true,
-      useUnifiedTopology: true,
+      useUnifiedTopology: true
     });
   } catch (e) {
     console.error(e);

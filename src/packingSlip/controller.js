@@ -5,7 +5,7 @@ var ObjectId = require("mongodb").ObjectId;
 const Customer = require('../customer/model');
 const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const { default: mongoose } = require("mongoose");
-const { GetOrderInfo } = require("../service.shopq.js");
+const { GetOrderFulfillmentInfo } = require("../shopQ/controller.js");
 
 module.exports = {
   router,
@@ -133,7 +133,7 @@ function getAsPDF(req, res) {
 
       const [ packingSlipsRes, shopQOrderInfoRes ] = [
         await GetPopulatedPackingSlips(false, orderNumber, dateCreated),
-        await GetOrderInfo(orderNumber, req.headers.cookie)
+        await GetOrderFulfillmentInfo(orderNumber)
       ];
 
       const [packingSlipsErr, { packingSlips }] = packingSlipsRes;
