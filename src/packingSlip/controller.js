@@ -16,6 +16,7 @@ router.get("/", getAllPackingSlips);
 router.put("/", createPackingSlip);
 
 router.get("/search", searchPackingSlips);
+router.get("/histSearch", searchHistPackingSlips);
 
 router.post("/merge", mergePackingSlips);
 
@@ -33,7 +34,13 @@ router.post("/pdf", getAsPDF);
 async function GetPopulatedPackingSlips(
   hideShipped = false,
   matchOrder = undefined,
-  onlyAfterDate = undefined
+  matchPart = undefined,
+  regexMatch = false,
+  onlyAfterDate = undefined,
+  limit = undefined,
+  offset = 0,
+  sort = undefined,
+  groupByOrderNum = true
 ) {
   try {
     const pipeline = [
@@ -82,39 +89,66 @@ async function GetPopulatedPackingSlips(
           as: "workOrderItem",
         },
       },
-      {
-        $group: {
-          _id: "$_id",
-          orderNumber: {
-            $first: { $arrayElemAt: ["$workOrderItem.orderNumber", 0] },
-          },
-          items: {
-            $push: {
-              item: { $arrayElemAt: ["$workOrderItem", 0] },
-              _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
-              qty: "$items.qty",
-            },
-          },
-          packingSlipId: { $first: "$packingSlipId" },
-          customer: { $first: "$customer" },
-          dateCreated: { $first: "$dateCreated" },
-          shipment: { $first: "$shipment" },
-        },
-      },
-      {
-        $lookup: {
-          from: "oldClients-v2",
-          localField: "customer",
-          foreignField: "_id",
-          as: "customer",
-        },
-      },
-      {
-        $addFields: {
-          customer: { $arrayElemAt: ["$customer", 0] },
-        },
-      },
     ];
+
+    if (groupByOrderNum) {
+      pipeline.concat([
+        {
+          $group: {
+            _id: "$_id",
+            orderNumber: {
+              $first: { $arrayElemAt: ["$workOrderItem.orderNumber", 0] },
+            },
+            items: {
+              $push: {
+                item: { $arrayElemAt: ["$workOrderItem", 0] },
+                _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
+                qty: "$items.qty",
+              },
+            },
+            packingSlipId: { $first: "$packingSlipId" },
+            customer: { $first: "$customer" },
+            dateCreated: { $first: "$dateCreated" },
+            shipment: { $first: "$shipment" },
+          },
+        },
+        {
+          $lookup: {
+            from: "oldClients-v2",
+            localField: "customer",
+            foreignField: "_id",
+            as: "customer",
+          },
+        },
+        {
+          $addFields: {
+            customer: { $arrayElemAt: ["$customer", 0] },
+          },
+        },
+      ]);
+    } else {
+      pipeline.concat([
+        {
+          $lookup: {
+            from: "oldClients-v2",
+            localField: "customer",
+            foreignField: "_id",
+            as: "customer",
+          },
+        },
+        {
+          $addFields: {
+            customer: { $arrayElemAt: ["$customer", 0] },
+          },
+        },
+      ]);
+    }
+
+    if (sort) {
+      pipeline.unshift({
+        $sort: sort,
+      });
+    }
 
     if (onlyAfterDate) {
       pipeline.splice(0, 0, {
@@ -132,11 +166,60 @@ async function GetPopulatedPackingSlips(
       });
     }
 
-    if (matchOrder) {
+    if (matchOrder && matchPart && regexMatch) {
       pipeline.splice(0, 0, {
         $match: {
-          orderNumber: matchOrder,
+          $or: [
+            { orderNumber: { $regex: matchOrder } },
+            {
+              items: { items: { item: { partNumber: { $regex: matchPart } } } },
+            },
+          ],
         },
+      });
+    } else {
+      if (matchOrder && regexMatch) {
+        pipeline.splice(0, 0, {
+          $match: {
+            orderNumber: { $regex: matchOrder },
+          },
+        });
+      }
+
+      if (matchOrder && !regexMatch) {
+        pipeline.splice(0, 0, {
+          $match: {
+            orderNumber: matchOrder,
+          },
+        });
+      }
+
+      if (matchPart && regexMatch) {
+        pipeline.splice(0, 0, {
+          $match: {
+            items: { items: { item: { partNumber: { $regex: matchPart } } } },
+          },
+        });
+      }
+
+      if (matchPart && !regexMatch) {
+        pipeline.splice(0, 0, {
+          $match: {
+            items: { items: { item: { partNumber: matchPart } } },
+          },
+        });
+      }
+    }
+
+    if (limit) {
+      pipeline.splice(0, 0, {
+        $limit: limit,
+      });
+    }
+
+    if (offset) {
+      pipeline.splice(0, 0, {
+        $skip: offset,
       });
     }
 
@@ -157,7 +240,13 @@ function getAsPDF(req, res) {
       const { orderNumber, packingSlipId, dateCreated } = req.body;
 
       const [packingSlipsRes, shopQOrderInfoRes] = [
-        await GetPopulatedPackingSlips(false, orderNumber, dateCreated),
+        await GetPopulatedPackingSlips(
+          false,
+          orderNumber,
+          undefined,
+          false,
+          dateCreated
+        ),
         await GetOrderFulfillmentInfo(orderNumber),
       ];
 
@@ -210,6 +299,71 @@ async function searchPackingSlips(req, res) {
     },
     res,
     "fetching packing slips"
+  );
+}
+
+/**
+ * Compute a search of shipment documents that match either a given order or a given part.
+ * Further, results should be paginated according to the parameters
+ * - resultsPerPage
+ * - pageNumber
+ */
+async function searchHistPackingSlips(req, res) {
+  ExpressHandler(
+    async () => {
+      let {
+        sortBy,
+        sortOrder,
+        matchOrder,
+        matchPart,
+        resultsPerPage,
+        pageNumber,
+      } = req.query;
+
+      const sortTypes = {
+        ORDER: "orderNumber",
+        DATE: "dateCreated",
+        SLIPNUM: "packingSlipId",
+      };
+
+      if (isNaN(+resultsPerPage) || resultsPerPage <= 0) {
+        return HTTPError("resultsPerPage must be a positive integer.", 400);
+      }
+
+      if (sortBy !== "ORDER" && sortBy !== "DATE" && sortBy !== "SLIPNUM")
+        sortBy = "DATE";
+      if (sortOrder === "-1" || sortOrder === "1") {
+        sortOrder = parseInt(sortOrder);
+      } else {
+        sortOrder = 1;
+      }
+      if (isNaN(+pageNumber) || pageNumber < 0) pageNumber = 0;
+
+      const sortDict = {};
+
+      sortDict[sortTypes[sortBy]] = sortOrder;
+
+      const allPackingSlips = await GetPopulatedPackingSlips(
+        false,
+        matchOrder,
+        matchPart,
+        true,
+        undefined,
+        resultsPerPage * 1,
+        pageNumber * resultsPerPage,
+        sortDict,
+        false
+      );
+
+      return {
+        data: {
+          allPackingSlips: allPackingSlips[1],
+          totalCount: allPackingSlips[1].length,
+        },
+      };
+    },
+    res,
+    "searching shipments"
   );
 }
 
