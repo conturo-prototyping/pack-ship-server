@@ -112,12 +112,8 @@ async function searchShipments(req, res) {
 async function getQueue(_req, res) {
   ExpressHandler(
     async () => {
-      console.time();
-
       const [e, { packingSlips }] = await GetPopulatedPackingSlips(true);
       if (e) return HTTPError('Error fetching shipping queue.');
-
-      console.timeEnd();
 
       return {
         data: {
