@@ -30,7 +30,6 @@ const schema = new mongoose.Schema({
     slipId: String,
   },
 
-  destination: String,
   isPartialDelivery: Boolean,
 
   // comments to customer

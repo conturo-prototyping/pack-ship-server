@@ -23,7 +23,7 @@ router.post('/drop', dropData);
 async function resetData(_req, res) {
   const Customer = require("./customer/model");
   const WorkOrder = require("./workOrder/model");
-  const ShopQueue = require('./workOrder/shopQueue.model');
+  const ShopQueue = require('./shopQ/shopQueue.model');
   const { randomInt } = require("crypto");
 
   console.debug("Resetting collections...");
@@ -72,8 +72,6 @@ async function resetData(_req, res) {
 
   await Promise.all(promises);
 
-  console.log(workOrderIds);
-
   const sq = new ShopQueue({
     Items: workOrderIds
   });
@@ -91,7 +89,7 @@ async function dropAllCollections() {
   const Shipment = require("./shipment/model");
   const PackingSlip = require("./packingSlip/model");
   const Customer = require("./customer/model");
-  const ShopQueue = require('./workOrder/shopQueue.model');
+  const ShopQueue = require('./shopQ/shopQueue.model');
 
   const _dropCollection = async (model) => {
     try {

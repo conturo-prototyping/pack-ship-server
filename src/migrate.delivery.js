@@ -21,7 +21,7 @@ router.post('/first', async (_req, res) => {
 
   const _makeNewDocs = async (deliveryDoc) => {
     try {
-      const { orderNumber, packedBy, packDate, delivery, destination, itemsShipped } = deliveryDoc;
+      const { orderNumber, packedBy, packDate, delivery, itemsShipped } = deliveryDoc;
   
       const customer = await _getCustomerFromOrderNumber(orderNumber);
       const { tag } = customer;
@@ -52,8 +52,6 @@ router.post('/first', async (_req, res) => {
         customerAccountUsed:  (delivery.useCustomerAccount ? delivery.customerAccountNumber : customer.defaultCarrierAccount),
         trackingNumber:       delivery.trackingNumber,
         cost:                 delivery.shippingCost,
-        
-        destination,
   
         dateCreated: packDate,
         createdBy: packedBy
@@ -81,10 +79,10 @@ router.post('/first', async (_req, res) => {
           newShipment.shipmentId = newPackingSlip.packingSlipId.replace('-PS', '-SH');
         }
       }
-
-      newPackingSlip.shipmentId = newShipment._id;
   
       await newShipment.save();
+      newPackingSlip.shipment = newShipment._id;
+      await newPackingSlip.save();
 
       const customerUpdates = Object.entries(customerShipmentCounts).map( ([tag, count]) => {
         return {
