@@ -62,7 +62,6 @@ app.all('*', (_req, res) => res.sendStatus(404));
       useNewUrlParser: true,
       useUnifiedTopology: true,
       useCreateIndex: true,
-      useUnifiedTopology: true
     });
   } catch (e) {
     console.error(e);
