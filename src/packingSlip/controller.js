@@ -92,57 +92,41 @@ async function GetPopulatedPackingSlips(
     ];
 
     if (groupByOrderNum) {
-      pipeline.concat([
-        {
-          $group: {
-            _id: "$_id",
-            orderNumber: {
-              $first: { $arrayElemAt: ["$workOrderItem.orderNumber", 0] },
+      pipeline.push({
+        $group: {
+          _id: "$_id",
+          orderNumber: {
+            $first: { $arrayElemAt: ["$workOrderItem.orderNumber", 0] },
+          },
+          items: {
+            $push: {
+              item: { $arrayElemAt: ["$workOrderItem", 0] },
+              _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
+              qty: "$items.qty",
             },
-            items: {
-              $push: {
-                item: { $arrayElemAt: ["$workOrderItem", 0] },
-                _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
-                qty: "$items.qty",
-              },
-            },
-            packingSlipId: { $first: "$packingSlipId" },
-            customer: { $first: "$customer" },
-            dateCreated: { $first: "$dateCreated" },
-            shipment: { $first: "$shipment" },
           },
+          packingSlipId: { $first: "$packingSlipId" },
+          customer: { $first: "$customer" },
+          dateCreated: { $first: "$dateCreated" },
+          shipment: { $first: "$shipment" },
         },
-        {
-          $lookup: {
-            from: "oldClients-v2",
-            localField: "customer",
-            foreignField: "_id",
-            as: "customer",
-          },
-        },
-        {
-          $addFields: {
-            customer: { $arrayElemAt: ["$customer", 0] },
-          },
-        },
-      ]);
-    } else {
-      pipeline.concat([
-        {
-          $lookup: {
-            from: "oldClients-v2",
-            localField: "customer",
-            foreignField: "_id",
-            as: "customer",
-          },
-        },
-        {
-          $addFields: {
-            customer: { $arrayElemAt: ["$customer", 0] },
-          },
-        },
-      ]);
+      });
     }
+    pipeline.push(
+      {
+        $lookup: {
+          from: "oldClients-v2",
+          localField: "customer",
+          foreignField: "_id",
+          as: "customer",
+        },
+      },
+      {
+        $addFields: {
+          customer: { $arrayElemAt: ["$customer", 0] },
+        },
+      },
+    );
 
     if (sort) {
       pipeline.unshift({
