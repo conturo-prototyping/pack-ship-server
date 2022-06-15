@@ -50,13 +50,21 @@ async function resetData(_req, res) {
       const Items = [];
 
       for (let j = 0; j < randomInt(10); j++) {
-        Items.push({
+
+        const newItem = {
           OrderNumber:  `${c.tag}${1001 + i}`,
           PartNumber:   `PN-00${randomInt(1, 9)}`,
           PartName:     'Dummy part for testing...',
           Revision:     ['A', 'B', 'C'][randomInt(0,2)],
-          Quantity:     randomInt(1, 50)
-        });
+          Quantity:     randomInt(1, 50),
+        };
+
+        for (let k = 1; k < randomInt(4); k++) {
+          Items.push({
+            ...newItem,
+            batchNumber: k
+          });
+        }
       }
 
       const newWorkOrder = new WorkOrder({
