@@ -212,7 +212,6 @@ async function GetPopulatedPackingSlips(
     });
 
     const packingSlips = await PackingSlip.aggregate(pipeline);
-    console.debug(packingSlips[0]);
 
     return [
       null,
