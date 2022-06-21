@@ -125,11 +125,11 @@ async function GetPopulatedPackingSlips(
         $addFields: {
           customer: { $arrayElemAt: ["$customer", 0] },
         },
-      },
+      }
     );
 
     if (sort) {
-      pipeline.unshift({
+      pipeline.push({
         $sort: sort,
       });
     }
@@ -151,12 +151,12 @@ async function GetPopulatedPackingSlips(
     }
 
     if (matchOrder && matchPart && regexMatch) {
-      pipeline.splice(0, 0, {
+      pipeline.push({
         $match: {
           $or: [
             { orderNumber: { $regex: matchOrder } },
             {
-              items: { items: { item: { partNumber: { $regex: matchPart } } } },
+              "items.item.partNumber": { $regex: matchPart },
             },
           ],
         },
@@ -179,36 +179,50 @@ async function GetPopulatedPackingSlips(
       }
 
       if (matchPart && regexMatch) {
-        pipeline.splice(0, 0, {
+        pipeline.push({
           $match: {
-            items: { items: { item: { partNumber: { $regex: matchPart } } } },
+            "items.item.partNumber": { $regex: matchPart },
           },
         });
       }
 
       if (matchPart && !regexMatch) {
-        pipeline.splice(0, 0, {
+        pipeline.push({
           $match: {
-            items: { items: { item: { partNumber: matchPart } } },
+            "items.item.partNumber": matchPart,
           },
         });
       }
     }
 
+    let facetResult = [];
+    if (offset) {
+      facetResult.push({ $skip: offset });
+    }
     if (limit) {
-      pipeline.splice(0, 0, {
-        $limit: limit,
-      });
+      facetResult.push({ $limit: limit });
     }
 
-    if (offset) {
-      pipeline.splice(0, 0, {
-        $skip: offset,
-      });
-    }
+    pipeline.push({
+      $facet: {
+        result: facetResult,
+        totalCount: [
+          {
+            $count: "totalCount",
+          },
+        ],
+      },
+    });
 
     const packingSlips = await PackingSlip.aggregate(pipeline);
-    return [null, { packingSlips }];
+
+    return [
+      null,
+      {
+        packingSlips: packingSlips[0]?.result ?? [],
+        totalCount: packingSlips[0]?.totalCount[0]?.totalCount ?? 0,
+      },
+    ];
   } catch (e) {
     LogError(e);
     return [e];
@@ -336,13 +350,13 @@ async function searchHistPackingSlips(req, res) {
         resultsPerPage * 1,
         pageNumber * resultsPerPage,
         sortDict,
-        false
+        true
       );
 
       return {
         data: {
-          allPackingSlips: allPackingSlips[1],
-          totalCount: allPackingSlips[1].length,
+          packingSlips: allPackingSlips[1].packingSlips,
+          totalCount: allPackingSlips[1]?.totalCount ?? 0,
         },
       };
     },
