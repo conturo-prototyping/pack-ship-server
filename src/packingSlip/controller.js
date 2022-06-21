@@ -154,9 +154,9 @@ async function GetPopulatedPackingSlips(
       pipeline.push({
         $match: {
           $or: [
-            { orderNumber: { $regex: matchOrder } },
+            { orderNumber: { $regex: matchOrder, $options: 'i' } },
             {
-              "items.item.partNumber": { $regex: matchPart },
+              "items.item.partNumber": { $regex: matchPart, $options: 'i' },
             },
           ],
         },
@@ -165,7 +165,7 @@ async function GetPopulatedPackingSlips(
       if (matchOrder && regexMatch) {
         pipeline.splice(0, 0, {
           $match: {
-            orderNumber: { $regex: matchOrder },
+            orderNumber: { $regex: matchOrder, $options: 'i' },
           },
         });
       }
@@ -181,7 +181,7 @@ async function GetPopulatedPackingSlips(
       if (matchPart && regexMatch) {
         pipeline.push({
           $match: {
-            "items.item.partNumber": { $regex: matchPart },
+            "items.item.partNumber": { $regex: matchPart, $options: 'i' },
           },
         });
       }
