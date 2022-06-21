@@ -195,10 +195,7 @@ async function GetPopulatedPackingSlips(
       }
     }
 
-    let facetResult = [];
-    if (offset) {
-      facetResult.push({ $skip: offset });
-    }
+    let facetResult = [{ $skip: offset }];
     if (limit) {
       facetResult.push({ $limit: limit });
     }
@@ -215,12 +212,13 @@ async function GetPopulatedPackingSlips(
     });
 
     const packingSlips = await PackingSlip.aggregate(pipeline);
+    console.debug(packingSlips[0]);
 
     return [
       null,
       {
         packingSlips: packingSlips[0]?.result ?? [],
-        totalCount: packingSlips[0]?.totalCount[0]?.totalCount ?? 0,
+        totalCount: packingSlips[0]?.totalCount?.[0]?.totalCount ?? 0,
       },
     ];
   } catch (e) {
