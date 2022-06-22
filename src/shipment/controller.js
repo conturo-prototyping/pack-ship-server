@@ -42,14 +42,13 @@ async function searchShipments(req, res) {
       } = req.query;
 
       if (isNaN(+resultsPerPage) || resultsPerPage <= 0) {
-        return HTTPError('resultsPerPage must be a positive integer.', 400);
+        return HTTPError("resultsPerPage must be a positive integer.", 400);
       }
-        
+
       if (sortBy !== "CUSTOMER" && sortBy !== "DATE") sortBy = "DATE";
       if (sortOrder === "-1" || sortOrder === "1") {
         sortOrder = parseInt(sortOrder);
-      }
-      else {
+      } else {
         sortOrder = 1;
       }
       if (isNaN(+pageNumber) || pageNumber < 1) pageNumber = 1;
@@ -78,9 +77,8 @@ async function searchShipments(req, res) {
         let testVal;
         if (sortBy === "CUSTOMER") {
           testVal = a.customer.tag.localeCompare(b.customer.tag);
-        }
-        else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
-        
+        } else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
+
         if (testVal * sortOrder < 1) return -1;
         else return 1;
       };
@@ -95,13 +93,12 @@ async function searchShipments(req, res) {
       return {
         data: {
           shipments,
-          totalCount: matchShipments.length
-        }
+          totalCount: matchShipments.length,
+        },
       };
-
     },
     res,
-    "searching shipments",
+    "searching shipments"
   );
 }
 
@@ -113,12 +110,12 @@ async function getQueue(_req, res) {
   ExpressHandler(
     async () => {
       const [e, { packingSlips }] = await GetPopulatedPackingSlips(true);
-      if (e) return HTTPError('Error fetching shipping queue.');
+      if (e) return HTTPError("Error fetching shipping queue.");
 
       return {
         data: {
-          packingSlips
-        }
+          packingSlips,
+        },
       };
     },
     res,
@@ -139,8 +136,8 @@ async function getAll(_req, res) {
 
       return {
         data: {
-          shipments
-        }
+          shipments,
+        },
       };
     },
     res,
@@ -202,12 +199,12 @@ async function createOne(req, res) {
 
       return {
         data: {
-          shipment
-        }
+          shipment,
+        },
       };
     },
     res,
-    "creating shipment",
+    "creating shipment"
   );
 }
 
@@ -223,12 +220,12 @@ async function getOne(req, res) {
 
       return {
         data: {
-          shipment
-        }
+          shipment,
+        },
       };
     },
     res,
-    "fetching shipment",
+    "fetching shipment"
   );
 }
 
@@ -258,18 +255,25 @@ async function editOne(req, res) {
       const p_added =
         newPackingSlips?.map((x) => assignPackingSlipToShipment(x, sid)) ?? [];
 
+      await updateShipmentTrackingHistory(sid);
+
+      const updateDict = {};
+
+      if (deliveryMethod) updateDict = { ...updateDict, deliveryMethod };
+      if (cost) updateDict = { ...updateDict, cost };
+      if (carrier) updateDict = { ...updateDict, carrier };
+      if (deliverySpeed) updateDict = { ...updateDict, deliverySpeed };
+      if (customerAccount) updateDict = { ...updateDict, customerAccount };
+      if (trackingNumber) updateDict = { ...updateDict, trackingNumber };
+      if (customerHandoffName)
+        updateDict = { ...updateDict, customerHandoffName };
+
       // Update
       await Shipment.updateOne(
         { _id: sid },
         {
           $set: {
-            deliveryMethod,
-            cost: cost,
-            carrier,
-            deliverySpeed,
-            customerAccount,
-            trackingNumber,
-            customerHandoffName,
+            ...updateDict,
           },
           $pull: {
             manifest: {
@@ -293,7 +297,7 @@ async function editOne(req, res) {
       await Promise.all(promises);
     },
     res,
-    "editing shipment",
+    "editing shipment"
   );
 }
 
@@ -304,6 +308,8 @@ async function deleteOne(req, res) {
   ExpressHandler(
     async () => {
       const { sid } = req.params;
+
+      await updateShipmentTrackingHistory(sid);
 
       // delete shipment
       const p_delete = Shipment.deleteOne({ _id: sid });
@@ -317,8 +323,22 @@ async function deleteOne(req, res) {
       await Promise.all([p_delete, p_updatePackingSlips]);
     },
     res,
-    "deleting shipment",
+    "deleting shipment"
   );
+}
+
+async function updateShipmentTrackingHistory(sid) {
+  let oldShipment = {
+    ...(await Shipment.findById(sid).lean().exec()),
+    isPastVersion: true,
+  };
+
+  delete oldShipment["_id"];
+  const editedShipment = new Shipment({
+    ...oldShipment,
+  });
+
+  await editedShipment.save();
 }
 
 /**
@@ -342,81 +362,114 @@ async function unassignPackingSlipFromShipment(packingSlipId) {
 
 /**
  * Get shipment documents with manifest.items.item populated
- * 
- * @param {(String | mongoose.Schema.Types.ObjectId)?} shipmentId 
+ *
+ * @param {(String | mongoose.Schema.Types.ObjectId)?} shipmentId
  */
-async function getPopulatedShipmentData(shipmentId=undefined) {
+async function getPopulatedShipmentData(shipmentId = undefined) {
   try {
     const pipeline = [
-      { $lookup: {
-        from: 'packingSlips',
-        as: 'manifest',
-        let: { manifest: '$manifest' },
-        pipeline: [
-          { $match: {
-            $expr: { $in: [ '$_id', '$$manifest' ] }
-          } },
-          { $lookup: {
-            from: 'workorders',
-            let: { itemId: '$items.item', rowId: '$items._id', rowQty: '$items.qty', orderNumber: '$orderNumber' },
-            pipeline: [
-              { $match: {
-                $expr: { $eq: [ '$OrderNumber', '$$orderNumber' ] }
-              } },
-              { $unwind: '$Items' },
-              { $match: {
-                $expr: { $in: [ '$Items._id', '$$itemId' ] }
-              } },
-              { $group: {
-                _id: '$Items._id',
-                item: {
-                  $first: {
-                    _id:              '$Items._id',
-                    orderNumber:      '$Items.OrderNumber',
-                    partNumber:       '$Items.PartNumber',
-                    partDescription:  '$Items.PartName',
-                    partRev:          '$Items.Revision',
-                    batch:            '$Items.batchNumber',
-                    quantity:         '$Items.Quantity', // batchQty    
-                  }
+      {
+        $lookup: {
+          from: "packingSlips",
+          as: "manifest",
+          let: { manifest: "$manifest" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $in: ["$_id", "$$manifest"] },
+              },
+            },
+            {
+              $lookup: {
+                from: "workorders",
+                let: {
+                  itemId: "$items.item",
+                  rowId: "$items._id",
+                  rowQty: "$items.qty",
+                  orderNumber: "$orderNumber",
                 },
-                qty:  { $first: { $arrayElemAt: [ '$$rowQty', 0 ] } },
-                rowId: { $first: { $arrayElemAt: [ '$$rowId', 0 ] } }
-              } },
-              { $addFields: {
-                _id: '$rowId'
-              } }
-            ],
-            as: 'items'
-          } },
-          // { $addFields: {
-          //   _id: '$manifest._id'
-          // } }
-        ],
-        as: 'manifest'
-      } },
-      { $lookup: {
-        from: 'oldClients-v2',
-        localField: 'customer',
-        foreignField: '_id',
-        as: 'customer'
-      } },
-      { $addFields: {
-        customer: { $arrayElemAt: [ '$customer', 0 ] }
-      } }
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: { $eq: ["$OrderNumber", "$$orderNumber"] },
+                    },
+                  },
+                  { $unwind: "$Items" },
+                  {
+                    $match: {
+                      $expr: { $in: ["$Items._id", "$$itemId"] },
+                    },
+                  },
+                  {
+                    $group: {
+                      _id: "$Items._id",
+                      item: {
+                        $first: {
+                          _id: "$Items._id",
+                          orderNumber: "$Items.OrderNumber",
+                          partNumber: "$Items.PartNumber",
+                          partDescription: "$Items.PartName",
+                          partRev: "$Items.Revision",
+                          batch: "$Items.batchNumber",
+                          quantity: "$Items.Quantity", // batchQty
+                        },
+                      },
+                      qty: { $first: { $arrayElemAt: ["$$rowQty", 0] } },
+                      rowId: { $first: { $arrayElemAt: ["$$rowId", 0] } },
+                      isPastVersion: {
+                        $first: {
+                          isPastVersion: "$isPastVersion",
+                        },
+                      },
+                    },
+                  },
+                  {
+                    $addFields: {
+                      _id: "$rowId",
+                    },
+                  },
+                ],
+                as: "items",
+              },
+            },
+            // { $addFields: {
+            //   _id: '$manifest._id'
+            // } }
+          ],
+          as: "manifest",
+        },
+      },
+      {
+        $lookup: {
+          from: "oldClients-v2",
+          localField: "customer",
+          foreignField: "_id",
+          as: "customer",
+        },
+      },
+      {
+        $addFields: {
+          customer: { $arrayElemAt: ["$customer", 0] },
+        },
+      },
     ];
 
     if (shipmentId) {
       pipeline.splice(0, 0, {
-        $match: { _id: ObjectId(shipmentId) }
+        $match: { _id: ObjectId(shipmentId) },
       });
     }
+
+    pipeline.push({
+      $match: {
+        isPastVersion: false,
+      },
+    });
 
     const allShipments = await Shipment.aggregate(pipeline);
 
     return [null, { allShipments }];
-  }
-  catch (e) {
+  } catch (e) {
     LogError(e);
     return [e];
   }

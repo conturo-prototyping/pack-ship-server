@@ -109,6 +109,7 @@ async function GetPopulatedPackingSlips(
           customer: { $first: "$customer" },
           dateCreated: { $first: "$dateCreated" },
           shipment: { $first: "$shipment" },
+          isPastVersion: { $first: "$isPastVersion" },
         },
       });
     }
@@ -154,9 +155,9 @@ async function GetPopulatedPackingSlips(
       pipeline.push({
         $match: {
           $or: [
-            { orderNumber: { $regex: matchOrder, $options: 'i' } },
+            { orderNumber: { $regex: matchOrder, $options: "i" } },
             {
-              "items.item.partNumber": { $regex: matchPart, $options: 'i' },
+              "items.item.partNumber": { $regex: matchPart, $options: "i" },
             },
           ],
         },
@@ -165,7 +166,7 @@ async function GetPopulatedPackingSlips(
       if (matchOrder && regexMatch) {
         pipeline.splice(0, 0, {
           $match: {
-            orderNumber: { $regex: matchOrder, $options: 'i' },
+            orderNumber: { $regex: matchOrder, $options: "i" },
           },
         });
       }
@@ -181,7 +182,7 @@ async function GetPopulatedPackingSlips(
       if (matchPart && regexMatch) {
         pipeline.push({
           $match: {
-            "items.item.partNumber": { $regex: matchPart, $options: 'i' },
+            "items.item.partNumber": { $regex: matchPart, $options: "i" },
           },
         });
       }
@@ -194,6 +195,12 @@ async function GetPopulatedPackingSlips(
         });
       }
     }
+
+    pipeline.push({
+      $match: {
+        isPastVersion: false,
+      },
+    });
 
     let facetResult = [{ $skip: offset }];
     if (limit) {
@@ -280,7 +287,7 @@ async function searchPackingSlips(req, res) {
     async () => {
       let { customer, shipment } = req.query;
 
-      let query = {};
+      let query = { isPastVersion: false };
       if ("customer" in req.query) {
         query = { ...query, customer: customer ? ObjectId(customer) : null };
       }
@@ -449,6 +456,8 @@ async function editPackingSlip(req, res) {
       const { pid } = req.params;
       const { items } = req.body;
 
+      await updatePackingSlipTrackingHistory(pid);
+
       await PackingSlip.updateOne(
         { _id: pid },
         {
@@ -470,6 +479,9 @@ async function deletePackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
+
+      await updatePackingSlipTrackingHistory(pid);
+
       const doc = await PackingSlip.findOne({ _id: pid }).lean();
 
       if (doc.shipment) {
@@ -491,7 +503,11 @@ async function mergePackingSlips(req, res) {
     async () => {
       const { pids, orderNumber } = req.body;
 
-      const numPackingSlips = await PackingSlip.countDocuments({ orderNumber });
+      const numPackingSlips = await PackingSlip.countDocuments({
+        orderNumber,
+        isPastVersion: false,
+      });
+
       const packingSlips = await PackingSlip.find({ _id: { $in: pids } })
         .lean()
         .exec();
@@ -531,6 +547,20 @@ async function mergePackingSlips(req, res) {
     res,
     "merging packing slips"
   );
+}
+
+async function updatePackingSlipTrackingHistory(pid) {
+  let oldPackingSlip = {
+    ...(await PackingSlip.findById(pid).lean().exec()),
+    isPastVersion: true,
+  };
+
+  delete oldPackingSlip["_id"];
+  const editedPackingSlip = new PackingSlip({
+    ...oldPackingSlip,
+  });
+
+  await editedPackingSlip.save();
 }
 
 function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {

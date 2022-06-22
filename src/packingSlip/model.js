@@ -14,24 +14,25 @@ const schema = new Schema({
 
   customer: {
     type: ObjectId,
-    ref: 'oldClient-v2'
+    ref: "oldClient-v2",
   },
 
   packingSlipId: {
     type: String,
     required: true,
-    unique: true
   },
 
-  items: [{
-    // ObjectId of the workorder.Items[] item that is packed here
-    // which should give us part details (number, description, batch, qty)
-    // NOTE: (jarrilla) this doesn't use ref b/c currently these objects are nested
-    item: ObjectId,
-    
-    // quantity in the packing slip
-    qty: Number,
-  }],
+  items: [
+    {
+      // ObjectId of the workorder.Items[] item that is packed here
+      // which should give us part details (number, description, batch, qty)
+      // NOTE: (jarrilla) this doesn't use ref b/c currently these objects are nested
+      item: ObjectId,
+
+      // quantity in the packing slip
+      qty: Number,
+    },
+  ],
 
   dateCreated: {
     type: Date,
@@ -40,14 +41,19 @@ const schema = new Schema({
 
   createdBy: {
     type: ObjectId,
-    ref: 'user'
+    ref: "user",
   },
 
   // ref to the shipment ID that contains this packing slip
   // empty until it is assigned to a shipment
   shipment: ObjectId,
+
+  isPastVersion: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const Model = model('packingSlip', schema, 'packingSlips');
+const Model = model("packingSlip", schema, "packingSlips");
 
 module.exports = Model;
