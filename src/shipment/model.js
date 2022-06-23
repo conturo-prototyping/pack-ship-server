@@ -47,6 +47,10 @@ const schema = new Schema({
     ref: "users",
   },
 
+  // This is to track all edits.
+  // Latest version is always set to false,
+  // Whenever an edit is made, a copy of the document should be made (with this set to true)
+  // And the new "copy" (i.e. the edit) will have this set to false
   isPastVersion: {
     type: Boolean,
     default: false,
