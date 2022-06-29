@@ -257,7 +257,7 @@ async function editOne(req, res) {
 
       await updateShipmentTrackingHistory(sid);
 
-      const updateDict = {};
+      let updateDict = {};
 
       if (deliveryMethod) updateDict = { ...updateDict, deliveryMethod };
       if (cost) updateDict = { ...updateDict, cost };
