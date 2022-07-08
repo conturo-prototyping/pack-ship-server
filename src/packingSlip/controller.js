@@ -198,7 +198,7 @@ async function GetPopulatedPackingSlips(
 
     pipeline.push({
       $match: {
-        isPastVersion: false,
+        isPastVersion: { $ne: true }
       },
     });
 

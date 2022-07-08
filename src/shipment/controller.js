@@ -487,7 +487,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
 
     pipeline.push({
       $match: {
-        isPastVersion: false,
+        isPastVersion: { $ne: true },
       },
     });
 
