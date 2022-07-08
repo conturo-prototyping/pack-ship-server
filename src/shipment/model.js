@@ -17,7 +17,6 @@ const schema = new Schema({
   shipmentId: {
     type: String,
     required: true,
-    unique: true,
   },
 
   manifest: [
@@ -45,8 +44,13 @@ const schema = new Schema({
 
   createdBy: {
     type: ObjectId,
-    ref: 'users'
-  }
+    ref: "users",
+  },
+
+  isPastVersion: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const Model = model("shipment", schema, "shipments");
