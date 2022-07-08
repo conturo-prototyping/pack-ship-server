@@ -257,7 +257,7 @@ async function editOne(req, res) {
 
       await updateShipmentTrackingHistory(sid);
 
-      const updateDict = {};
+      let updateDict = {};
 
       if (deliveryMethod) updateDict = { ...updateDict, deliveryMethod };
       if (cost) updateDict = { ...updateDict, cost };
@@ -379,14 +379,23 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                 $expr: { $in: ["$_id", "$$manifest"] },
               },
             },
+            { $unwind: "$items" },
             {
               $lookup: {
                 from: "workorders",
                 let: {
-                  itemId: "$items.item",
-                  rowId: "$items._id",
-                  rowQty: "$items.qty",
+                  // ---- FORMAT OF ITEMS ARRAY
+                  // items: [{
+                  //   _id,   // the front-end uses this to distinguish items (auto-generated)
+                  //   item,  // ID of the item packed
+                  //   qty    // packed qty of item
+                  // }]
+                  // --------------
+                  arrayItemIds: "$items._id",
+                  packedItemIds: "$items.item",
+                  packedItemQtys: "$items.qty",
                   orderNumber: "$orderNumber",
+                  packingSlipOID: "$_id",
                 },
                 pipeline: [
                   {
@@ -397,7 +406,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                   { $unwind: "$Items" },
                   {
                     $match: {
-                      $expr: { $in: ["$Items._id", "$$itemId"] },
+                      $expr: { $eq: ["$Items._id", "$$packedItemIds"] },
                     },
                   },
                   {
@@ -414,8 +423,9 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                           quantity: "$Items.Quantity", // batchQty
                         },
                       },
-                      qty: { $first: { $arrayElemAt: ["$$rowQty", 0] } },
-                      rowId: { $first: { $arrayElemAt: ["$$rowId", 0] } },
+                      packingSlipId: { $first: "$$packingSlipOID" },
+                      packedQty: { $first: "$$packedItemQtys" },
+                      rowId: { $first: "$$arrayItemIds" },
                       isPastVersion: {
                         $first: {
                           isPastVersion: "$isPastVersion",
@@ -432,9 +442,24 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                 as: "items",
               },
             },
-            // { $addFields: {
-            //   _id: '$manifest._id'
-            // } }
+            {
+              $group: {
+                _id: { $arrayElemAt: ["$items.packingSlipId", 0] },
+                items: {
+                  $push: {
+                    _id: { $arrayElemAt: ["$items.rowId", 0] },
+                    item: { $arrayElemAt: ["$items.item", 0] },
+                    qty: { $arrayElemAt: ["$items.packedQty", 0] },
+                  },
+                },
+                customer: { $first: "$customer" },
+                orderNumber: { $first: "$orderNumber" },
+                packingSlipId: { $first: "$packingSlipId" },
+                createdBy: { $first: "$createdBy" },
+                dateCreated: { $first: "$dateCreated" },
+                shipment: { $first: "$shipment" },
+              },
+            },
           ],
           as: "manifest",
         },
