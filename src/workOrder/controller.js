@@ -131,7 +131,6 @@ async function getAllWithPackedQties(showFulfilled) {
 
   try {
     const data = (await ShopQueue.aggregate(agg))[0]?.activeWorkOrders;
-    console.debug(data[0]);
 
     const customerTags = new Set();
     data.forEach((x) => {
