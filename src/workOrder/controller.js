@@ -60,9 +60,20 @@ async function getAllWithPackedQties(showFulfilled) {
           {
             $lookup: {
               from: "packingSlips",
-              localField: "Items._id",
-              foreignField: "items.item",
+              // localField: "Items._id",
+              // foreignField: "items.item",
               as: "packingSlips",
+              let: { workOrderItemId: '$Items._id' },
+              pipeline: [
+                { $match: {
+                  $expr: {
+                    $and: [
+                      { $in: ['$$workOrderItemId', '$items.item'], },
+                      { $ne: ['$isPastVersion', true] }
+                    ]
+                  }
+                } },
+              ]
             },
           },
 
@@ -85,18 +96,7 @@ async function getAllWithPackedQties(showFulfilled) {
           {
             $match: {
               $or: [
-                {
-                  $and: [
-                    {
-                      $expr: {
-                        $eq: ["$packingSlips.items.item", "$Items._id"],
-                      },
-                    },
-                    {
-                      "packingSlips.isPastVersion": { $eq: false },
-                    },
-                  ],
-                },
+                { $expr: { $eq: ["$packingSlips.items.item", "$Items._id"] } },
                 { packingSlips: { $exists: false } },
               ],
             },
@@ -131,6 +131,7 @@ async function getAllWithPackedQties(showFulfilled) {
 
   try {
     const data = (await ShopQueue.aggregate(agg))[0]?.activeWorkOrders;
+    console.debug(data[0]);
 
     const customerTags = new Set();
     data.forEach((x) => {
