@@ -198,7 +198,7 @@ async function GetPopulatedPackingSlips(
 
     pipeline.push({
       $match: {
-        isPastVersion: { $ne: true }
+        isPastVersion: { $ne: true },
       },
     });
 
@@ -395,7 +395,11 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer } = req.body;
+      const { items, orderNumber, customer, destination } = req.body;
+
+      if (destination !== "VENDOR" && destination !== "CUSTOMER") {
+        return HTTPError("Destination must be either vendor or customer.", 400);
+      }
 
       const customerDoc = await Customer.findOne({ _id: customer });
       const { numPackingSlips } = customerDoc;
@@ -408,6 +412,7 @@ async function createPackingSlip(req, res) {
         packingSlipId,
         items,
         createdBy: req.user._id,
+        destination,
       });
 
       await packingSlip.save();
@@ -454,16 +459,31 @@ async function editPackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
-      const { items } = req.body;
+      const { items, destination } = req.body;
 
       await updatePackingSlipTrackingHistory(pid);
+
+      let updateDict = {};
+
+      if (items !== undefined) {
+        updateDict = { ...updateDict, items };
+      }
+
+      if (destination !== undefined) {
+        if (destination !== "VENDOR" && destination !== "CUSTOMER") {
+          return HTTPError(
+            "Destination must be either vendor or customer.",
+            400
+          );
+        }
+
+        updateDict = { ...updateDict, destination };
+      }
 
       await PackingSlip.updateOne(
         { _id: pid },
         {
-          $set: {
-            items,
-          },
+          $set: updateDict,
         }
       );
     },
