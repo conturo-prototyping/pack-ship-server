@@ -459,16 +459,31 @@ async function editPackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
-      const { items } = req.body;
+      const { items, destination } = req.body;
 
       await updatePackingSlipTrackingHistory(pid);
+
+      let updateDict = {};
+
+      if (items !== undefined) {
+        updateDict = { ...updateDict, items };
+      }
+
+      if (destination !== undefined) {
+        if (destination !== "VENDOR" && destination !== "CUSTOMER") {
+          return HTTPError(
+            "Destination must be either vendor or customer.",
+            400
+          );
+        }
+
+        updateDict = { ...updateDict, destination };
+      }
 
       await PackingSlip.updateOne(
         { _id: pid },
         {
-          $set: {
-            items,
-          },
+          $set: updateDict,
         }
       );
     },
