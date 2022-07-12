@@ -463,6 +463,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                 createdBy: { $first: "$createdBy" },
                 dateCreated: { $first: "$dateCreated" },
                 shipment: { $first: "$shipment" },
+                destination: { $first: "$destination" },
               },
             },
           ],
