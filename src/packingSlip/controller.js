@@ -198,7 +198,7 @@ async function GetPopulatedPackingSlips(
 
     pipeline.push({
       $match: {
-        isPastVersion: { $ne: true }
+        isPastVersion: { $ne: true },
       },
     });
 
@@ -395,7 +395,11 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer } = req.body;
+      const { items, orderNumber, customer, destination } = req.body;
+
+      if (destination !== "VENDOR" && destination !== "CUSTOMER") {
+        return HTTPError("Destination must be either vendor or customer.", 400);
+      }
 
       const customerDoc = await Customer.findOne({ _id: customer });
       const { numPackingSlips } = customerDoc;
@@ -408,6 +412,7 @@ async function createPackingSlip(req, res) {
         packingSlipId,
         items,
         createdBy: req.user._id,
+        destination,
       });
 
       await packingSlip.save();
