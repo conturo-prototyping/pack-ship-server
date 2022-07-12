@@ -110,6 +110,7 @@ async function GetPopulatedPackingSlips(
           dateCreated: { $first: "$dateCreated" },
           shipment: { $first: "$shipment" },
           isPastVersion: { $first: "$isPastVersion" },
+          destination: { $first: "$destination" },
         },
       });
     }
