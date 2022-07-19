@@ -62,12 +62,12 @@ async function searchShipments(req, res) {
         matchShipments = allShipments.filter((x) =>
           x.manifest.some(
             (y) =>
-              (matchOrder && new RegExp(matchOrder).test(y.orderNumber)) ||
+              (matchOrder && new RegExp(matchOrder, "i").test(y.orderNumber)) ||
               (matchPart &&
                 y.items.some(
                   (z) =>
-                    new RegExp(matchPart).test(z.item.partNumber) ||
-                    new RegExp(matchPart).test(z.item.partDescription)
+                    new RegExp(matchPart, "i").test(z.item.partNumber) ||
+                    new RegExp(matchPart, "i").test(z.item.partDescription)
                 ))
           )
         );
@@ -162,6 +162,7 @@ async function createOne(req, res) {
         deliverySpeed,
         customerAccount,
         customerHandoffName,
+        shippingAddress,
       } = req.body;
 
       const customerDoc = await Customer.findOne({ _id: customer });
@@ -183,6 +184,7 @@ async function createOne(req, res) {
         cost,
 
         createdBy: req.user._id,
+        specialShippingAddress: shippingAddress,
       });
 
       await shipment.save();
@@ -246,6 +248,7 @@ async function editOne(req, res) {
         customerHandoffName,
         deletedPackingSlips,
         newPackingSlips,
+        shippingAddress,
       } = req.body;
 
       const p_deleted =
@@ -267,6 +270,8 @@ async function editOne(req, res) {
       if (trackingNumber) updateDict = { ...updateDict, trackingNumber };
       if (customerHandoffName)
         updateDict = { ...updateDict, customerHandoffName };
+      if (shippingAddress)
+        updateDict = { ...updateDict, specialShippingAddress: shippingAddress };
 
       // Update
       await Shipment.updateOne(
@@ -458,6 +463,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                 createdBy: { $first: "$createdBy" },
                 dateCreated: { $first: "$dateCreated" },
                 shipment: { $first: "$shipment" },
+                destination: { $first: "$destination" },
               },
             },
           ],
