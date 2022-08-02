@@ -55,6 +55,8 @@ const schema = new Schema({
     type: Boolean,
     default: false,
   },
+
+  specialShippingAddress: String,
 });
 
 const Model = model("shipment", schema, "shipments");

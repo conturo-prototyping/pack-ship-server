@@ -56,6 +56,11 @@ const schema = new Schema({
     type: Boolean,
     default: false,
   },
+
+  destination: {
+    type: String,
+    default: 'CUSTOMER'
+  },
 });
 
 const Model = model("packingSlip", schema, "packingSlips");

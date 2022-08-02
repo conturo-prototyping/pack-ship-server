@@ -47,7 +47,9 @@ async function getAllWithPackedQties(showFulfilled) {
         // localField: 'Items',
         // foreignField: '_id',
         as: "activeWorkOrders",
-        let: { activeWorkOrderIds: "$Items" },
+        let: {
+          activeWorkOrderIds: "$Items"
+        },
         pipeline: [
           {
             $match: {
@@ -106,7 +108,15 @@ async function getAllWithPackedQties(showFulfilled) {
           {
             $group: {
               _id: "$Items._id",
-              packedQty: { $sum: "$packingSlips.items.qty" },
+              packedQty: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$packingSlips.destination', 'CUSTOMER'] },
+                    '$packingSlips.items.qty',
+                    0
+                  ]
+                },
+              },
               batchQty: { $first: "$Items.Quantity" },
 
               batch: { $first: "$Items.batchNumber" },
@@ -126,6 +136,12 @@ async function getAllWithPackedQties(showFulfilled) {
       $match: {
         $expr: { $gt: ["$batchQty", "$packedQty"] },
       },
+    });
+
+    agg.splice(0, 0, {
+      $match: {
+        $expr: { $eq: ['$destination', ''] }
+      }
     });
   }
 
