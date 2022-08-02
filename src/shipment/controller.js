@@ -62,12 +62,12 @@ async function searchShipments(req, res) {
         matchShipments = allShipments.filter((x) =>
           x.manifest.some(
             (y) =>
-              (matchOrder && new RegExp(matchOrder).test(y.orderNumber)) ||
+              (matchOrder && new RegExp(matchOrder, "i").test(y.orderNumber)) ||
               (matchPart &&
                 y.items.some(
                   (z) =>
-                    new RegExp(matchPart).test(z.item.partNumber) ||
-                    new RegExp(matchPart).test(z.item.partDescription)
+                    new RegExp(matchPart, "i").test(z.item.partNumber) ||
+                    new RegExp(matchPart, "i").test(z.item.partDescription)
                 ))
           )
         );

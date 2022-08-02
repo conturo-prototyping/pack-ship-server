@@ -501,14 +501,13 @@ async function deletePackingSlip(req, res) {
     async () => {
       const { pid } = req.params;
 
-      await updatePackingSlipTrackingHistory(pid);
-
       const doc = await PackingSlip.findOne({ _id: pid }).lean();
 
       if (doc.shipment) {
         return HTTPError("That packing slip has already been shipped.", 400);
       }
 
+      await updatePackingSlipTrackingHistory(pid);
       await PackingSlip.deleteOne({ _id: pid });
     },
     res,
