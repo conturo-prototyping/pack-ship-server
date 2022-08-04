@@ -66,8 +66,8 @@ async function searchShipments(req, res) {
               (matchPart &&
                 y.items.some(
                   (z) =>
-                    new RegExp(matchPart, "i").test(z.item.partNumber) ||
-                    new RegExp(matchPart, "i").test(z.item.partDescription)
+                    new RegExp(matchPart, "i").test(z.item?.partNumber) ||
+                    new RegExp(matchPart, "i").test(z.item?.partDescription)
                 ))
           )
         );
