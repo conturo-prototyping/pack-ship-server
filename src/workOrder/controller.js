@@ -137,16 +137,11 @@ async function getAllWithPackedQties(showFulfilled) {
         $expr: { $gt: ["$batchQty", "$packedQty"] },
       },
     });
-
-    agg.splice(0, 0, {
-      $match: {
-        $expr: { $eq: ['$destination', ''] }
-      }
-    });
   }
 
   try {
-    const data = (await ShopQueue.aggregate(agg))[0]?.activeWorkOrders;
+    const d = await ShopQueue.aggregate(agg);
+    const data = d?.[0]?.activeWorkOrders;
 
     const customerTags = new Set();
     data.forEach((x) => {
