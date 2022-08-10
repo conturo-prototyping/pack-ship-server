@@ -1,30 +1,38 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const cookieParser = require('cookie-parser');
-const passport = require('passport');
-const cookieSession = require('cookie-session');
+// const express = require("express");
+// const mongoose = require("mongoose");
+// const cors = require("cors");
+// const cookieParser = require('cookie-parser');
+// const passport = require('passport');
+// const cookieSession = require('cookie-session');
+
+import express from 'express';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import cookieSession from 'cookie-session';
+import passport from 'passport';
+import mongoose from 'mongoose';
 
 require("dotenv").config();
 require('./config.passport')(passport);
 
 const app = express();
 
-app.use(cors({
+app.use( cors({
   origin: [
-    process.env.CORS_CLIENT_URL,
+    process.env.CORS_CLIENT_URL!,
   ],
   credentials: true
-}));
-app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+}) );
+app.use( cookieParser() );
+app.use( express.json() );
+app.use( express.urlencoded({ extended: true }) );
 app.use( cookieSession({
   name: process.env.SESSION_NAME,
-  keys: [ process.env.SESSION_SECRET ]
+  keys: [ process.env.SESSION_SECRET! ]
 }));
-app.use(passport.initialize());
-app.use(passport.session());
+
+app.use( passport.initialize() );
+app.use( passport.session() );
 
 if( process.env.NODE_ENV === 'DEBUG' ) {
   console.debug('DEBUGGING ROUTES ARE ON !!!');
@@ -55,10 +63,10 @@ app.all('*', (_req, res) => res.sendStatus(404));
 
 (async () => {
   let { MONGO_DB_URI, PORT } = process.env;
-  if (!PORT) PORT = 3000;
+  if (!PORT) PORT = '8000';
 
   try {
-    await mongoose.connect(MONGO_DB_URI, {
+    await mongoose.connect(MONGO_DB_URI!, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       useCreateIndex: true,
