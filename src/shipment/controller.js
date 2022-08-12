@@ -3,6 +3,7 @@ const router = Router();
 const Shipment = require("./model");
 const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
+const WorkOrder = require("../workOrder/model");
 const User = require("../user/model");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
@@ -514,12 +515,48 @@ async function getAsPdf(req, res) {
   ExpressHandler(
     async () => {
       const { manifest, customer, dateCreated, createdBy, shipmentId } = req.body;
+      const { orderNumber } = manifest[0];
+      const { title } = customer;
+
+      // const woDoc = await WorkOrder.findOne({ OrderNumber: orderNumber })
+      //   .lean()
+      //   .select('purchaseOrderNumber')
+      //   .exec();
+      // const { purchaseOrderNumber } = woDoc;
+
+      // const shipmentCreatedBy = await User.findOne({ _id: createdBy })
+      //   .lean()
+      //   .select('UserName')
+      //   .exec();
+
+      // const [shippingError, shipmentInfo] = await GetOrderFulfillmentInfo(orderNumber)
+      // if ( shippingError ) {
+      //   HTTPError('getting shipping contact information');
+      // }
+
+      const promises = [];
+
+      //this will be an array of orderNumber 
+      promises.push(WorkOrder.findOne({ OrderNumber: orderNumber })
+        .lean()
+        .select('purchaseOrderNumber')
+        .exec()
+      );
+
+      promises.push(User.findOne({ _id: createdBy })
+        .lean()
+        .select('UserName')
+        .exec()
+      );
+
+      promises.push(GetOrderFulfillmentInfo(orderNumber))
+
+      const [woDoc, shipmentCreatedBy, [shippingError, shipmentInfo] ] = await Promise.all(promises);
+      const { purchaseOrderNumber } = woDoc;
+      if ( shippingError ) HTTPError('getting shipping contact information');
+
+
       const _report = {};
-      // console.log(req.body);
-      // console.log(req.user)
-      // console.log(customer)
-      // console.log(input.body)
-      // console.log(manifest[0].items)
     
       for ( const ps of manifest ) {
         const { items } = ps;
@@ -548,27 +585,22 @@ async function getAsPdf(req, res) {
       const manifestBlock = _pdf_makeManifestBlock(items, 'Items in Shipment');
       // console.log(manifestBlock.table.body)
 
-      const [shippingError, shipmentInfo] = await GetOrderFulfillmentInfo(manifest[0].orderNumber)
-      if ( shippingError ) {
-        HTTPError('getting shipping contact information');
-      }
+      
       // console.log('----------------- shipping contact --------------------------');
       // console.log(shipmentInfo)
       //TODO: where does the customerTitle come from?
-      const shippingBlock = _pdf_makePackingBlock(undefined, shipmentInfo.shippingContact);
+      const shippingBlock = _pdf_makePackingBlock(title, shipmentInfo.shippingContact);
       // console.log(shippingBlock)
     
       //ASSUMPTION: all PS on Shipment are from the same order???
       const bannerBlock = _pdf_makeBannerBlock(
-        manifest[0].orderNumber,
+        orderNumber,
         new Date(dateCreated),
-        //TODO: need to pass PO number from FE???
+        purchaseOrderNumber
+
       )
 
-      const shipmentCreatedBy = await User.findOne({ _id: createdBy })
-        .lean()
-        .select('UserName')
-        .exec();
+      
 
       const signatureBlock = _pdf_makeSignaturesBlock(shipmentCreatedBy.UserName);
       
@@ -653,37 +685,7 @@ function _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber) {
   return ret;
 }
 
-function _pdf_makeShipToBlock(customerTitle, shippingContact) {
-  const bypassShipToCheck =
-    !process.env.SHOPQ_URL && process.env.NODE_ENV === "DEBUG";
 
-  if (!shippingContact && !bypassShipToCheck) {
-    return HTTPError(
-      "Shipping contact not set! Please contact sales rep.",
-      400
-    );
-  }
-
-  const body = [[{ text: "SHIP TO", bold: true }]];
-
-  const { address, name } = shippingContact;
-  const { line1, line2, line3, line4 } = address || {};
-
-  body.push([customerTitle], [line1]);
-
-  if (line2) body.push([line2]);
-  if (line3) body.push([line3]);
-  if (line4) body.push([line4]);
-  body.push(["ATTN: " + name]);
-
-  const ret = {
-    table: { body },
-    layout: "noBorders",
-    margin: [0, 20, 0, 20],
-  };
-
-  return ret;
-}
 
 function _pdf_makePackingBlock(customerTitle, shippingContact) {
   const bypassShipToCheck =
@@ -748,7 +750,6 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
         ],
       ],
     },
-    // pageBreak: "after",
     unbreakable: true,
   };
 }
@@ -802,17 +803,17 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
 
     let lineText = "";
     if (partNumber && partNumber?.trim() !== "-") lineText = partNumber;
-    if (partDescription && partDescription?.trim() !== "-")
-      lineText += " " + partDescription;
     if (partRev && partRev?.trim() !== "-") lineText += ` Rev ${partRev}`;
     lineText = lineText.trim();
+    if (partDescription && partDescription?.trim() !== "-")
+      lineText += "\n " + partDescription;
 
     const row = [
       { text: lineNumber + 1, alignment: "center" },
 
       // TODO: display as 2 lines:
       // - (line 1: partNumber - rev)
-      // - (line 2: partDescription)
+      // - (line 2: partDescription),
       { text: lineText },
       { text: `${qtyOrdered}`, alignment: "right" },
       { text: `${qtyShipped}`, alignment: "right" },
