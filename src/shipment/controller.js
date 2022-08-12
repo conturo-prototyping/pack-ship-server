@@ -3,9 +3,11 @@ const router = Router();
 const Shipment = require("./model");
 const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
+const User = require("../user/model");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
+const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 
 module.exports = router;
 
@@ -508,64 +510,106 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
   }
 }
 
-async function getAsPdf(input) {
-  const { manifest, customer, dateCreated, shipmentId } = input.body;
-  const _report = {};
-  // console.log(customer)
-  // console.log(input.body)
-  // console.log(manifest[0].items)
-
-  for ( const ps of manifest ) {
-    const { items } = ps;
-
-    for (const i of items ) {
-      const { item, qty } = i;
-      const { _id } = item;
+async function getAsPdf(req, res) {
+  ExpressHandler(
+    async () => {
+      const { manifest, customer, dateCreated, createdBy, shipmentId } = req.body;
+      const _report = {};
+      // console.log(req.body);
+      // console.log(req.user)
+      // console.log(customer)
+      // console.log(input.body)
+      // console.log(manifest[0].items)
+    
+      for ( const ps of manifest ) {
+        const { items } = ps;
+    
+        for (const i of items ) {
+          const { item, qty } = i;
+          const { _id } = item;
+          
+          if ( _id in _report === false ) {
+            _report[_id] = item;
+            _report[_id].qtyShipped = qty;
+          }
+          else {
+            _report[_id].qtyShipped += qty;
+          }
+        }
+    
+      }
+      console.log(_report)
+      const items = [];
+      for ( const [ ,item] of Object.entries(_report) ) {
+        items.push(item);
+      }
+      // console.log(items)
       
-      if ( _id in _report === false ) {
-        _report[_id] = item;
-        _report[_id].qtyShipped = qty;
+      const manifestBlock = _pdf_makeManifestBlock(items, 'Items in Shipment');
+      // console.log(manifestBlock.table.body)
+
+      const [shippingError, shipmentInfo] = await GetOrderFulfillmentInfo(manifest[0].orderNumber)
+      if ( shippingError ) {
+        HTTPError('getting shipping contact information');
       }
-      else {
-        _report[_id].qtyShipped += qty;
-      }
-    }
+      // console.log('----------------- shipping contact --------------------------');
+      // console.log(shipmentInfo)
+      //TODO: where does the customerTitle come from?
+      const shippingBlock = _pdf_makePackingBlock(undefined, shipmentInfo.shippingContact);
+      // console.log(shippingBlock)
+    
+      //ASSUMPTION: all PS on Shipment are from the same order???
+      const bannerBlock = _pdf_makeBannerBlock(
+        manifest[0].orderNumber,
+        new Date(dateCreated),
+        //TODO: need to pass PO number from FE???
+      )
 
-  }
-  // console.log(_report)
+      const shipmentCreatedBy = await User.findOne({ _id: createdBy })
+        .lean()
+        .select('UserName')
+        .exec();
 
-  //ASSUMPTION: all PS on Shipment are from the same order???
-  const bannerBlock = _pdf_makeBannerBlock(
-    manifest[0].orderNumber,
-    new Date(dateCreated),
-    //TODO: need to pass PO number from FE???
-  )
-  
-  const docDefinition = {
-    content: [
-      bannerBlock,
-      // shipToBlock,
-      // manifestBlock,
-      // signaturesBlock,
-      // fulfilledBlock,
-    ],
-    header: {
-      text: shipmentId,
-      alignment: "left",
-      margin: [10, 20, 0, 0],
-      fontSize: 10,
+      const signatureBlock = _pdf_makeSignaturesBlock(shipmentCreatedBy.UserName);
+      
+      const docDefinition = {
+        content: [
+          bannerBlock,
+          shippingBlock,
+          manifestBlock,
+          signatureBlock,
+          // shipToBlock,
+          // manifestBlock,
+          // signaturesBlock,
+          // fulfilledBlock,
+        ],
+        header: {
+          text: shipmentId,
+          alignment: "left",
+          margin: [10, 20, 0, 0],
+          fontSize: 10,
+        },
+        footer: {
+          text: "THANK YOU FOR YOUR BUSINESS",
+          alignment: "center",
+          bold: true,
+        },
+        // shippingBlock,
+      };
+    
+      const filename = shipmentId + ".pdf";
+      console.log('-----------------  --------------------------');
+      console.log(new Date() )
+      console.log(filename)
+      // console.log(docDefinition)
+      // return 'this returned something'
+      const data = { docDefinition, filename };
+      return { data };
+      //need to use the express handler
     },
-    footer: {
-      text: "THANK YOU FOR YOUR BUSINESS",
-      alignment: "center",
-      bold: true,
-    },
-  };
-
-  const filename = shipmentId + ".pdf";
-  console.log(filename)
-  console.log(docDefinition)
-  return { docDefinition, filename };
+    res,
+    'creating shipment pdf layout'
+  );
 }
 
 function _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber) {
@@ -635,6 +679,175 @@ function _pdf_makeShipToBlock(customerTitle, shippingContact) {
   const ret = {
     table: { body },
     layout: "noBorders",
+    margin: [0, 20, 0, 20],
+  };
+
+  return ret;
+}
+
+function _pdf_makePackingBlock(customerTitle, shippingContact) {
+  const bypassShipToCheck =
+    !process.env.SHOPQ_URL && process.env.NODE_ENV === "DEBUG";
+
+  if (!shippingContact && !bypassShipToCheck) {
+    return HTTPError(
+      "Shipping contact not set! Please contact sales rep.",
+      400
+    );
+  }
+
+  const body = [[{ text: "SHIP TO", bold: true }]];
+
+  const { address, name } = shippingContact;
+  const { line1, line2, line3, line4 } = address || {};
+
+  body.push([customerTitle], [line1]);
+
+  if (line2) body.push([line2]);
+  if (line3) body.push([line3]);
+  if (line4) body.push([line4]);
+  body.push(["ATTN: " + name]);
+
+  const ret = {
+    table: { body },
+    layout: "noBorders",
+    margin: [0, 20, 0, 20],
+  };
+
+  return ret;
+}
+
+/**
+ * Make signature block
+ * @param {String} packedByuUsernam
+ */
+ function _pdf_makeSignaturesBlock(packedByUsername) {
+  return {
+    table: {
+      widths: ["auto", "*"],
+      body: [
+        [
+          {
+            text: "Packed by: ",
+            bold: true,
+            border: [false, false, false, false],
+          },
+          {
+            text: packedByUsername || "",
+            border: [false, false, false, false],
+            alignment: "left",
+          },
+        ],
+        [
+          {
+            colSpan: 2,
+            text: "X __________________________",
+            border: [false, false, false, false],
+          },
+          {},
+        ],
+      ],
+    },
+    // pageBreak: "after",
+    unbreakable: true,
+  };
+}
+
+/**
+ * Make the manifest block.
+ * This includes only the line items in the
+ * @param {any[]} items Items in the packing slip
+ */
+ function _pdf_makeManifestBlock(items, tableTitle) {
+  const body = [
+    [
+      {
+        colSpan: 4,
+        text: tableTitle,
+        fillColor: "#cccccc",
+        bold: true,
+        alignment: "center",
+      },
+      {},
+      {},
+      {},
+    ],
+    [
+      { text: "LINE" },
+      { text: "ITEM" },
+      { text: "ORDER QTY" },
+      { text: "SHIP QTY" },
+    ],
+  ];
+
+  body[1].forEach((x) => {
+    x.fillColor = "#cccccc";
+    x.bold = true;
+    x.alignment = "center";
+  });
+
+  let totalOrdered = 0;
+  let totalShipped = 0;
+  let lineNumber = 0;
+  for (let i of items) {
+    // this is the item in the packing slip & the qty of that item that was packed
+    // as specified in the packing slip
+    // const { item, qty } = items[i];
+    // const qtyShipped = qty;
+
+    // these are the details/description of the item above
+    // here, 'quantity' refers to the quantity ordered in the PO
+    const { partNumber, partDescription, partRev, quantity, qtyShipped } = i;
+    const qtyOrdered = quantity;
+
+    let lineText = "";
+    if (partNumber && partNumber?.trim() !== "-") lineText = partNumber;
+    if (partDescription && partDescription?.trim() !== "-")
+      lineText += " " + partDescription;
+    if (partRev && partRev?.trim() !== "-") lineText += ` Rev ${partRev}`;
+    lineText = lineText.trim();
+
+    const row = [
+      { text: lineNumber + 1, alignment: "center" },
+
+      // TODO: display as 2 lines:
+      // - (line 1: partNumber - rev)
+      // - (line 2: partDescription)
+      { text: lineText },
+      { text: `${qtyOrdered}`, alignment: "right" },
+      { text: `${qtyShipped}`, alignment: "right" },
+    ];
+
+    if (i % 2) row.forEach((x) => (x.fillColor = "#e1e1e1"));
+
+    body.push(row);
+
+    // totalOrdered += +qtyOrdered;
+    // totalShipped += +qtyShipped;
+  }
+
+  // const totalsRow = [
+  //   {
+  //     text: "TOTAL",
+  //     colSpan: 2,
+  //     alignment: "right",
+  //     border: [false, true, true, false],
+  //   },
+  //   {},
+  //   { text: totalOrdered, alignment: "right" },
+  //   { text: totalShipped, alignment: "right" },
+  // ];
+
+  // body.push(totalsRow);
+
+  const widths = ["auto", "*", "auto", "auto"];
+  const table = {
+    widths,
+    body,
+    headerRows: 1,
+  };
+  const ret = {
+    table,
     margin: [0, 20, 0, 20],
   };
 
