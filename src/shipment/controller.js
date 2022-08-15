@@ -515,8 +515,19 @@ async function getAsPdf(req, res) {
   ExpressHandler(
     async () => {
       const { manifest, customer, dateCreated, createdBy, shipmentId } = req.body;
-      const { orderNumber } = manifest[0];
       const { title } = customer;
+      // const { orderNumber } = manifest[0];
+
+      const orderNumbers = [];
+      for ( m of manifest ) {
+        if ( !orderNumbers.includes(m.orderNumber) ) orderNumbers.push(m.orderNumber);
+      }
+
+      
+
+      console.log(req.body.manifest)
+
+
 
       // const woDoc = await WorkOrder.findOne({ OrderNumber: orderNumber })
       //   .lean()
@@ -524,80 +535,110 @@ async function getAsPdf(req, res) {
       //   .exec();
       // const { purchaseOrderNumber } = woDoc;
 
-      // const shipmentCreatedBy = await User.findOne({ _id: createdBy })
-      //   .lean()
-      //   .select('UserName')
-      //   .exec();
+      const shipmentCreatedBy = await User.findOne({ _id: createdBy })
+        .lean()
+        .select('UserName')
+        .exec();
 
       // const [shippingError, shipmentInfo] = await GetOrderFulfillmentInfo(orderNumber)
       // if ( shippingError ) {
       //   HTTPError('getting shipping contact information');
       // }
 
-      const promises = [];
+      const manifestBlocks = [];
+      const purchaseOrderNumbers = [];
+      const allShipmentsInfo = [];
 
-      //this will be an array of orderNumber 
-      promises.push(WorkOrder.findOne({ OrderNumber: orderNumber })
-        .lean()
-        .select('purchaseOrderNumber')
-        .exec()
-      );
+      // for ( const idx in orderNumbers ) {
+      for ( let idx = 0; idx < orderNumbers.length; idx ++) {
+        console.log(typeof idx)
+        const orderNumber = orderNumbers[idx]
+        const promises = [];
 
-      promises.push(User.findOne({ _id: createdBy })
-        .lean()
-        .select('UserName')
-        .exec()
-      );
+        //this will be an array of orderNumber - there will be multiples of these
+        // promises.push(WorkOrder.findOne({ OrderNumber: orderNumber })
+        promises.push( WorkOrder.findOne({ OrderNumber: orderNumber })
+          .lean()
+          .select('purchaseOrderNumber')
+          .exec()
+        );
 
-      promises.push(GetOrderFulfillmentInfo(orderNumber))
+        // //TODO: PROBABLY CAN TAKE THIS OUT OF THE LOOP
+        // promises.push(User.findOne({ _id: createdBy })
+        //   .lean()
+        //   .select('UserName')
+        //   .exec()
+        // );
 
-      const [woDoc, shipmentCreatedBy, [shippingError, shipmentInfo] ] = await Promise.all(promises);
-      const { purchaseOrderNumber } = woDoc;
-      if ( shippingError ) HTTPError('getting shipping contact information');
+        promises.push(GetOrderFulfillmentInfo(orderNumber))
 
+        // const [woDoc, shipmentCreatedBy, [shippingError, shipmentInfo] ] = await Promise.all(promises);
+        const [woDoc, [shippingError, shipmentInfo] ] = await Promise.all(promises);
+        const { purchaseOrderNumber } = woDoc;
+        purchaseOrderNumbers.push(purchaseOrderNumber);
+        if ( shippingError ) HTTPError('getting shipping contact information');
+        
+        allShipmentsInfo.push(shipmentInfo);
 
-      const _report = {};
-    
-      for ( const ps of manifest ) {
-        const { items } = ps;
-    
-        for (const i of items ) {
-          const { item, qty } = i;
-          const { _id } = item;
-          
-          if ( _id in _report === false ) {
-            _report[_id] = item;
-            _report[_id].qtyShipped = qty;
-          }
-          else {
-            _report[_id].qtyShipped += qty;
+        const _report = {};
+        const packingSlips = manifest.filter( x => x.orderNumber === orderNumber );
+        for ( const ps of packingSlips ) {
+          const { items } = ps;
+      
+          for (const i of items ) {
+            const { item, qty } = i;
+            const { _id } = item;
+            
+            if ( _id in _report === false ) {
+              _report[_id] = item;
+              _report[_id].qtyShipped = qty;
+            }
+            else {
+              _report[_id].qtyShipped += qty;
+            }
           }
         }
-    
+        // console.log(_report)
+        const items = [];
+        for ( const [ ,item] of Object.entries(_report) ) {
+          items.push(item);
+        }
+
+        const pageBreakAfter =  ( orderNumbers.length === 1 || idx === (orderNumbers.length - 1) ) ?
+          false :
+          true;
+        manifestBlocks.push(_pdf_makeManifestBlock(items, `ORDER: ${orderNumber} - PO: ${purchaseOrderNumber}`, pageBreakAfter));
+
+
+
+
+
       }
-      console.log(_report)
-      const items = [];
-      for ( const [ ,item] of Object.entries(_report) ) {
-        items.push(item);
-      }
+      
+      
+
+
+      
+      
       // console.log(items)
       
-      const manifestBlock = _pdf_makeManifestBlock(items, 'Items in Shipment');
-      // console.log(manifestBlock.table.body)
+      
 
       
       // console.log('----------------- shipping contact --------------------------');
       // console.log(shipmentInfo)
-      //TODO: where does the customerTitle come from?
-      const shippingBlock = _pdf_makePackingBlock(title, shipmentInfo.shippingContact);
+      // if ( !shippingInfo.shippingContact ) return HTTPError('No shipping contact info ')
+      if ( !allShipmentsInfo[0]?.shippingContact || allShipmentsInfo.length === 0 ) return HTTPError('No shipping contact info ')
+      // const shippingBlock = _pdf_makePackingBlock(title, shipmentInfo.shippingContact);
+      const shippingBlock = _pdf_makePackingBlock(title, allShipmentsInfo[0].shippingContact);
       // console.log(shippingBlock)
     
-      //ASSUMPTION: all PS on Shipment are from the same order???
+      //ASSUMPTION: all PS on Shipment are from the same order??? - NO they do not have to be
+      //TODO: create this so it is an array o forder numbers and purchase orderNumbers
       const bannerBlock = _pdf_makeBannerBlock(
-        orderNumber,
+        (orderNumbers.length === 1) ? orderNumbers[0] : 'MANY',
         new Date(dateCreated),
-        purchaseOrderNumber
-
+        (purchaseOrderNumbers.length === 1) ? purchaseOrderNumbers[0] : 'MANY'
       )
 
       
@@ -608,7 +649,8 @@ async function getAsPdf(req, res) {
         content: [
           bannerBlock,
           shippingBlock,
-          manifestBlock,
+          // manifestBlock,
+          ...manifestBlocks,
           signatureBlock,
           // shipToBlock,
           // manifestBlock,
@@ -649,7 +691,7 @@ function _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber) {
     widths: ["auto", "*", "auto"],
     body: [
       [
-        { rowSpan: 4, image: _pdf_GetLogoURI(), width: 200 },
+        { rowSpan: 2, image: _pdf_GetLogoURI(), width: 200 },
         {
           colSpan: 2,
           text: "SHIPMENT",
@@ -666,12 +708,12 @@ function _pdf_makeBannerBlock(orderNumber, dateCreated, purchaseOrderNumber) {
         { text: "DATE: ", alignment: "right", bold: true },
         dateCreated.toLocaleDateString(),
       ],
-      [{}, { text: "ORDER #: ", alignment: "right", bold: true }, orderNumber],
-      [
-        {},
-        { text: "PO #: ", alignment: "right", bold: true },
-        purchaseOrderNumber,
-      ],
+      // [{}, { text: "ORDER #: ", alignment: "right", bold: true }, orderNumber],
+      // [
+      //   {},
+      //   { text: "PO #: ", alignment: "right", bold: true },
+      //   purchaseOrderNumber,
+      // ],
     ],
   };
 
@@ -759,7 +801,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
  * This includes only the line items in the
  * @param {any[]} items Items in the packing slip
  */
- function _pdf_makeManifestBlock(items, tableTitle) {
+ function _pdf_makeManifestBlock(items, tableTitle, pageBreak) {
   const body = [
     [
       {
@@ -851,6 +893,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
     table,
     margin: [0, 20, 0, 20],
   };
+  if ( pageBreak ) ret.pageBreak = 'after';
 
   return ret;
 }
