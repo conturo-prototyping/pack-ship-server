@@ -578,7 +578,10 @@ async function getAsPdf(req, res) {
         const pageBreakAfter =  ( orderNumbers.length === 1 || idx === (orderNumbers.length - 1) ) ?
           false :
           true;
-        manifestBlocks.push(_pdf_makeManifestBlock(items, `ORDER: ${orderNumber} - PO: ${purchaseOrderNumber}`, pageBreakAfter));
+        let tableTitle = `ORDER: ${orderNumber}`;
+        if ( purchaseOrderNumber ) tableTitle += ` - PO: ${purchaseOrderNumber}`;
+          
+        manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitle, pageBreakAfter));
       }
       
 
