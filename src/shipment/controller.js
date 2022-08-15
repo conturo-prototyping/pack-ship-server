@@ -573,10 +573,14 @@ async function getAsPdf(req, res) {
         const pageBreakAfter =  ( orderNumbers.length === 1 || idx === (orderNumbers.length - 1) ) ?
           false :
           true;
-        let tableTitle = `ORDER: ${orderNumber}`;
-        if ( purchaseOrderNumber ) tableTitle += ` - PO: ${purchaseOrderNumber}`;
-          
-        manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitle, pageBreakAfter));
+        // let tableTitle = `ORDER: ${orderNumber}`;
+        // if ( purchaseOrderNumber ) tableTitle += ` - PO: ${purchaseOrderNumber}`;
+        const tableTitleArr = [ `ORDER: ${orderNumber}` ];
+        ( purchaseOrderNumber )  ?
+          tableTitleArr.push(`PO: ${purchaseOrderNumber}`) :
+          tableTitleArr.push('');
+
+        manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitleArr, pageBreakAfter));
       }
       
 
@@ -746,18 +750,25 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
  * This includes only the line items in the
  * @param {any[]} items Items in the packing slip
  */
- function _pdf_makeManifestBlock(items, tableTitle, pageBreak) {
+ function _pdf_makeManifestBlock(items, tableTitleArr, pageBreak) {
   const body = [
     [
       {
-        colSpan: 4,
-        text: tableTitle,
+        colSpan: 2,
+        text: tableTitleArr[0],
         fillColor: "#cccccc",
         bold: true,
-        alignment: "center",
+        border: [true, true, false, true],
       },
       {},
-      {},
+      {
+        colSpan: 2,
+        text: tableTitleArr[1],
+        fillColor: "#cccccc",
+        bold: true,
+        border: [false, true, true, true],
+        alignment: "right",
+      },
       {},
     ],
     [
