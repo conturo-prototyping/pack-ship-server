@@ -514,18 +514,13 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
 async function getAsPdf(req, res) {
   ExpressHandler(
     async () => {
-      const { manifest, customer, dateCreated, createdBy, shipmentId } = req.body;
+      const { manifest, customer, dateCreated, shipmentId, deliveryMethod } = req.body;
       const { title } = customer;
 
       const orderNumbers = [];
       for ( m of manifest ) {
         if ( !orderNumbers.includes(m.orderNumber) ) orderNumbers.push(m.orderNumber);
       }
-
-      const shipmentCreatedBy = await User.findOne({ _id: createdBy })
-        .lean()
-        .select('UserName')
-        .exec();
 
       const manifestBlocks = [];
       const purchaseOrderNumbers = [];
@@ -591,10 +586,9 @@ async function getAsPdf(req, res) {
 
       //because all packing ships on a shipment SHOULD be shipping to the same address/contact info
       const shippingBlock = _pdf_makePackingBlock(title, allShipmentsInfo[0].shippingContact);
-    
       const bannerBlock = _pdf_makeBannerBlock( new Date(dateCreated) );
 
-      const signatureBlock = _pdf_makeSignaturesBlock(shipmentCreatedBy.UserName);
+      const signatureBlock = _pdf_makeSignaturesBlock(deliveryMethod);
       
       const docDefinition = {
         content: [
@@ -698,35 +692,53 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
  * Make signature block
  * @param {String} packedByuUsernam
  */
- function _pdf_makeSignaturesBlock(packedByUsername) {
-  return {
+ function _pdf_makeSignaturesBlock(deliveryMethod) {
+
+  const _table =  { 
     table: {
-      widths: ["auto", "*"],
-      body: [
-        [
-          {
-            text: "Packed by: ",
-            bold: true,
-            border: [false, false, false, false],
-          },
-          {
-            text: packedByUsername || "",
-            border: [false, false, false, false],
-            alignment: "left",
-          },
-        ],
-        [
-          {
-            colSpan: 2,
-            text: "X __________________________",
-            border: [false, false, false, false],
-          },
-          {},
-        ],
-      ],
+      widths: ["*", "*"],
     },
     unbreakable: true,
   };
+
+  let deliveryTypeString;
+  let secondColumnSignoff;
+  if ( ['DROPOFF', 'PICKUP'].includes(deliveryMethod) ) {
+    deliveryTypeString = deliveryMethod[0] + deliveryMethod.slice(1).toLowerCase() + ' by:';
+    secondColumnSignoff = "X __________________________";
+  }
+  else {
+    deliveryTypeString = '';
+    secondColumnSignoff = '';
+  }
+
+  _table.table.body = [
+    [
+      {
+        text: "Packed by: ",
+        bold: true,
+        border: [false, false, false, false],
+      },
+      {
+        text: deliveryTypeString,
+        bold: true,
+        border: [false, false, false, false],
+        alignment: "left",
+      },
+    ],
+    [
+      {
+        text: "X __________________________",
+        border: [false, false, false, false],
+      },
+      {
+        text: secondColumnSignoff,
+        border: [false, false, false, false],
+      },
+    ],
+  ];
+
+  return _table;
 }
 
 /**
