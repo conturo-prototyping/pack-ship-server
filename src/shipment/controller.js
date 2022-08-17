@@ -517,17 +517,14 @@ async function getAsPdf(req, res) {
       const { manifest, customer, dateCreated, shipmentId, deliveryMethod } = req.body;
       const { title } = customer;
 
-      const orderNumbers = [];
-      for ( m of manifest ) {
-        if ( !orderNumbers.includes(m.orderNumber) ) orderNumbers.push(m.orderNumber);
-      }
+      const orderNumbers = new Set( manifest.map( x => x.orderNumber ) );
 
       const manifestBlocks = [];
       const purchaseOrderNumbers = [];
       const allShipmentsInfo = [];
 
-      for ( let idx = 0; idx < orderNumbers.length; idx ++) {
-        const orderNumber = orderNumbers[idx]
+      let idx = 0;
+      for ( const orderNumber of orderNumbers ) {
         const promises = [];
 
         promises.push( WorkOrder.findOne({ OrderNumber: orderNumber })
@@ -565,22 +562,17 @@ async function getAsPdf(req, res) {
           }
         }
 
-        const items = [];
-        for ( const [ ,item] of Object.entries(_report) ) {
-          items.push(item);
-        }
+        const items = Object.values(_report); 
 
-        const pageBreakAfter =  ( orderNumbers.length === 1 || idx === (orderNumbers.length - 1) ) ?
-          false :
-          true;
-        // let tableTitle = `ORDER: ${orderNumber}`;
-        // if ( purchaseOrderNumber ) tableTitle += ` - PO: ${purchaseOrderNumber}`;
+        const pageBreakAfter =  ( orderNumbers.size !== 1 && idx !== (orderNumbers.size - 1) );
+
         const tableTitleArr = [ `ORDER: ${orderNumber}` ];
         ( purchaseOrderNumber )  ?
           tableTitleArr.push(`PO: ${purchaseOrderNumber}`) :
           tableTitleArr.push('');
 
         manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitleArr, pageBreakAfter));
+        idx += 1;
       }
       
 
@@ -786,7 +778,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
   });
 
   let lineNumber = 0;
-  for (let i of items) {
+  for (const i of items) {
 
     // here, 'quantity' refers to the quantity ordered in the PO
     const { partNumber, partDescription, partRev, quantity, qtyShipped } = i;
