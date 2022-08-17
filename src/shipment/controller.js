@@ -700,7 +700,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
   let deliveryTypeString;
   let secondColumnSignoff;
   if ( ['DROPOFF', 'PICKUP'].includes(deliveryMethod) ) {
-    deliveryTypeString = deliveryMethod[0] + deliveryMethod.slice(1).toLowerCase() + ' by:';
+    deliveryTypeString = 'Received by:';
     secondColumnSignoff = "X __________________________";
   }
   else {
