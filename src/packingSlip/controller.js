@@ -28,20 +28,25 @@ router.post("/pdf", getAsPDF);
 
 /**
  * Get all packing slips with an option to hide shipped.
- * @param {Boolean?} hideShipped Hide packing slips that have already shipped?
- * @param {mongoose.Schema.Types.ObjectId?} matchId If specified, only populate the specified packingSlipId
  */
-async function GetPopulatedPackingSlips(
-  hideShipped = false,
-  matchOrder = undefined,
-  matchPart = undefined,
-  regexMatch = false,
-  onlyAfterDate = undefined,
-  limit = undefined,
-  offset = 0,
-  sort = undefined,
-  groupByOrderNum = true
-) {
+async function GetPopulatedPackingSlips({
+  hideShipped:      Boolean,
+  matchOrder:       String,
+  matchPart:        String,
+  regexMatch:       Boolean,
+  onlyAfterDate:    Date,
+  limit:            Number,
+  offset:           Number,
+  sort:             Object,
+  groupByOrderNum:  Boolean,
+  onlyShowDueBack:  Boolean,
+} = {
+  hideShipped: false,
+  groupByOrderNum: true,
+  offset: 0,
+  regexMatch: false,
+  onlyShowDueBack: false
+}) {
   try {
     const pipeline = [
       // unwind packing slip items[]
@@ -90,6 +95,47 @@ async function GetPopulatedPackingSlips(
         },
       },
     ];
+
+    // If we're only interesting in packages that are returning
+    // first narrow down by shipments that are flagged as 'isDueBack: true'
+    if (onlyShowDueBack) {
+      pipeline.splice(0, 0, ...[
+        {
+          $match: {
+            shipment: { $ne: null }
+          }
+        },
+        {
+          $lookup: {
+            from: 'shipments',
+            let: { shipmentId: '$shipment' },
+            pipeline: [
+              {
+                $match: {
+                  $and: [
+                    { $expr: {
+                      $eq: ['$$shipmentId', '$_id'],
+                    } },
+                    { $expr: {
+                      $eq: ['$isDueBack', true]
+                    } }
+                  ]
+                }
+              },
+              { $project: {
+                1: 1
+              } }
+            ],
+            as: 'returning'
+          }
+        },
+        {
+          $match: {
+            '$returning.1': 1
+          }
+        },
+      ]);
+    }
 
     if (groupByOrderNum) {
       pipeline.push({
@@ -243,13 +289,11 @@ function getAsPDF(req, res) {
       const { orderNumber, packingSlipId, dateCreated } = req.body;
 
       const [packingSlipsRes, shopQOrderInfoRes] = [
-        await GetPopulatedPackingSlips(
-          false,
-          orderNumber,
-          undefined,
-          false,
-          dateCreated
-        ),
+        await GetPopulatedPackingSlips({
+          hideShipped: false,
+          matchOrder: orderNumber,
+          onlyAfterDate: dateCreated
+        }),
         await GetOrderFulfillmentInfo(orderNumber),
       ];
 
@@ -346,17 +390,15 @@ async function searchHistPackingSlips(req, res) {
 
       sortDict[sortTypes[sortBy]] = sortOrder;
 
-      const allPackingSlips = await GetPopulatedPackingSlips(
-        false,
+      const allPackingSlips = await GetPopulatedPackingSlips({
+        hideShipped: false,
         matchOrder,
         matchPart,
-        true,
-        undefined,
-        resultsPerPage * 1,
-        pageNumber * resultsPerPage,
-        sortDict,
-        true
-      );
+        regexMatch: true,
+        limit: resultsPerPage * 1,
+        offset: pageNumber * resultsPerPage,
+        sort: sortDict,
+      });
 
       return {
         data: {

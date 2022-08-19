@@ -15,10 +15,33 @@ router.put("/", createOne);
 router.get("/search", searchShipments);
 
 router.get("/queue", getQueue);
+router.get("/receivingQueue", getReceivingQueue);
 
 router.get("/:sid", getOne);
 router.patch("/:sid", editOne);
 router.delete("/:sid", deleteOne);
+
+/**
+ * Get a list of all shipments that have been sent out are and due to be coming back.
+ */
+function getReceivingQueue(_req, res) {
+  ExpressHandler(
+    async () => {
+      const [e, { packingSlips }] = await GetPopulatedPackingSlips({
+        onlyShowDueBack: true
+      });
+      if (e) return HTTPError("Error fetching shipping queue.");
+
+      return {
+        data: {
+          packingSlips,
+        },
+      };
+    },
+    res,
+    'fetching receiving queue.'
+  )
+}
 
 /**
  * Compute a search of shipment documents that match either a given order or a given part.
@@ -109,7 +132,9 @@ async function searchShipments(req, res) {
 async function getQueue(_req, res) {
   ExpressHandler(
     async () => {
-      const [e, { packingSlips }] = await GetPopulatedPackingSlips(true);
+      const [e, { packingSlips }] = await GetPopulatedPackingSlips({
+        hideShipped: true
+      });
       if (e) return HTTPError("Error fetching shipping queue.");
 
       return {
