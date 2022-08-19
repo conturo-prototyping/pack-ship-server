@@ -163,6 +163,7 @@ async function createOne(req, res) {
         customerAccount,
         customerHandoffName,
         shippingAddress,
+        isDueBack,
       } = req.body;
 
       const customerDoc = await Customer.findOne({ _id: customer });
@@ -185,6 +186,8 @@ async function createOne(req, res) {
 
         createdBy: req.user._id,
         specialShippingAddress: shippingAddress,
+
+        isDueBack
       });
 
       await shipment.save();
@@ -249,6 +252,7 @@ async function editOne(req, res) {
         deletedPackingSlips,
         newPackingSlips,
         shippingAddress,
+        isDueBack,
       } = req.body;
 
       const p_deleted =
@@ -272,6 +276,9 @@ async function editOne(req, res) {
         updateDict = { ...updateDict, customerHandoffName };
       if (shippingAddress)
         updateDict = { ...updateDict, specialShippingAddress: shippingAddress };
+      if (isDueBack !== undefined) {
+        updateDict = { ...updateDic, isDueBack };
+      }
 
       // Update
       await Shipment.updateOne(
