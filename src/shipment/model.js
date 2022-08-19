@@ -57,6 +57,15 @@ const schema = new Schema({
   },
 
   specialShippingAddress: String,
+
+  // These fields are used to track if a shipment is coming back
+  //  for example in case it's going to a vendor and coming back
+  isDueBack: Boolean,
+  receivedOn: Date,
+  receivedBy: {
+    type: ObjectId,
+    ref: 'users'
+  }
 });
 
 const Model = model("shipment", schema, "shipments");
