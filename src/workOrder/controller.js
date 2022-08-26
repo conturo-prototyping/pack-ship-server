@@ -124,7 +124,85 @@ async function getAllWithPackedQties(showFulfilled) {
               partNumber: { $first: "$Items.PartNumber" },
               orderNumber: { $first: "$Items.OrderNumber" },
               partDescription: { $first: "$Items.PartName" },
+              shippingInfo: { $first: '$Items.partRouter' }
             },
+          },
+          { 
+            $unwind: {
+              path: '$shippingInfo',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          { 
+            $match: {
+              $or: [
+                { $expr: {
+                  $eq: [ { $toLower: '$shippingInfo.step.category' }, 'shipping' ]
+                } },
+                { $expr: {
+                  $eq: ['$shippingInfo', null]
+                } }
+              ]
+            } 
+          },
+          // add in destination and destinationCode fields
+          {
+            $addFields: {
+              destination: {
+                $cond: [
+                  { 
+                    $or: [
+                      { $eq: [ { $toLower: '$shippingInfo.step.name' }, 'ship to customer'] },
+                      { $eq: ['$shippingInfo', null] }
+                    ] 
+                  },
+                  'CUSTOMER',
+                  'VENDOR'
+                ]
+              }, 
+              destinationCode : {
+                $cond: [
+                  { 
+                    $or: [
+                      { $eq: [ { $toLower: '$shippingInfo.step.name' }, 'ship to customer'] },
+                      { $eq: ['$shippingInfo', null] }
+                    ] 
+                  },
+
+                  //TRUE, shipment is going to CUSTOMER - now check if stepcode exists
+                  { 
+                    $cond: [
+                      { $eq: ['$shippingInfo', null] },
+                      'CUSTOMER',
+                      { 
+                        $concat: [ 
+                          'CUSTOMER',
+                          { $cond: [ 
+                            { $gt: ['$shippingInfo.stepCode', 0] }, 
+                            //stepCode exists -> concat stepCode
+                            { $concat: ['-', { $toString: '$shippingInfo.stepCode' } ] }, 
+                            //stepCode does not exist -> add fake stepCode
+                            '-001' 
+                          ] },
+                        ] 
+                      }
+                    ] 
+                  },
+
+                  // FALSE, so it has to be a vendor shipment
+                  { $concat: [ 
+                    'VENDOR', 
+                    { $cond: [ 
+                      { $gt: ['$shippingInfo.stepCode', 0] }, 
+                      //stepCode exists -> concat stepCode
+                      { $concat: ['-', { $toString: '$shippingInfo.stepCode' } ] },
+                      //stepCode does not exist -> add fake stepCode 
+                      '-001' 
+                    ] }
+                  ] }
+                ]
+              }
+            }
           },
         ],
       },
