@@ -124,8 +124,17 @@ async function getAllWithPackedQties(showFulfilled) {
               partNumber: { $first: "$Items.PartNumber" },
               orderNumber: { $first: "$Items.OrderNumber" },
               partDescription: { $first: "$Items.PartName" },
-              shippingInfo: { $first: '$Items.partRouter' }
+              shippingInfo: { $first: '$Items.partRouter' },
+              released: { $first: '$Items.released' },
             },
+          },
+          //only get released parts
+          { 
+            $match: {
+              $expr: {
+                $eq: [ '$released', true ]
+              }
+            }
           },
           { 
             $unwind: {
@@ -220,6 +229,7 @@ async function getAllWithPackedQties(showFulfilled) {
   try {
     const d = await ShopQueue.aggregate(agg);
     const data = d?.[0]?.activeWorkOrders;
+    console.log(data)
 
     const customerTags = new Set();
     data.forEach((x) => {
