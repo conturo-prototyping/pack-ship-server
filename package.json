@@ -27,7 +27,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.1",
     "express": "^4.17.1",
-    "mongoose": "5.13.14",
+    "mongoose": "^6.5.4",
     "node-redis": "^0.1.7",
     "nodemailer": "^6.7.5",
     "passport": "^0.5.2",

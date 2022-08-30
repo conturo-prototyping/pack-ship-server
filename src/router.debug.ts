@@ -8,8 +8,7 @@ import { LotModel } from './lot/model';
 const Customer = require('./customer/model');
 
 const router = express.Router();
-
-module.exports = router;
+export default router;
 
 router.post('/reset', resetData);
 
@@ -142,7 +141,7 @@ async function dropAllCollections() {
     await dropCollection(Customer),
     await dropCollection(CustomerPartModel),
     await dropCollection(JobModel),
-    await dropCollection(LotModel)
+    await dropCollection(LotModel),
   ];
 
   if (ok.some((x) => !x)) return [new Error('Error dropping collections')];

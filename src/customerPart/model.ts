@@ -10,7 +10,7 @@ export interface ICustomerPart extends Document {
   partNumber: String;
   partDescription: String;
   partRev: String;
-};
+}
 
 export const CustomerPartSchema = new Schema<ICustomerPart>({
   customerId: {

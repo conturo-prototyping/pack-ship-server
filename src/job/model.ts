@@ -19,7 +19,7 @@ export interface IJob extends Document {
   externalPostProcesses: string[];
 
   lots: ILot['_id'][];
-};
+}
 
 export const JobSchema = new Schema<IJob>({
   partId: Schema.Types.ObjectId,

@@ -62,12 +62,7 @@ app.all('*', (_req, res) => res.sendStatus(404));
   if (!PORT) PORT = '8000';
 
   try {
-    await mongoose.connect(MONGO_DB_URI!, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useCreateIndex: true,
-      useFindAndModify: false,
-    });
+    await mongoose.connect(MONGO_DB_URI!);
   } catch (e) {
     console.error(e);
     process.exit(2);
