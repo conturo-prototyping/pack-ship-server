@@ -3,7 +3,7 @@
  * Added here b/c interfacing with ShopQ's current private API is too much of a hassle
  */
 
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
   name: String,

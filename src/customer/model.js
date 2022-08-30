@@ -1,4 +1,4 @@
-const { Schema, model } = require("mongoose");
+const { Schema, model } = require('mongoose');
 
 const schema = new Schema({
   title: { type: String, required: true, unique: true },
@@ -10,12 +10,12 @@ const schema = new Schema({
   // keep track of how many shipments & packing slips have been created
   numShipments: {
     type: Number,
-    default: 0
+    default: 0,
   },
 
   numPackingSlips: {
     type: Number,
-    default: 0
+    default: 0,
   },
 });
 

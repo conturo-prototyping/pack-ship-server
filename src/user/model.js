@@ -9,14 +9,14 @@ const schema = new Schema({
     id: String,
     accessToken: String,
     refreshToken: String,
-    email: String
+    email: String,
   },
 
   UserName: { type: String, required: true },
 
   // String representing what groups the user belongs to
   // e.g. HR_Manager|Shop_Manager
-  Groups: { type: String, default: "GENERIC" },
+  Groups: { type: String, default: 'GENERIC' },
 
   // indicate if user is active
   // (inactive users shouldn't be shown in user lists)

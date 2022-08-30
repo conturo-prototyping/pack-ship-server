@@ -1,24 +1,25 @@
-const { Router } = require("express");
+const { Router } = require('express');
+
 const router = Router();
-const Shipment = require("./model");
-const PackingSlip = require("../packingSlip/model");
-const Customer = require("../customer/model");
-const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
-const { ExpressHandler, HTTPError, LogError } = require("../utils");
-var ObjectId = require("mongodb").ObjectId;
+const { ObjectId } = require('mongodb');
+const Shipment = require('./model');
+const PackingSlip = require('../packingSlip/model');
+const Customer = require('../customer/model');
+const { GetPopulatedPackingSlips } = require('../packingSlip/controller');
+const { ExpressHandler, HTTPError, LogError } = require('../utils');
 
 module.exports = router;
 
-router.get("/", getAll);
-router.put("/", createOne);
+router.get('/', getAll);
+router.put('/', createOne);
 
-router.get("/search", searchShipments);
+router.get('/search', searchShipments);
 
-router.get("/queue", getQueue);
+router.get('/queue', getQueue);
 
-router.get("/:sid", getOne);
-router.patch("/:sid", editOne);
-router.delete("/:sid", deleteOne);
+router.get('/:sid', getOne);
+router.patch('/:sid', editOne);
+router.delete('/:sid', deleteOne);
 
 /**
  * Compute a search of shipment documents that match either a given order or a given part.
@@ -41,46 +42,42 @@ async function searchShipments(req, res) {
         pageNumber,
       } = req.query;
 
-      if (isNaN(+resultsPerPage) || resultsPerPage <= 0) {
-        return HTTPError("resultsPerPage must be a positive integer.", 400);
+      if (Number.isNaN(+resultsPerPage) || resultsPerPage <= 0) {
+        return HTTPError('resultsPerPage must be a positive integer.', 400);
       }
 
-      if (sortBy !== "CUSTOMER" && sortBy !== "DATE") sortBy = "DATE";
-      if (sortOrder === "-1" || sortOrder === "1") {
-        sortOrder = parseInt(sortOrder);
+      if (sortBy !== 'CUSTOMER' && sortBy !== 'DATE') sortBy = 'DATE';
+      if (sortOrder === '-1' || sortOrder === '1') {
+        sortOrder = parseInt(sortOrder, 10);
       } else {
         sortOrder = 1;
       }
-      if (isNaN(+pageNumber) || pageNumber < 1) pageNumber = 1;
+      if (Number.isNaN(+pageNumber) || pageNumber < 1) pageNumber = 1;
 
-      const [_, { allShipments }] = await getPopulatedShipmentData();
+      const [, { allShipments }] = await getPopulatedShipmentData();
 
       let matchShipments;
       if (!matchOrder && !matchPart) {
         matchShipments = allShipments;
       } else {
-        matchShipments = allShipments.filter((x) =>
-          x.manifest.some(
-            (y) =>
-              (matchOrder && new RegExp(matchOrder, "i").test(y.orderNumber)) ||
-              (matchPart &&
-                y.items.some(
-                  (z) =>
-                    new RegExp(matchPart, "i").test(z.item?.partNumber) ||
-                    new RegExp(matchPart, "i").test(z.item?.partDescription)
-                ))
-          )
-        );
+        matchShipments = allShipments.filter((x) => x.manifest.some(
+          (y) => (matchOrder && new RegExp(matchOrder, 'i').test(y.orderNumber))
+              || (matchPart
+                && y.items.some(
+                  (z) => new RegExp(matchPart, 'i').test(z.item?.partNumber)
+                    || new RegExp(matchPart, 'i').test(z.item?.partDescription),
+                )),
+        ));
       }
 
       const sortFunc = (a, b) => {
         let testVal;
-        if (sortBy === "CUSTOMER") {
+        if (sortBy === 'CUSTOMER') {
           testVal = a.customer.tag.localeCompare(b.customer.tag);
         } else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
 
         if (testVal * sortOrder < 1) return -1;
-        else return 1;
+        return 1;
       };
 
       matchShipments.sort(sortFunc);
@@ -98,7 +95,7 @@ async function searchShipments(req, res) {
       };
     },
     res,
-    "searching shipments"
+    'searching shipments',
   );
 }
 
@@ -110,7 +107,7 @@ async function getQueue(_req, res) {
   ExpressHandler(
     async () => {
       const [e, { packingSlips }] = await GetPopulatedPackingSlips(true);
-      if (e) return HTTPError("Error fetching shipping queue.");
+      if (e) return HTTPError('Error fetching shipping queue.');
 
       return {
         data: {
@@ -119,7 +116,7 @@ async function getQueue(_req, res) {
       };
     },
     res,
-    "fetching shipping queue"
+    'fetching shipping queue',
   );
 }
 
@@ -130,7 +127,7 @@ async function getAll(_req, res) {
   ExpressHandler(
     async () => {
       const shipments = await Shipment.find()
-        .populate("customer")
+        .populate('customer')
         .lean()
         .exec();
 
@@ -141,7 +138,7 @@ async function getAll(_req, res) {
       };
     },
     res,
-    "fetching shipments"
+    'fetching shipments',
   );
 }
 
@@ -190,9 +187,8 @@ async function createOne(req, res) {
       await shipment.save();
 
       // update all packing slips in manifest w/ this shipment's id
-      const promises = manifest.map((x) =>
-        PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } })
-      );
+      const promises = manifest
+        .map((x) => PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } }));
 
       customerDoc.numShipments = numShipments + 1;
       promises.push(customerDoc.save());
@@ -206,7 +202,7 @@ async function createOne(req, res) {
       };
     },
     res,
-    "creating shipment"
+    'creating shipment',
   );
 }
 
@@ -217,7 +213,7 @@ async function getOne(req, res) {
   ExpressHandler(
     async () => {
       const { sid } = req.params;
-      const [_, { allShipments }] = await getPopulatedShipmentData(sid);
+      const [, { allShipments }] = await getPopulatedShipmentData(sid);
       const shipment = allShipments[0];
 
       return {
@@ -227,7 +223,7 @@ async function getOne(req, res) {
       };
     },
     res,
-    "fetching shipment"
+    'fetching shipment',
   );
 }
 
@@ -238,7 +234,7 @@ async function editOne(req, res) {
   ExpressHandler(
     async () => {
       const { sid } = req.params;
-      let {
+      const {
         deliveryMethod,
         cost,
         carrier,
@@ -251,12 +247,12 @@ async function editOne(req, res) {
         shippingAddress,
       } = req.body;
 
-      const p_deleted =
-        deletedPackingSlips?.map((x) => unassignPackingSlipFromShipment(x)) ??
-        [];
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      const p_deleted = deletedPackingSlips?.map((x) => unassignPackingSlipFromShipment(x))
+        ?? [];
 
-      const p_added =
-        newPackingSlips?.map((x) => assignPackingSlipToShipment(x, sid)) ?? [];
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      const p_added = newPackingSlips?.map((x) => assignPackingSlipToShipment(x, sid)) ?? [];
 
       await updateShipmentTrackingHistory(sid);
 
@@ -268,10 +264,8 @@ async function editOne(req, res) {
       if (deliverySpeed) updateDict = { ...updateDict, deliverySpeed };
       if (customerAccount) updateDict = { ...updateDict, customerAccount };
       if (trackingNumber) updateDict = { ...updateDict, trackingNumber };
-      if (customerHandoffName)
-        updateDict = { ...updateDict, customerHandoffName };
-      if (shippingAddress)
-        updateDict = { ...updateDict, specialShippingAddress: shippingAddress };
+      if (customerHandoffName) updateDict = { ...updateDict, customerHandoffName };
+      if (shippingAddress) updateDict = { ...updateDict, specialShippingAddress: shippingAddress };
 
       // Update
       await Shipment.updateOne(
@@ -285,7 +279,7 @@ async function editOne(req, res) {
               $in: deletedPackingSlips?.map((e) => ObjectId(e)) ?? [],
             },
           },
-        }
+        },
       );
 
       // then update newPackingSlips otherwise a conflict will occur
@@ -295,14 +289,14 @@ async function editOne(req, res) {
           $push: {
             manifest: { $each: newPackingSlips?.map((e) => ObjectId(e)) ?? [] },
           },
-        }
+        },
       );
 
       const promises = p_deleted.concat(p_added);
       await Promise.all(promises);
     },
     res,
-    "editing shipment"
+    'editing shipment',
   );
 }
 
@@ -317,28 +311,30 @@ async function deleteOne(req, res) {
       await updateShipmentTrackingHistory(sid);
 
       // delete shipment
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       const p_delete = Shipment.deleteOne({ _id: sid });
 
       // update packing slips to unassign them from shipments
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       const p_updatePackingSlips = PackingSlip.updateMany(
         { shipment: sid },
-        { $unset: { shipment: 1 } }
+        { $unset: { shipment: 1 } },
       );
 
       await Promise.all([p_delete, p_updatePackingSlips]);
     },
     res,
-    "deleting shipment"
+    'deleting shipment',
   );
 }
 
 async function updateShipmentTrackingHistory(sid) {
-  let oldShipment = {
+  const oldShipment = {
     ...(await Shipment.findById(sid).lean().exec()),
     isPastVersion: true,
   };
 
-  delete oldShipment["_id"];
+  delete oldShipment._id;
   const editedShipment = new Shipment({
     ...oldShipment,
   });
@@ -354,14 +350,14 @@ async function updateShipmentTrackingHistory(sid) {
 async function assignPackingSlipToShipment(packingSlipId, shipmentId) {
   await PackingSlip.updateOne(
     { _id: packingSlipId },
-    { $set: { shipment: shipmentId } }
+    { $set: { shipment: shipmentId } },
   );
 }
 
 async function unassignPackingSlipFromShipment(packingSlipId) {
   await PackingSlip.updateOne(
     { _id: packingSlipId },
-    { $unset: { shipment: 1 } }
+    { $unset: { shipment: 1 } },
   );
 }
 
@@ -375,19 +371,19 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
     const pipeline = [
       {
         $lookup: {
-          from: "packingSlips",
-          as: "manifest",
-          let: { manifest: "$manifest" },
+          from: 'packingSlips',
+          as: 'manifest',
+          let: { manifest: '$manifest' },
           pipeline: [
             {
               $match: {
-                $expr: { $in: ["$_id", "$$manifest"] },
+                $expr: { $in: ['$_id', '$$manifest'] },
               },
             },
-            { $unwind: "$items" },
+            { $unwind: '$items' },
             {
               $lookup: {
-                from: "workorders",
+                from: 'workorders',
                 let: {
                   // ---- FORMAT OF ITEMS ARRAY
                   // items: [{
@@ -396,91 +392,90 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                   //   qty    // packed qty of item
                   // }]
                   // --------------
-                  arrayItemIds: "$items._id",
-                  packedItemIds: "$items.item",
-                  packedItemQtys: "$items.qty",
-                  orderNumber: "$orderNumber",
-                  packingSlipOID: "$_id",
+                  arrayItemIds: '$items._id',
+                  packedItemIds: '$items.item',
+                  packedItemQtys: '$items.qty',
+                  orderNumber: '$orderNumber',
+                  packingSlipOID: '$_id',
                 },
                 pipeline: [
                   {
                     $match: {
-                      $expr: { $eq: ["$OrderNumber", "$$orderNumber"] },
+                      $expr: { $eq: ['$OrderNumber', '$$orderNumber'] },
                     },
                   },
-                  { $unwind: "$Items" },
+                  { $unwind: '$Items' },
                   {
                     $match: {
-                      $expr: { $eq: ["$Items._id", "$$packedItemIds"] },
+                      $expr: { $eq: ['$Items._id', '$$packedItemIds'] },
                     },
                   },
                   {
                     $group: {
-                      _id: "$Items._id",
+                      _id: '$Items._id',
                       item: {
                         $first: {
-                          _id: "$Items._id",
-                          orderNumber: "$Items.OrderNumber",
-                          partNumber: "$Items.PartNumber",
-                          partDescription: "$Items.PartName",
-                          partRev: "$Items.Revision",
-                          batch: "$Items.batchNumber",
-                          quantity: "$Items.Quantity", // batchQty
+                          _id: '$Items._id',
+                          orderNumber: '$Items.OrderNumber',
+                          partNumber: '$Items.PartNumber',
+                          partDescription: '$Items.PartName',
+                          partRev: '$Items.Revision',
+                          batch: '$Items.batchNumber',
+                          quantity: '$Items.Quantity', // batchQty
                         },
                       },
-                      packingSlipId: { $first: "$$packingSlipOID" },
-                      packedQty: { $first: "$$packedItemQtys" },
-                      rowId: { $first: "$$arrayItemIds" },
+                      packingSlipId: { $first: '$$packingSlipOID' },
+                      packedQty: { $first: '$$packedItemQtys' },
+                      rowId: { $first: '$$arrayItemIds' },
                       isPastVersion: {
                         $first: {
-                          isPastVersion: "$isPastVersion",
+                          isPastVersion: '$isPastVersion',
                         },
                       },
                     },
                   },
                   {
                     $addFields: {
-                      _id: "$rowId",
+                      _id: '$rowId',
                     },
                   },
                 ],
-                as: "items",
+                as: 'items',
               },
             },
             {
               $group: {
-                _id: { $arrayElemAt: ["$items.packingSlipId", 0] },
+                _id: { $arrayElemAt: ['$items.packingSlipId', 0] },
                 items: {
                   $push: {
-                    _id: { $arrayElemAt: ["$items.rowId", 0] },
-                    item: { $arrayElemAt: ["$items.item", 0] },
-                    qty: { $arrayElemAt: ["$items.packedQty", 0] },
+                    _id: { $arrayElemAt: ['$items.rowId', 0] },
+                    item: { $arrayElemAt: ['$items.item', 0] },
+                    qty: { $arrayElemAt: ['$items.packedQty', 0] },
                   },
                 },
-                customer: { $first: "$customer" },
-                orderNumber: { $first: "$orderNumber" },
-                packingSlipId: { $first: "$packingSlipId" },
-                createdBy: { $first: "$createdBy" },
-                dateCreated: { $first: "$dateCreated" },
-                shipment: { $first: "$shipment" },
-                destination: { $first: "$destination" },
+                customer: { $first: '$customer' },
+                orderNumber: { $first: '$orderNumber' },
+                packingSlipId: { $first: '$packingSlipId' },
+                createdBy: { $first: '$createdBy' },
+                dateCreated: { $first: '$dateCreated' },
+                shipment: { $first: '$shipment' },
+                destination: { $first: '$destination' },
               },
             },
           ],
-          as: "manifest",
         },
       },
       {
         $lookup: {
-          from: "oldClients-v2",
-          localField: "customer",
-          foreignField: "_id",
-          as: "customer",
+          from: 'oldClients-v2',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer',
         },
       },
       {
         $addFields: {
-          customer: { $arrayElemAt: ["$customer", 0] },
+          customer: { $arrayElemAt: ['$customer', 0] },
         },
       },
     ];

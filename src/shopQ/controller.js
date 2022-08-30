@@ -2,12 +2,12 @@ const { HTTPError, LogError } = require('../utils');
 const shopQOrder = require('./order.model');
 
 module.exports = {
-  GetOrderFulfillmentInfo
+  GetOrderFulfillmentInfo,
 };
 
 /**
  * Get shipping contact and PO # from GenOrder-v2
- * @param {string} orderNumber 
+ * @param {string} orderNumber
  */
 async function GetOrderFulfillmentInfo(orderNumber) {
   try {
@@ -20,7 +20,7 @@ async function GetOrderFulfillmentInfo(orderNumber) {
     const { name, address } = shippingContact || {};
 
     if (!shippingContact?.name) {
-      return [ HTTPError('Shipping contact not set. Please contact sales rep!', 400) ];
+      return [HTTPError('Shipping contact not set. Please contact sales rep!', 400)];
     }
 
     shippingContact = { name, address };
@@ -31,9 +31,8 @@ async function GetOrderFulfillmentInfo(orderNumber) {
     };
 
     return [null, data];
-  }
-  catch (e) {
+  } catch (e) {
     LogError(e);
-    return [ HTTPError('Unexpected error fetching fulfillment info for order ' + orderNumber) ];
+    return [HTTPError(`Unexpected error fetching fulfillment info for order ${orderNumber}`)];
   }
 }

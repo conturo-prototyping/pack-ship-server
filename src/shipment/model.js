@@ -5,13 +5,14 @@
 // - shipmentId (unique human-readable identifier)
 // - manifest (pointers to all packing slips in this shipment)
 
-const { Schema, model } = require("mongoose");
+const { Schema, model } = require('mongoose');
+
 const { ObjectId } = Schema.Types;
 
 const schema = new Schema({
   customer: {
     type: ObjectId,
-    ref: "oldClient-v2",
+    ref: 'oldClient-v2',
   },
 
   shipmentId: {
@@ -22,7 +23,7 @@ const schema = new Schema({
   manifest: [
     {
       type: ObjectId,
-      ref: "packingSlip",
+      ref: 'packingSlip',
     },
   ],
 
@@ -44,7 +45,7 @@ const schema = new Schema({
 
   createdBy: {
     type: ObjectId,
-    ref: "users",
+    ref: 'users',
   },
 
   // This is to track all edits.
@@ -59,6 +60,6 @@ const schema = new Schema({
   specialShippingAddress: String,
 });
 
-const Model = model("shipment", schema, "shipments");
+const Model = model('shipment', schema, 'shipments');
 
 module.exports = Model;

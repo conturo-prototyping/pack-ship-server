@@ -6,7 +6,8 @@
 // - items          (refs to work order items & qty in packing slip)
 // - shipment       (ref to shipment-if any-that contains this packing slip--can only be one)
 
-const { Schema, model } = require("mongoose");
+const { Schema, model } = require('mongoose');
+
 const { ObjectId } = Schema.Types;
 
 const schema = new Schema({
@@ -14,7 +15,7 @@ const schema = new Schema({
 
   customer: {
     type: ObjectId,
-    ref: "oldClient-v2",
+    ref: 'oldClient-v2',
   },
 
   packingSlipId: {
@@ -41,7 +42,7 @@ const schema = new Schema({
 
   createdBy: {
     type: ObjectId,
-    ref: "user",
+    ref: 'user',
   },
 
   // ref to the shipment ID that contains this packing slip
@@ -59,10 +60,10 @@ const schema = new Schema({
 
   destination: {
     type: String,
-    default: 'CUSTOMER'
+    default: 'CUSTOMER',
   },
 });
 
-const Model = model("packingSlip", schema, "packingSlips");
+const Model = model('packingSlip', schema, 'packingSlips');
 
 module.exports = Model;

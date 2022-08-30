@@ -1,10 +1,11 @@
 // Legacy schema for delivery documents.
-// 
+//
 
 // models/delivery.js
 // Schema for delivery contents & metadata of order shipments
 
 const mongoose = require('mongoose');
+
 const { ObjectId } = mongoose.Schema.Types;
 
 const schema = new mongoose.Schema({
@@ -20,7 +21,7 @@ const schema = new mongoose.Schema({
 
     useCustomerAccount: Boolean,
     customerAccountNumber: String,
-    
+
     trackingNumber: String,
     shippingCost: Number,
     notes: String,
@@ -44,7 +45,7 @@ const schema = new mongoose.Schema({
     // for internal tracking
     // not shown to customer
     batchNumber: Number,
-  }]
+  }],
 });
 
 const Model = mongoose.model('delivery', schema);

@@ -1,0 +1,23 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 12,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint"],
+  "extends": ["airbnb-base", "airbnb-typescript/base"],
+  // "include": ["src/**/*.js", "src/**/*.ts"],
+  "rules": {
+    "@typescript-eslint/no-use-before-define": "off",
+    "no-underscore-dangle": "off",
+    "no-plusplus": "off",
+    "no-restricted-syntax": ["error", "ForInStatement", "LabeledStatement", "WithStatement"],
+    "prefer-const": ["error", {
+      "destructuring": "all"
+    }]
+  },
+  "env": {
+    "es2021": true
+  }
+}

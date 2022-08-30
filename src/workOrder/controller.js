@@ -1,11 +1,12 @@
-const { Router } = require("express");
+const { Router } = require('express');
+
 const router = Router();
 // const WorkOrder = require('./model');
-const ShopQueue = require("../shopQ/shopQueue.model");
-const Customer = require("../customer/model");
+const ShopQueue = require('../shopQ/shopQueue.model');
+const Customer = require('../customer/model');
 
-router.get("/packingQueue", getPackingQueue);
-router.get("/", getAll);
+router.get('/packingQueue', getPackingQueue);
+router.get('/', getAll);
 
 module.exports = router;
 
@@ -34,7 +35,7 @@ async function getPackingQueue(_req, res) {
  * @param {Boolean} showFulfilled should query show fulfilled qties?
  */
 async function getAllWithPackedQties(showFulfilled) {
-  const _customerTagFromOrderNumber = (orderNum) => {
+  const customerTagFromOrderNumber = (orderNum) => {
     const match = orderNum.match(/([A-Z]+)(?:[0-9]+)/);
     return match[1];
   };
@@ -43,52 +44,54 @@ async function getAllWithPackedQties(showFulfilled) {
   const agg = [
     {
       $lookup: {
-        from: "workorders",
+        from: 'workorders',
         // localField: 'Items',
         // foreignField: '_id',
-        as: "activeWorkOrders",
+        as: 'activeWorkOrders',
         let: {
-          activeWorkOrderIds: "$Items"
+          activeWorkOrderIds: '$Items',
         },
         pipeline: [
           {
             $match: {
               $expr: {
-                $in: ["$_id", "$$activeWorkOrderIds"],
+                $in: ['$_id', '$$activeWorkOrderIds'],
               },
             },
           },
-          { $unwind: "$Items" },
+          { $unwind: '$Items' },
           {
             $lookup: {
-              from: "packingSlips",
+              from: 'packingSlips',
               // localField: "Items._id",
               // foreignField: "items.item",
-              as: "packingSlips",
+              as: 'packingSlips',
               let: { workOrderItemId: '$Items._id' },
               pipeline: [
-                { $match: {
-                  $expr: {
-                    $and: [
-                      { $in: ['$$workOrderItemId', '$items.item'], },
-                      { $ne: ['$isPastVersion', true] }
-                    ]
-                  }
-                } },
-              ]
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $in: ['$$workOrderItemId', '$items.item'] },
+                        { $ne: ['$isPastVersion', true] },
+                      ],
+                    },
+                  },
+                },
+              ],
             },
           },
 
           // unwind
           {
             $unwind: {
-              path: "$packingSlips",
+              path: '$packingSlips',
               preserveNullAndEmptyArrays: true,
             },
           },
           {
             $unwind: {
-              path: "$packingSlips.items",
+              path: '$packingSlips.items',
               preserveNullAndEmptyArrays: true,
             },
           },
@@ -98,7 +101,7 @@ async function getAllWithPackedQties(showFulfilled) {
           {
             $match: {
               $or: [
-                { $expr: { $eq: ["$packingSlips.items.item", "$Items._id"] } },
+                { $expr: { $eq: ['$packingSlips.items.item', '$Items._id'] } },
                 { packingSlips: { $exists: false } },
               ],
             },
@@ -107,23 +110,23 @@ async function getAllWithPackedQties(showFulfilled) {
           // sum quantities
           {
             $group: {
-              _id: "$Items._id",
+              _id: '$Items._id',
               packedQty: {
                 $sum: {
                   $cond: [
                     { $eq: ['$packingSlips.destination', 'CUSTOMER'] },
                     '$packingSlips.items.qty',
-                    0
-                  ]
+                    0,
+                  ],
                 },
               },
-              batchQty: { $first: "$Items.Quantity" },
+              batchQty: { $first: '$Items.Quantity' },
 
-              batch: { $first: "$Items.batchNumber" },
-              partRev: { $first: "$Items.Revision" },
-              partNumber: { $first: "$Items.PartNumber" },
-              orderNumber: { $first: "$Items.OrderNumber" },
-              partDescription: { $first: "$Items.PartName" },
+              batch: { $first: '$Items.batchNumber' },
+              partRev: { $first: '$Items.Revision' },
+              partNumber: { $first: '$Items.PartNumber' },
+              orderNumber: { $first: '$Items.OrderNumber' },
+              partDescription: { $first: '$Items.PartName' },
             },
           },
         ],
@@ -134,7 +137,7 @@ async function getAllWithPackedQties(showFulfilled) {
   if (!showFulfilled) {
     agg[0].$lookup.pipeline.push({
       $match: {
-        $expr: { $gt: ["$batchQty", "$packedQty"] },
+        $expr: { $gt: ['$batchQty', '$packedQty'] },
       },
     });
   }
@@ -148,17 +151,20 @@ async function getAllWithPackedQties(showFulfilled) {
       if (!x?.orderNumber) {
         return;
       }
-      customerTags.add(_customerTagFromOrderNumber(x.orderNumber));
+      customerTags.add(customerTagFromOrderNumber(x.orderNumber));
     });
 
-    const p_customerData = Array.from(customerTags).map((tag) =>
-      Customer.findOne({ tag }).lean().exec()
-    );
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const p_customerData = Array.from(customerTags)
+      .map((tag) => Customer.findOne({ tag }).lean().exec());
     const customerData = (await Promise.all(p_customerData)).filter((x) => !!x);
 
     data.forEach((x) => {
-      const tagToMatch = _customerTagFromOrderNumber(x.orderNumber);
-      x.customer = customerData.find((y) => y.tag === tagToMatch)?._id;
+      const tagToMatch = customerTagFromOrderNumber(x.orderNumber);
+      const ret = { ...x };
+
+      ret.customer = customerData.find((y) => y.tag === tagToMatch)?._id;
+      return ret;
     });
 
     return [null, data];
