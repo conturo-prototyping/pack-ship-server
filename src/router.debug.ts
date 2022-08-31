@@ -73,8 +73,8 @@ async function createRandomSetupData(customers) {
     for (let i = 0; i < randomInt(3); i++) {
       const externals = ['Vendor A', 'Vendor B', 'Vendor C'];
 
-      const sliceStart = randomInt(0, 4);
-      const max = externals.length - sliceStart - 1;
+      const sliceStart = randomInt(0, 2);
+      const max = externals.length - 1 - sliceStart;
       const sliceEnd = max > sliceStart
         ? randomInt(0, externals.length - sliceStart - 1)
         : sliceStart;
