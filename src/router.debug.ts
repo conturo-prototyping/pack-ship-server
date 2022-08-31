@@ -88,6 +88,7 @@ async function createRandomSetupData(customers) {
 
   // 3) Create random lots from the jobs
   for (const j of allJobs) {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     const { batchQty, _id } = j;
 
     if (batchQty > 1) {
