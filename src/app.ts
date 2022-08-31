@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import cookieSession from 'cookie-session';
 import passport from 'passport';
 import mongoose from 'mongoose';
+import debugRouter from './router.debug';
 
 require('dotenv').config();
 require('./config.passport')(passport);
@@ -31,9 +32,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 if (process.env.NODE_ENV === 'DEBUG') {
-  console.debug('DEBUGGING ROUTES ARE ON !!!');
-
-  app.use('/debug', require('./router.debug'));
+  app.use('/debug', debugRouter);
 }
 
 // This handles authentication

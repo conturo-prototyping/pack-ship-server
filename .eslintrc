@@ -19,6 +19,6 @@
   },
   "env": {
     "es2021": true,
-    "mocha": true,
+    "mocha": true
   }
 }

@@ -8,7 +8,6 @@ import { LotModel } from './lot/model';
 const Customer = require('./customer/model');
 
 const router = express.Router();
-export default router;
 
 router.post('/reset', resetData);
 
@@ -149,3 +148,5 @@ async function dropAllCollections() {
 
   return [null];
 }
+
+export default router;
