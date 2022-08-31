@@ -18,22 +18,29 @@ router.post('/reset', resetData);
 async function resetData(_req: Request, res: Response) {
   console.debug('Resetting data...');
 
-  const [dropErr] = await dropAllCollections();
-  if (dropErr) res.status(500).send(dropErr.message);
+  try {
+    const [dropErr] = await dropAllCollections();
+    if (dropErr) res.status(500).send(dropErr.message);
 
-  const tags = ['ABC', 'DEF', 'GHI'];
+    const tags = ['ABC', 'DEF', 'GHI'];
 
-  const customers = await Promise.all(
-    tags.map(async (tag) => {
-      const newCustomer = new Customer({ tag, title: `${tag} Corp` });
-      await newCustomer.save();
-      return newCustomer;
-    }),
-  );
+    const customers = await Promise.all(
+      tags.map(async (tag) => {
+        const newCustomer = new Customer({ tag, title: `${tag} Corp` });
+        await newCustomer.save();
+        return newCustomer;
+      }),
+    );
 
-  await createRandomSetupData(customers);
+    await createRandomSetupData(customers);
 
-  console.debug('Done resetting data!');
+    console.debug('Done resetting data!');
+    res.sendStatus(200);
+  }
+  catch (e) {
+    console.error(e);
+    res.status(500).send(e);
+  }
 }
 
 /**
@@ -64,10 +71,13 @@ async function createRandomSetupData(customers) {
   const allJobs: IJob[] = [];
   for (const p of allParts) {
     for (let i = 0; i < randomInt(3); i++) {
-      const externals = [undefined, 'Vendor A', 'Vendor B', 'Vendor C'];
+      const externals = ['Vendor A', 'Vendor B', 'Vendor C'];
 
       const sliceStart = randomInt(0, 4);
-      const sliceEnd = randomInt(0, externals.length - sliceStart - 1);
+      const max = externals.length - sliceStart - 1;
+      const sliceEnd = max > sliceStart
+        ? randomInt(0, externals.length - sliceStart - 1)
+        : sliceStart;
 
       const newJob = new JobModel({
         partId: p,
