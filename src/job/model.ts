@@ -19,6 +19,8 @@ export interface IJob extends Document {
   externalPostProcesses: string[];
 
   lots: ILot['_id'][];
+
+  released: boolean;
 }
 
 export const JobSchema = new Schema<IJob>({
@@ -33,6 +35,8 @@ export const JobSchema = new Schema<IJob>({
     type: Schema.Types.ObjectId,
     ref: 'lots',
   }],
+
+  released: Boolean,
 });
 
 export const JobModel = model<IJob>('job', JobSchema);
