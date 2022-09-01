@@ -36,8 +36,7 @@ async function resetData(_req: Request, res: Response) {
 
     console.debug('Done resetting data!');
     res.sendStatus(200);
-  }
-  catch (e) {
+  } catch (e) {
     console.error(e);
     res.status(500).send(e);
   }
