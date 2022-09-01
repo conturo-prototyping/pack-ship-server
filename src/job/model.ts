@@ -21,6 +21,10 @@ export interface IJob extends Document {
   lots: ILot['_id'][];
 
   released: boolean;
+
+  onHold: boolean;
+
+  canceled: boolean;
 }
 
 export const JobSchema = new Schema<IJob>({
@@ -37,6 +41,10 @@ export const JobSchema = new Schema<IJob>({
   }],
 
   released: Boolean,
+
+  onHold: Boolean,
+
+  canceled: Boolean,
 });
 
 export const JobModel = model<IJob>('job', JobSchema);
