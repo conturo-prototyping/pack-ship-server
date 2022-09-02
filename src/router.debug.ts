@@ -70,13 +70,12 @@ async function createRandomSetupData(customers) {
   const allJobs: IJob[] = [];
   for (const p of allParts) {
     for (let i = 0; i < randomInt(3); i++) {
-      const externals = ['Vendor A', 'Vendor B', 'Vendor C'];
+      const externals = ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D'];
 
-      const sliceStart = randomInt(0, 2);
-      const max = externals.length - 1 - sliceStart;
-      const sliceEnd = max > sliceStart
-        ? randomInt(0, externals.length - sliceStart - 1)
-        : sliceStart;
+      const sliceStart = randomInt(0, externals.length);
+      const sliceEnd = randomInt(sliceStart, externals.length);
+
+      console.log(sliceStart, sliceEnd);
 
       const newJob = new JobModel({
         partId: p,
