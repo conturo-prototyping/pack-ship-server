@@ -70,57 +70,32 @@ async function createRandomSetupData(customers) {
   const allJobs: IJob[] = [];
   for (const p of allParts) {
     for (let i = 0; i < randomInt(3); i++) {
-      const externals = ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D'];
+      promises.push((async () => {
+        const externals = ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D'];
 
-      const sliceStart = randomInt(0, externals.length);
-      const sliceEnd = randomInt(sliceStart, externals.length);
+        const sliceStart = randomInt(0, externals.length);
+        const sliceEnd = randomInt(sliceStart, externals.length+1);
+  
+        const newJob = new JobModel({
+          partId: p,
+          dueDate: new Date(Math.random() * Date.now()).toLocaleDateString(),
+          batchQty: randomInt(1, 20),
+          material: ['Aluminum', 'Titanium', 'Stainless', 'Plastic'][randomInt(0, 3)],
+          externalPostProcesses: externals.slice(sliceStart, sliceEnd),
+        });
+  
+        const newLot = new LotModel({
+          jobId:    newJob._id,
+          quantity: newJob.batchQty,
+          router: []
+        });
 
-      console.log(sliceStart, sliceEnd);
+        await newLot.save();
+        newJob.lots = [ newLot._id ];
 
-      const newJob = new JobModel({
-        partId: p,
-        dueDate: new Date(Math.random() * Date.now()).toLocaleDateString(),
-        batchQty: randomInt(1, 20),
-        material: ['Aluminum', 'Titanium', 'Stainless', 'Plastic'][randomInt(0, 3)],
-        externalPostProcesses: externals.slice(sliceStart, sliceEnd),
-      });
-
-      allJobs.push(newJob);
-      promises.push(newJob.save());
-    }
-  }
-
-  await Promise.all(promises);
-  promises = [];
-
-  // 3) Create random lots from the jobs
-  for (const j of allJobs) {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { batchQty, _id } = j;
-
-    if (batchQty > 1) {
-      const lot1 = new LotModel({
-        jobId: _id,
-        // @ts-ignore
-        quantity: Math.floor(batchQty / 2),
-        router: [],
-      });
-      const lot2 = new LotModel({
-        jobId: _id,
-        // @ts-ignore
-        quantity: Math.ceil(batchQty / 2),
-        router: [],
-      });
-
-      promises.push(lot1.save(), lot2.save());
-    } else {
-      const lot = new LotModel({
-        jobId: _id,
-        quantity: batchQty,
-        router: [],
-      });
-
-      promises.push(lot.save());
+        await newJob.save();
+        allJobs.push(newJob);
+      })());
     }
   }
 
