@@ -59,19 +59,131 @@ async function getAllWithPackedQties(showFulfilled) {
             },
           },
           { $unwind: "$Items" },
+
+          // only keep:
+          // released && !onHold
+          { 
+            $match: {
+              $and: [
+                { $expr: { $eq: [ '$Items.released', true ] } },
+                { $expr: { $ne: [ '$Items.onHold', true ] } },
+              ]
+            }
+          },
+
+          // now we start making unique entries for every shipping step in the router
+          // Essentially, we only keep shipping steps & assign them a code
+          // then we tally everything up
+          {
+            $unwind: {
+              path: '$Items.partRouter',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+
+          // Filter out non-shipping steps
+          {
+            $match: {
+              $or: [
+                {
+                  $and: [
+                    { $expr: {
+                      $eq: [ { $toUpper: '$Items.partRouter.step.category' }, 'SHIPPING' ]
+                    } },
+
+                    // If the shipping step was NULLED out, discard it
+                    { $expr: {
+                      $ne: [
+                        { $substr: [
+                          '$Items.partRouter.step.name', 0, 6
+                        ] },
+                        '-NULL-'
+                      ]
+                    } }
+                  ]
+                },
+
+                // Keep legacy items that do not have a partRouter[]
+                // We will insert a SHIP TO CUSTOMER step manually
+                { $expr: {
+                  $eq: ['$Items.partRouter', null]
+                } }
+              ]
+            } 
+          },
+
+          // add in destination and destinationCode fields
+          {
+            $addFields: {
+
+              // destination is either CUSTOMER or VENDOR
+              // default is CUSTOMER (if no router exists i.e. legacy orders)
+              destination: {
+                $cond: [
+                  { 
+                    $or: [
+                      { $eq: [ { $toUpper: '$Items.partRouter.step.name' }, 'SHIP TO CUSTOMER'] },
+                      { $eq: ['$Items.partRouter', null] }
+                    ] 
+                  },
+                  'CUSTOMER',
+                  'VENDOR'
+                ]
+              }, 
+
+              // destination code is <DESTINATION>-<STEP NUMBER>
+              // default is CUSTOMER-001 (i.e. for legacy orders)
+              destinationCode : {
+                $cond: [
+                  { 
+                    $or: [
+                      { $eq: [ { $toUpper: '$Items.partRouter.step.name' }, 'SHIP TO CUSTOMER'] },
+                      { $eq: ['$Items.partRouter', null] }
+                    ] 
+                  },
+
+                  //TRUE, shipment is going to CUSTOMER
+                  { 
+                    $concat: [ 
+                      'CUSTOMER',
+                      { $cond: [ 
+                        { $gt: ['$Items.partRouter.stepCode', 0] }, 
+                        
+                        //stepCode exists -> concat stepCode
+                        { $concat: ['-', { $toString: '$Items.partRouter.stepCode' } ] }, 
+                        
+                        //stepCode does not exist -> add fake stepCode
+                        '-001' 
+                      ] },
+                    ]
+                  },
+
+                  // FALSE, so it has to be a vendor shipment
+                  // These are guaranteed to have a step code
+                  { $concat: [ 
+                    'VENDOR-', 
+                    { $toString: '$Items.partRouter.stepCode' }
+                  ] }
+                ]
+              }
+            }
+          },
+
+          // match entries to their packing slips by itemId & destinationCode
           {
             $lookup: {
               from: "packingSlips",
               // localField: "Items._id",
               // foreignField: "items.item",
               as: "packingSlips",
-              let: { workOrderItemId: '$Items._id' },
+              let: { workOrderItemId: '$Items._id', destinationCode: '$destinationCode' },
               pipeline: [
                 { $match: {
                   $expr: {
                     $and: [
-                      { $in: ['$$workOrderItemId', '$items.item'], },
-                      { $ne: ['$isPastVersion', true] }
+                      { $ne: ['$isPastVersion', true] },                  // ignore edit histories
+                      { $eq: ['$destinationCode', '$$destinationCode']},  // match by router destination code
+                      { $in: ['$$workOrderItemId', '$items.item'], }      // pull all packing slips that contain this item (to count packed qties)
                     ]
                   }
                 } },
@@ -79,7 +191,7 @@ async function getAllWithPackedQties(showFulfilled) {
             },
           },
 
-          // unwind
+          // unwind packing slips & items[] so we can ditch duplicates
           {
             $unwind: {
               path: "$packingSlips",
@@ -92,6 +204,7 @@ async function getAllWithPackedQties(showFulfilled) {
               preserveNullAndEmptyArrays: true,
             },
           },
+          
 
           // get rid of duplicates
           // AND keep work orders with no packing slips
@@ -107,16 +220,13 @@ async function getAllWithPackedQties(showFulfilled) {
           // sum quantities
           {
             $group: {
-              _id: "$Items._id",
-              packedQty: {
-                $sum: {
-                  $cond: [
-                    { $eq: ['$packingSlips.destination', 'CUSTOMER'] },
-                    '$packingSlips.items.qty',
-                    0
-                  ]
-                },
+              _id: {
+                itemId: "$Items._id",
+                destinationCode: '$destinationCode'
               },
+
+              // sum of packed quantities
+              packedQty: { $sum: '$packingSlips.items.qty' },
               batchQty: { $first: "$Items.Quantity" },
 
               batch: { $first: "$Items.batchNumber" },
@@ -124,104 +234,19 @@ async function getAllWithPackedQties(showFulfilled) {
               partNumber: { $first: "$Items.PartNumber" },
               orderNumber: { $first: "$Items.OrderNumber" },
               partDescription: { $first: "$Items.PartName" },
-              shippingInfo: { $first: '$Items.partRouter' },
               released: { $first: '$Items.released' },
+              destination: { $first: '$destination'},
             },
           },
-          //only get released parts
-          { 
-            $match: {
-              $expr: {
-                $eq: [ '$released', true ]
-              }
-            }
-          },
-          { 
-            $unwind: {
-              path: '$shippingInfo',
-              preserveNullAndEmptyArrays: true
-            }
-          },
-          { 
-            $match: {
-              $or: [
-                { $expr: {
-                  $eq: [ { $toLower: '$shippingInfo.step.category' }, 'shipping' ]
-                } },
-                { $expr: {
-                  $eq: ['$shippingInfo', null]
-                } }
-              ]
-            } 
-          },
-          // add in destination and destinationCode fields
-          {
-            $addFields: {
-              destination: {
-                $cond: [
-                  { 
-                    $or: [
-                      { $eq: [ { $toLower: '$shippingInfo.step.name' }, 'ship to customer'] },
-                      { $eq: ['$shippingInfo', null] }
-                    ] 
-                  },
-                  'CUSTOMER',
-                  'VENDOR'
-                ]
-              }, 
-              destinationCode : {
-                $cond: [
-                  { 
-                    $or: [
-                      { $eq: [ { $toLower: '$shippingInfo.step.name' }, 'ship to customer'] },
-                      { $eq: ['$shippingInfo', null] }
-                    ] 
-                  },
-
-                  //TRUE, shipment is going to CUSTOMER - now check if stepcode exists
-                  { 
-                    $cond: [
-                      { $eq: ['$shippingInfo', null] },
-                      'CUSTOMER',
-                      { 
-                        $concat: [ 
-                          'CUSTOMER',
-                          { $cond: [ 
-                            { $gt: ['$shippingInfo.stepCode', 0] }, 
-                            //stepCode exists -> concat stepCode
-                            { $concat: ['-', { $toString: '$shippingInfo.stepCode' } ] }, 
-                            //stepCode does not exist -> add fake stepCode
-                            '-001' 
-                          ] },
-                        ] 
-                      }
-                    ] 
-                  },
-
-                  // FALSE, so it has to be a vendor shipment
-                  { $concat: [ 
-                    'VENDOR', 
-                    { $cond: [ 
-                      { $gt: ['$shippingInfo.stepCode', 0] }, 
-                      //stepCode exists -> concat stepCode
-                      { $concat: ['-', { $toString: '$shippingInfo.stepCode' } ] },
-                      //stepCode does not exist -> add fake stepCode 
-                      '-001' 
-                    ] }
-                  ] }
-                ]
-              }
-            }
-          },
-        ],
-      },
+        ]
+      }
     },
   ];
 
   if (!showFulfilled) {
     agg[0].$lookup.pipeline.push({
       $match: {
-        $expr: { $gt: ["$batchQty", "$packedQty"] },
+        $expr: { $gte: ["$batchQty", "$packedQty"] },
       },
     });
   }
@@ -229,7 +254,6 @@ async function getAllWithPackedQties(showFulfilled) {
   try {
     const d = await ShopQueue.aggregate(agg);
     const data = d?.[0]?.activeWorkOrders;
-    console.log(data)
 
     const customerTags = new Set();
     data.forEach((x) => {
@@ -247,6 +271,10 @@ async function getAllWithPackedQties(showFulfilled) {
     data.forEach((x) => {
       const tagToMatch = _customerTagFromOrderNumber(x.orderNumber);
       x.customer = customerData.find((y) => y.tag === tagToMatch)?._id;
+      
+      // fix Id
+      x.destinationCode = x._id.destinationCode;
+      x._id = x._id.itemId;
     });
 
     return [null, data];
