@@ -9,6 +9,7 @@ const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
+const { test, SetAirTableField } =  require('../service.airtable'); 
 
 module.exports = router;
 
@@ -265,6 +266,8 @@ async function myPipeline(req, res) {
   ExpressHandler(
     async () => {
 
+      //dummy data for testing (what I would expect from other function)
+      //----------------
       const orderNumbersArr = ['KB1041'];
       const customerId = '62266f18727ee33078019646';
       // console.log(customerId)
@@ -277,8 +280,11 @@ async function myPipeline(req, res) {
       const itemsShipped = { '62ea9ec30d506c1e802166e3': 
         { CUSTOMER: 3 }
       }
+      //----------------
+
       const itemsArr = Object.keys(itemsShipped);
 
+      //TODO: there is probably some ways to optimize the lookups
       const agg = [
         { $match: {
           customer: new ObjectId(customerId),
@@ -325,11 +331,7 @@ async function myPipeline(req, res) {
         } },
         { $unwind: '$workOrder' },
         { $unwind: '$workOrder.Items' },
-        // { $match: {
-        //   '_id': { $toString: '$workOrder.Items._id'} 
-        // }}
         { $match: {
-          // '_id': { $toString: '$workOrder.Items._id'} 
           $expr: { $eq: ['$_id', { $toString: '$workOrder.Items._id' } ] }
         } }, 
         { $addFields: {
@@ -343,25 +345,27 @@ async function myPipeline(req, res) {
       ];
 
 
-      
-
       const pipeline = await Shipment.aggregate(agg);
       // console.log(pipeline[0])
 
       //check to see if shipped to customer or vendor is fufilled
       //loop through pipeline data
       for ( x of pipeline ) {
+        // console.log(typeof x._id)
         const { qtyShippedCustomer, qtyShippedVendor, totalQty } = x;
         if ( qtyShippedCustomer >= totalQty ) {
           //set AT flag for shipped to customer
           console.log(`${x._id} full qty shipped to CUSTOMER`);
+          // SetAirTableField(x._id, 'Ready 2 Ship', true);
         }
         if ( qtyShippedVendor >= totalQty ) {     //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
           //set AT Flag for shipped to customer
-          console.log(`${x._id} full qty shipped to VENDOR`)
+          console.log(`${x._id} full qty shipped to VENDOR`);
+          // SetAirTableField(x._id, 'Ready 4 EPP', true);
         }
       }
 
+      SetAirTableField('6318e85175dc3d451445028a', 'Ready 4 EPP', true);
       const data = pipeline;
       return {data};
 
