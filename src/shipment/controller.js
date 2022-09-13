@@ -14,6 +14,7 @@ module.exports = router;
 
 router.get("/", getAll);
 router.put("/", createOne);
+router.get("/fakeroute", myPipeline);
 
 router.get("/search", searchShipments);
 
@@ -194,15 +195,60 @@ async function createOne(req, res) {
 
       await shipment.save();
 
+      const orderNumbers = new Set();   //keep track of orderNumbers (I think there should only ever be one)
+      let customerId;   //there will be only one 
+      const itemsShipped = {};    //key= string of woItem._id, value = total qty shipped
+
       // update all packing slips in manifest w/ this shipment's id
-      const promises = manifest.map((x) =>
-        PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } })
-      );
+      const promises = manifest.map( async (x) => {
+        // PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } }) //change this to findOne then a .save()
+        const packingSlip = await PackingSlip.findOne({ _id: x });
+
+        orderNumbers.add(packingSlip.orderNumber)
+        if ( customerId === undefined ) customerId = packingSlip.customer;
+
+        //build itemsShipped object - TODO: this needs improved
+        for ( const i of packingSlip.items ) {
+          const itemId = i.item.toString();
+          const { destination } = packingSlip;
+
+          if ( itemId in itemsShipped && destination in itemsShipped[itemId] ) {
+            itemsShipped[itemId][destination] += i.qty;
+          }
+          else if ( itemId in itemsShipped ) {
+            itemsShipped[itemId][destination] = i.qty;
+          }
+          else {
+            itemsShipped[itemId] = { [destination] : i.qty };
+          }
+
+        }
+
+        packingSlip.shipment = shipment.id;
+        packingSlip.save();
+      } );
 
       customerDoc.numShipments = numShipments + 1;
       promises.push(customerDoc.save());
 
       await Promise.all(promises);
+      console.log('----------------- results --------------------------');
+      console.log(orderNumbers)
+      console.log(customerId)
+      console.log(itemsShipped)
+
+      //do some type of pipeline to get total qty shipped vs qty needed
+      const orderNumbersArr = Array.from(orderNumbers);
+      const itemsArr = Object.keys(itemsShipped);
+
+      const agg = [
+        { $match: {
+          $expr: { $eq: ["$customer", "customerId"] },
+        }}
+      ]
+
+
+
 
       return {
         data: {
@@ -213,6 +259,118 @@ async function createOne(req, res) {
     res,
     "creating shipment"
   );
+}
+
+async function myPipeline(req, res) {
+  ExpressHandler(
+    async () => {
+
+      const orderNumbersArr = ['KB1041'];
+      const customerId = '62266f18727ee33078019646';
+      // console.log(customerId)
+      // const itemsShipped = { '62ea9ec30d506c1e802166e3': 
+      //   { 
+      //     qty: 3, 
+      //     destination: 'CUSTOMER' 
+      //   } 
+      // };
+      const itemsShipped = { '62ea9ec30d506c1e802166e3': 
+        { CUSTOMER: 3 }
+      }
+      const itemsArr = Object.keys(itemsShipped);
+
+      const agg = [
+        { $match: {
+          customer: new ObjectId(customerId),
+          isPastVersion: false,
+        } },
+        { $unwind: '$manifest'},
+        { $lookup: {
+          from: 'packingSlips',
+          localField: 'manifest',
+          foreignField: '_id',
+          as: '_manifest'
+        } },
+        { $unwind: '$_manifest' },
+        { $unwind: '$_manifest.items' },
+        { $addFields: {
+          itemId: { $toString: '$_manifest.items.item' }
+        } },
+        { $match: {
+          'itemId': itemsArr[0]
+        } },
+        { $group: {
+          _id: '$itemId',
+          orderNumber: { $first: '$_manifest.orderNumber' },
+          qtyShippedCustomer: { $sum: {
+            $cond: [
+              { $eq: ['$_manifest.destination', 'CUSTOMER'] },
+              '$_manifest.items.qty',
+              0
+            ]
+          } },
+          qtyShippedVendor: { $sum: {
+            $cond: [
+              { $eq: ['$_manifest.destination', 'VENDOR'] },
+              '$_manifest.items.qty',
+              0
+            ]
+          } }
+        } },
+        { $lookup: {
+          from: 'workorders',
+          localField: 'orderNumber',
+          foreignField: 'OrderNumber',
+          as: 'workOrder'
+        } },
+        { $unwind: '$workOrder' },
+        { $unwind: '$workOrder.Items' },
+        // { $match: {
+        //   '_id': { $toString: '$workOrder.Items._id'} 
+        // }}
+        { $match: {
+          // '_id': { $toString: '$workOrder.Items._id'} 
+          $expr: { $eq: ['$_id', { $toString: '$workOrder.Items._id' } ] }
+        } }, 
+        { $addFields: {
+          totalQty: '$workOrder.Items.Quantity',
+          calcItemId: '$workOrder.Items.calcItemId'
+        } },
+        { $project: {
+          workOrder: 0
+        }}
+
+      ];
+
+
+      
+
+      const pipeline = await Shipment.aggregate(agg);
+      // console.log(pipeline[0])
+
+      //check to see if shipped to customer or vendor is fufilled
+      //loop through pipeline data
+      for ( x of pipeline ) {
+        const { qtyShippedCustomer, qtyShippedVendor, totalQty } = x;
+        if ( qtyShippedCustomer >= totalQty ) {
+          //set AT flag for shipped to customer
+          console.log(`${x._id} full qty shipped to CUSTOMER`);
+        }
+        if ( qtyShippedVendor >= totalQty ) {     //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
+          //set AT Flag for shipped to customer
+          console.log(`${x._id} full qty shipped to VENDOR`)
+        }
+      }
+
+      const data = pipeline;
+      return {data};
+
+
+
+    },
+    res,
+    'my pipeline'
+  )
 }
 
 /**
