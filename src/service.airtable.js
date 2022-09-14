@@ -1,54 +1,39 @@
 
-
 module.exports = {
-  test,
-  SetAirTableField,
+  SetAirTableFields,
 }
 
 const AirTable = require('airtable')
 const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME } = process.env;
 
-// console.log(AIRTABLE_API_KEY)
-
-async function test(){
-  console.log(AIRTABLE_API_KEY);
-};
-
-
-async function SetAirTableField(calcItemId, field, value) {
+/**
+ * Used to update values in AirTable by searching by calcItemId === 'ShopQ Item Id'
+ * @param {String} calcItemId 
+ * @param {Object} fields 
+ */
+async function SetAirTableFields(calcItemId, fields) {
   try {
-      //setup airtable
-    // console.clear();
+    //setup airtable
     const base = new AirTable({ apiKey: AIRTABLE_API_KEY })
       .base(AIRTABLE_BASE_ID);
 
-    // const query = { maxRecords: 5 }
+    //get record for 
     const records = await base(AIRTABLE_TABLE_NAME)
       .select({
-        // filterByFormula: `Job = 'KA1028'`     //for testing    //works
-        // filterByFormula: `'ShopQ Item Id' = '${calcItemId}'`   //does not work
-        // filterByFormula: `ShopQ Item Id = '6318e85175dc3d451445028a'`    //does not work
-        // filterByFormula: `SEARCH('6318e85175dc3d451445028a', {ShopQ Item Id})`    //this works
         filterByFormula: `SEARCH('${calcItemId}', {ShopQ Item Id})` 
       })
       .all()
 
-    console.log(base)
-    console.log(records.length)
+    //TODO: check that records are found
 
     const recordId = records[0].id;   //since there will only be one record
-    console.log(recordId)
 
-
-    //UPDATE RECORD
+    //update record
     base(AIRTABLE_TABLE_NAME)
       .update([
-        // { 'id': `recZRTApgvf66lY7v`,
         { 
           'id': recordId,
-          'fields': {
-            [field]: value
-          } 
+          'fields': fields
         }
       ], function (err, records) {
         if (err) {
@@ -57,14 +42,6 @@ async function SetAirTableField(calcItemId, field, value) {
         }
         records.forEach( x => console.log(x.get('Job')))
       })
-
-    // records.forEach( x => {
-    //   console.log('-----------------  --------------------------');
-    //   // console.log(x.fields)
-    //   // console.log(x) 
-    //   console.log(x.id) 
-    //   console.log('-----------------  --------------------------');
-    // } )
   }
   catch (e) {
     console.log(e)
