@@ -24,8 +24,6 @@ async function SetAirTableFields(calcItemId, fields) {
       })
       .all()
 
-    //TODO: check that records are found
-
     const recordId = records[0].id;   //since there will only be one record
 
     //update record
@@ -35,12 +33,12 @@ async function SetAirTableFields(calcItemId, fields) {
           'id': recordId,
           'fields': fields
         }
-      ], function (err, records) {
+      ], function (err, _records) {
         if (err) {
           console.log('error updateing');   //TODO: might need to handle this error differently
           return;
         }
-        records.forEach( x => console.log(x.get('Job')))
+        // _records.forEach( x => console.log(x.get('Job')))
       })
   }
   catch (e) {
