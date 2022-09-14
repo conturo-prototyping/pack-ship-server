@@ -85,6 +85,10 @@ async function getAllWithPackedQties(showFulfilled) {
           {
             $match: {
               $or: [
+                // Keep legacy items that do not have a partRouter[]
+                // We will insert a SHIP TO CUSTOMER step manually
+                { 'Items.partRouter': { $exists: false } },
+
                 {
                   $and: [
                     { $expr: {
@@ -102,12 +106,6 @@ async function getAllWithPackedQties(showFulfilled) {
                     } }
                   ]
                 },
-
-                // Keep legacy items that do not have a partRouter[]
-                // We will insert a SHIP TO CUSTOMER step manually
-                { $expr: {
-                  $eq: ['$Items.partRouter', null]
-                } }
               ]
             } 
           },
@@ -123,7 +121,7 @@ async function getAllWithPackedQties(showFulfilled) {
                   { 
                     $or: [
                       { $eq: [ { $toUpper: '$Items.partRouter.step.name' }, 'SHIP TO CUSTOMER'] },
-                      { $eq: ['$Items.partRouter', null] }
+                      { $not: ['$Items.partRouter'] }
                     ] 
                   },
                   'CUSTOMER',
@@ -135,35 +133,14 @@ async function getAllWithPackedQties(showFulfilled) {
               // default is CUSTOMER-001 (i.e. for legacy orders)
               destinationCode : {
                 $cond: [
-                  { 
+                  {
                     $or: [
                       { $eq: [ { $toUpper: '$Items.partRouter.step.name' }, 'SHIP TO CUSTOMER'] },
-                      { $eq: ['$Items.partRouter', null] }
-                    ] 
-                  },
-
-                  //TRUE, shipment is going to CUSTOMER
-                  { 
-                    $concat: [ 
-                      'CUSTOMER',
-                      { $cond: [ 
-                        { $gt: ['$Items.partRouter.stepCode', 0] }, 
-                        
-                        //stepCode exists -> concat stepCode
-                        { $concat: ['-', { $toString: '$Items.partRouter.stepCode' } ] }, 
-                        
-                        //stepCode does not exist -> add fake stepCode
-                        '-001' 
-                      ] },
+                      { $not: ['$Items.partRouter'] }
                     ]
                   },
-
-                  // FALSE, so it has to be a vendor shipment
-                  // These are guaranteed to have a step code
-                  { $concat: [ 
-                    'VENDOR-', 
-                    { $toString: '$Items.partRouter.stepCode' }
-                  ] }
+                  { $concat: ['CUSTOMER-', { $toString: { $ifNull: ['$Items.partRouter.stepCode', '001'] } } ] },
+                  { $concat: ['VENDOR-', { $toString: '$Items.partRouter.stepCode' } ] }
                 ]
               }
             }
@@ -179,13 +156,22 @@ async function getAllWithPackedQties(showFulfilled) {
               let: { workOrderItemId: '$Items._id', destinationCode: '$destinationCode' },
               pipeline: [
                 { $match: {
-                  $expr: {
+                  // $expr: {
                     $and: [
-                      { $ne: ['$isPastVersion', true] },                  // ignore edit histories
-                      { $eq: ['$destinationCode', '$$destinationCode']},  // match by router destination code
-                      { $in: ['$$workOrderItemId', '$items.item'], }      // pull all packing slips that contain this item (to count packed qties)
+                      { $expr: { $ne: ['$isPastVersion', true] } },                  // ignore edit histories
+                      { $expr: { $in: ['$$workOrderItemId', '$items.item'] } },      // pull all packing slips that contain this item (to count packed qties)
+                      { $or: [
+                        {
+                          $and: [
+                            { 'destinationCode': { $exists: false } },
+                            { $expr: { $eq: ['$$destinationCode', 'CUSTOMER-001'] } }
+                          ],
+                        },
+                        { $expr: { $eq: ['$destinationCode', '$$destinationCode'] } }
+                      ] }
+                      // { $eq: ['$destinationCode', '$$destinationCode']},  // match by router destination code
                     ]
-                  }
+                  // }
                 } },
               ]
             },
