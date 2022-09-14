@@ -207,29 +207,11 @@ async function createOne(req, res) {
         const packingSlip = await PackingSlip.findOne({ _id: x });
 
         orderNumbers.add(packingSlip.orderNumber)
-        if ( customerId === undefined ) customerId = packingSlip.customer;
+        if ( customerId === undefined ) customerId = packingSlip.customer.toString();
 
         //build itemsShipped object - TODO: this needs improved
         for ( const i of packingSlip.items ) {
           itemsShipped.push( i.item.toString() );
-
-
-          // //I DONT THINK ANY OF THIS IS NEEDED ANYMORE
-          // //--------------------------------
-          // const itemId = i.item.toString();
-          // const { destination } = packingSlip;
-
-          // if ( itemId in itemsShipped && destination in itemsShipped[itemId] ) {
-          //   itemsShipped[itemId][destination] += i.qty;
-          // }
-          // else if ( itemId in itemsShipped ) {
-          //   itemsShipped[itemId][destination] = i.qty;
-          // }
-          // else {
-          //   itemsShipped[itemId] = { [destination] : i.qty };
-          // }
-          // //--------------------------------
-
         }
 
         packingSlip.shipment = shipment.id;
@@ -240,16 +222,9 @@ async function createOne(req, res) {
       promises.push(customerDoc.save());
 
       await Promise.all(promises);
-      console.log('----------------- results --------------------------');
-      console.log(orderNumbers)
-      console.log(customerId)
-      console.log(itemsShipped)
-
-      //start pipeline and check if AT fields need to be set
-      // const itemsArr = Object.keys(itemsShipped);   //this is needed for aggregation - NOT NEEDED ANYMORE
+      const orderNumbersArr = Array.from(orderNumbers);
 
       //aggregation
-      //TODO: there is probably some ways to optimize the lookups
       const agg = [
         { $match: {
           customer: new ObjectId(customerId),
@@ -263,16 +238,19 @@ async function createOne(req, res) {
           as: '_manifest'
         } },
         { $unwind: '$_manifest' },
-        { $unwind: '$_manifest.items' },
-        { $addFields: {
-          itemId: { $toString: '$_manifest.items.item' }
-        } },
         { $match: {
-          // 'itemId': { $in: itemsArr}
-          'itemId': { $in: itemsShipped }
+          $expr: {
+            $in: [ '$_manifest.orderNumber', orderNumbersArr]
+          }
+        } },
+        { $unwind: '$_manifest.items' },
+        { $match: {
+          $expr: { 
+            $in: [ { $toString: '$_manifest.items.item'} , itemsShipped ] 
+          }
         } },
         { $group: {
-          _id: '$itemId',
+          _id: '$_manifest.items.item',
           orderNumber: { $first: '$_manifest.orderNumber' },
           qtyShippedCustomer: { $sum: {
             $cond: [
@@ -291,28 +269,34 @@ async function createOne(req, res) {
         } },
         { $lookup: {
           from: 'workorders',
-          localField: 'orderNumber',
-          foreignField: 'OrderNumber',
-          as: 'workOrder'
+          let: { id: { $toString: '$_id' } },
+          pipeline: [
+            { $unwind: '$Items'},
+            { $match: {
+              $expr: {
+                $eq: [ '$$id', { $toString: '$Items._id' } ]
+              }
+            } },
+            { $project: {
+              'Items.Quantity': 1,
+              'Items.calcItemId': 1,
+            } },
+
+          ],
+          as: '_workOrder'
         } },
-        { $unwind: '$workOrder' },
-        { $unwind: '$workOrder.Items' },
-        { $match: {
-          $expr: { $eq: ['$_id', { $toString: '$workOrder.Items._id' } ] }
-        } }, 
+        { $unwind: '$_workOrder' },
         { $addFields: {
-          totalQty: '$workOrder.Items.Quantity',
-          calcItemId: '$workOrder.Items.calcItemId'
+          totalQty: '$_workOrder.Items.Quantity',
+          calcItemId: '$_workOrder.Items.calcItemId'
         } },
         { $project: {
-          workOrder: 0
-        }}
+          _workOrder: 0
+        } }
       ];
 
       const pipeline = await Shipment.aggregate(agg);
-      // console.log('------------------ pipeline data ---------------');
-      // console.log(pipeline);
-      // console.log('------------------  ---------------');
+      // console.log(pipeline)
 
       //loop through pipeline data and check if AT fields need set
       for ( x of pipeline ) {
@@ -349,9 +333,11 @@ async function myPipeline(req, res) {
 
       //dummy data for testing (what I would expect from other function)
       //----------------
-      const orderNumbersArr = ['KB1041'];
+      // const orderNumbersArr = ['KB1041'];
+      const orderNumbersArr = ['KB1043']; //NEW TEST
       // const customerId = '62266f18727ee33078019646';    //work
-      const customerId = '621d2f20b15b6909ceb23e23';    //home
+      const customerId = '62266f18727ee33078019646'; //NEW TEST
+      // const customerId = '621d2f20b15b6909ceb23e23';    //home
       // console.log(customerId)
       // const itemsShipped = { '62ea9ec30d506c1e802166e3': 
       //   { 
@@ -362,14 +348,21 @@ async function myPipeline(req, res) {
       // const itemsShipped = { '62ea9ec30d506c1e802166e3':    //work
       //   { CUSTOMER: 3 }
       // }
-      const itemsShipped = { '6321d773af41266e1fbe90df':    //home - not sure if this is actually needed because when this pipeline is run we don't how many were just on the shipment because that is already reflected in the db.
-        { CUSTOMER: 2 }
+      const itemsShipped = { '631751ad80b9312b0c3a76f3':    //NEW TEST
+        { CUSTOMER: 3 }
       }
+      // const itemsShipped = { '6321d773af41266e1fbe90df':    //home - not sure if this is actually needed because when this pipeline is run we don't how many were just on the shipment because that is already reflected in the db.
+      //   { CUSTOMER: 2 }
+      // }
       //----------------
 
       const itemsArr = Object.keys(itemsShipped);
+      console.log('-----------------  --------------------------');
+      console.log(orderNumbersArr)
+      console.log(customerId)
+      console.log(itemsArr)
 
-      //TODO: there is probably some ways to optimize the lookups
+      //TODO: there is probably some ways to optimize the lookups - the original (WORKS)
       const agg = [
         { $match: {
           customer: new ObjectId(customerId),
@@ -383,15 +376,19 @@ async function myPipeline(req, res) {
           as: '_manifest'
         } },
         { $unwind: '$_manifest' },
-        { $unwind: '$_manifest.items' },
-        { $addFields: {
-          itemId: { $toString: '$_manifest.items.item' }
-        } },
         { $match: {
-          'itemId': {$in : itemsArr}
+          $expr: {
+            $in: [ '$_manifest.orderNumber', orderNumbersArr]
+          }
+        } },
+        { $unwind: '$_manifest.items' },
+        { $match: {
+          $expr: { 
+            $in: [ { $toString: '$_manifest.items.item'} , itemsArr ] 
+          }
         } },
         { $group: {
-          _id: '$itemId',
+          _id: '$_manifest.items.item',
           orderNumber: { $first: '$_manifest.orderNumber' },
           qtyShippedCustomer: { $sum: {
             $cond: [
@@ -417,7 +414,9 @@ async function myPipeline(req, res) {
         { $unwind: '$workOrder' },
         { $unwind: '$workOrder.Items' },
         { $match: {
-          $expr: { $eq: ['$_id', { $toString: '$workOrder.Items._id' } ] }
+          $expr: { 
+            $eq: [ { $toString: '$_id' }, { $toString: '$workOrder.Items._id' } ] 
+          }
         } }, 
         { $addFields: {
           totalQty: '$workOrder.Items.Quantity',
@@ -429,9 +428,84 @@ async function myPipeline(req, res) {
 
       ];
 
+      console.log(itemsArr)
+      const agg2 = [
+        { $match: {
+          customer: new ObjectId(customerId),
+          isPastVersion: false,
+        } },
+        { $unwind: '$manifest'},
+        { $lookup: {
+          from: 'packingSlips',
+          localField: 'manifest',
+          foreignField: '_id',
+          as: '_manifest'
+        } },
+        { $unwind: '$_manifest' },
+        { $match: {
+          $expr: {
+            $in: [ '$_manifest.orderNumber', orderNumbersArr]
+          }
+        } },
+        { $unwind: '$_manifest.items' },
+        // { $match: {
+        //   $expr: { 
+        //     $in: [ { $toString: '$_manifest.items.item'} , itemsArr ] 
+        //   }
+        // } },
+        // { $group: {
+        //   _id: '$_manifest.items.item',
+        //   orderNumber: { $first: '$_manifest.orderNumber' },
+        //   qtyShippedCustomer: { $sum: {
+        //     $cond: [
+        //       { $eq: ['$_manifest.destination', 'CUSTOMER'] },
+        //       '$_manifest.items.qty',
+        //       0
+        //     ]
+        //   } },
+        //   qtyShippedVendor: { $sum: {
+        //     $cond: [
+        //       { $eq: ['$_manifest.destination', 'VENDOR'] },
+        //       '$_manifest.items.qty',
+        //       0
+        //     ]
+        //   } }
+        // } },
+        // { $lookup: {
+        //   from: 'workorders',
+        //   let: { id: { $toString: '$_id' } },
+        //   pipeline: [
+        //     { $unwind: '$Items'},
+        //     { $match: {
+        //       $expr: {
+        //         $eq: [ '$$id', { $toString: '$Items._id' } ]
+        //       }
+        //     } },
+        //     { $project: {
+        //       'Items.Quantity': 1,
+        //       'Items.calcItemId': 1,
+        //     } },
+
+        //   ],
+        //   as: '_workOrder'
+        // } },
+        // { $unwind: '$_workOrder' },
+        // { $addFields: {
+        //   totalQty: '$_workOrder.Items.Quantity',
+        //   calcItemId: '$_workOrder.Items.calcItemId'
+        // } },
+        // { $project: {
+        //   _workOrder: 0
+        // } }
+
+      ];
+
 
       const pipeline = await Shipment.aggregate(agg);
+      const pipeline2 = await Shipment.aggregate(agg2);
       // console.log(pipeline[0])
+      console.log(pipeline.length)
+      console.log(pipeline2.length)
 
       //check to see if shipped to customer or vendor is fufilled
       //loop through pipeline data
@@ -449,11 +523,12 @@ async function myPipeline(req, res) {
           // SetAirTableField(x._id, 'Ready 4 EPP', true);
         }
       }
-      const calcItemId = pipeline[0].calcItemId
+      // const calcItemId = pipeline[0].calcItemId
 
       // SetAirTableField('6321d773af41266e1fbe90df', 'Ready 4 EPP', true);
-      SetAirTableField(calcItemId, 'Ready 4 EPP', true);
-      const data = pipeline;
+      // SetAirTableField(calcItemId, 'Ready 4 EPP', true);
+      const data = {pipeline};
+      data.pipeline2 = pipeline2;
       return {data};
 
 
