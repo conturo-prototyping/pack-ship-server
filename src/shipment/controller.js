@@ -196,13 +196,14 @@ async function createOne(req, res) {
 
       await shipment.save();
 
-      const orderNumbers = new Set();   //keep track of orderNumbers (I think there should only ever be one)
+      const orderNumbers = new Set();   //keep track of orderNumbers (I think there should only ever be one) TODO: check on this assumption
       let customerId;   //there will be only one 
-      const itemsShipped = {};    //key= string of woItem._id, value = total qty shipped
+      // const itemsShipped = {};    //key= string of woItem._id, value = total qty shipped - OLD
+      const itemsShipped = [];
 
       // update all packing slips in manifest w/ this shipment's id
       const promises = manifest.map( async (x) => {
-        // PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } }) //change this to findOne then a .save()
+        // PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } }) // OLD CODE - change this to findOne then a .save()
         const packingSlip = await PackingSlip.findOne({ _id: x });
 
         orderNumbers.add(packingSlip.orderNumber)
@@ -210,18 +211,24 @@ async function createOne(req, res) {
 
         //build itemsShipped object - TODO: this needs improved
         for ( const i of packingSlip.items ) {
-          const itemId = i.item.toString();
-          const { destination } = packingSlip;
+          itemsShipped.push( i.item.toString() );
 
-          if ( itemId in itemsShipped && destination in itemsShipped[itemId] ) {
-            itemsShipped[itemId][destination] += i.qty;
-          }
-          else if ( itemId in itemsShipped ) {
-            itemsShipped[itemId][destination] = i.qty;
-          }
-          else {
-            itemsShipped[itemId] = { [destination] : i.qty };
-          }
+
+          // //I DONT THINK ANY OF THIS IS NEEDED ANYMORE
+          // //--------------------------------
+          // const itemId = i.item.toString();
+          // const { destination } = packingSlip;
+
+          // if ( itemId in itemsShipped && destination in itemsShipped[itemId] ) {
+          //   itemsShipped[itemId][destination] += i.qty;
+          // }
+          // else if ( itemId in itemsShipped ) {
+          //   itemsShipped[itemId][destination] = i.qty;
+          // }
+          // else {
+          //   itemsShipped[itemId] = { [destination] : i.qty };
+          // }
+          // //--------------------------------
 
         }
 
@@ -238,18 +245,92 @@ async function createOne(req, res) {
       console.log(customerId)
       console.log(itemsShipped)
 
-      //do some type of pipeline to get total qty shipped vs qty needed
-      const orderNumbersArr = Array.from(orderNumbers);
-      const itemsArr = Object.keys(itemsShipped);
+      //start pipeline and check if AT fields need to be set
+      // const itemsArr = Object.keys(itemsShipped);   //this is needed for aggregation - NOT NEEDED ANYMORE
 
+      //aggregation
+      //TODO: there is probably some ways to optimize the lookups
       const agg = [
         { $match: {
-          $expr: { $eq: ["$customer", "customerId"] },
+          customer: new ObjectId(customerId),
+          isPastVersion: false,
+        } },
+        { $unwind: '$manifest'},
+        { $lookup: {
+          from: 'packingSlips',
+          localField: 'manifest',
+          foreignField: '_id',
+          as: '_manifest'
+        } },
+        { $unwind: '$_manifest' },
+        { $unwind: '$_manifest.items' },
+        { $addFields: {
+          itemId: { $toString: '$_manifest.items.item' }
+        } },
+        { $match: {
+          // 'itemId': { $in: itemsArr}
+          'itemId': { $in: itemsShipped }
+        } },
+        { $group: {
+          _id: '$itemId',
+          orderNumber: { $first: '$_manifest.orderNumber' },
+          qtyShippedCustomer: { $sum: {
+            $cond: [
+              { $eq: ['$_manifest.destination', 'CUSTOMER'] },
+              '$_manifest.items.qty',
+              0
+            ]
+          } },
+          qtyShippedVendor: { $sum: {
+            $cond: [
+              { $eq: ['$_manifest.destination', 'VENDOR'] },
+              '$_manifest.items.qty',
+              0
+            ]
+          } }
+        } },
+        { $lookup: {
+          from: 'workorders',
+          localField: 'orderNumber',
+          foreignField: 'OrderNumber',
+          as: 'workOrder'
+        } },
+        { $unwind: '$workOrder' },
+        { $unwind: '$workOrder.Items' },
+        { $match: {
+          $expr: { $eq: ['$_id', { $toString: '$workOrder.Items._id' } ] }
+        } }, 
+        { $addFields: {
+          totalQty: '$workOrder.Items.Quantity',
+          calcItemId: '$workOrder.Items.calcItemId'
+        } },
+        { $project: {
+          workOrder: 0
         }}
-      ]
+      ];
 
+      const pipeline = await Shipment.aggregate(agg);
+      // console.log('------------------ pipeline data ---------------');
+      // console.log(pipeline);
+      // console.log('------------------  ---------------');
 
+      //loop through pipeline data and check if AT fields need set
+      for ( x of pipeline ) {
+        const { qtyShippedCustomer, qtyShippedVendor, totalQty } = x;
 
+        if ( qtyShippedCustomer >= totalQty ) {
+          //set AT flag for shipped to customer
+          console.log(`${x.calcItemId} full qty shipped to CUSTOMER`);
+          SetAirTableField(x.calcItemId, 'Ready 2 Ship', true);
+        }
+
+        //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
+        if ( qtyShippedVendor >= totalQty ) {
+          //set AT Flag for shipped to customer
+          console.log(`${x.calcItemId} full qty shipped to VENDOR`);
+          SetAirTableField(x.calcItemId, 'Ready 4 EPP', true);
+        }
+      }
 
       return {
         data: {
@@ -269,7 +350,8 @@ async function myPipeline(req, res) {
       //dummy data for testing (what I would expect from other function)
       //----------------
       const orderNumbersArr = ['KB1041'];
-      const customerId = '62266f18727ee33078019646';
+      // const customerId = '62266f18727ee33078019646';    //work
+      const customerId = '621d2f20b15b6909ceb23e23';    //home
       // console.log(customerId)
       // const itemsShipped = { '62ea9ec30d506c1e802166e3': 
       //   { 
@@ -277,8 +359,11 @@ async function myPipeline(req, res) {
       //     destination: 'CUSTOMER' 
       //   } 
       // };
-      const itemsShipped = { '62ea9ec30d506c1e802166e3': 
-        { CUSTOMER: 3 }
+      // const itemsShipped = { '62ea9ec30d506c1e802166e3':    //work
+      //   { CUSTOMER: 3 }
+      // }
+      const itemsShipped = { '6321d773af41266e1fbe90df':    //home - not sure if this is actually needed because when this pipeline is run we don't how many were just on the shipment because that is already reflected in the db.
+        { CUSTOMER: 2 }
       }
       //----------------
 
@@ -303,7 +388,7 @@ async function myPipeline(req, res) {
           itemId: { $toString: '$_manifest.items.item' }
         } },
         { $match: {
-          'itemId': itemsArr[0]
+          'itemId': {$in : itemsArr}
         } },
         { $group: {
           _id: '$itemId',
@@ -364,8 +449,10 @@ async function myPipeline(req, res) {
           // SetAirTableField(x._id, 'Ready 4 EPP', true);
         }
       }
+      const calcItemId = pipeline[0].calcItemId
 
-      SetAirTableField('6318e85175dc3d451445028a', 'Ready 4 EPP', true);
+      // SetAirTableField('6321d773af41266e1fbe90df', 'Ready 4 EPP', true);
+      SetAirTableField(calcItemId, 'Ready 4 EPP', true);
       const data = pipeline;
       return {data};
 
