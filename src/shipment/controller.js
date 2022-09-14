@@ -9,7 +9,7 @@ const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
-const { test, SetAirTableField } =  require('../service.airtable'); 
+const { SetAirTableFields } =  require('../service.airtable'); 
 
 module.exports = router;
 
@@ -198,18 +198,16 @@ async function createOne(req, res) {
 
       const orderNumbers = new Set();   //keep track of orderNumbers (I think there should only ever be one) TODO: check on this assumption
       let customerId;   //there will be only one 
-      // const itemsShipped = {};    //key= string of woItem._id, value = total qty shipped - OLD
       const itemsShipped = [];
 
       // update all packing slips in manifest w/ this shipment's id
       const promises = manifest.map( async (x) => {
-        // PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } }) // OLD CODE - change this to findOne then a .save()
         const packingSlip = await PackingSlip.findOne({ _id: x });
 
         orderNumbers.add(packingSlip.orderNumber)
         if ( customerId === undefined ) customerId = packingSlip.customer.toString();
 
-        //build itemsShipped object - TODO: this needs improved
+        //build itemsShipped object
         for ( const i of packingSlip.items ) {
           itemsShipped.push( i.item.toString() );
         }
@@ -296,23 +294,26 @@ async function createOne(req, res) {
       ];
 
       const pipeline = await Shipment.aggregate(agg);
-      // console.log(pipeline)
 
       //loop through pipeline data and check if AT fields need set
+      const fields = {};
       for ( x of pipeline ) {
-        const { qtyShippedCustomer, qtyShippedVendor, totalQty } = x;
+        const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } = x;
 
         if ( qtyShippedCustomer >= totalQty ) {
-          //set AT flag for shipped to customer
-          console.log(`${x.calcItemId} full qty shipped to CUSTOMER`);
-          SetAirTableField(x.calcItemId, 'Ready 2 Ship', true);
+          //set fields key/value to be set in AT
+          fields['Ready 2 Ship'] = true;
         }
 
         //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
         if ( qtyShippedVendor >= totalQty ) {
-          //set AT Flag for shipped to customer
-          console.log(`${x.calcItemId} full qty shipped to VENDOR`);
-          SetAirTableField(x.calcItemId, 'Ready 4 EPP', true);
+          //set fields key/value to be set in AT
+          fields['Ready 4 EPP'] = true;
+        }
+
+        //set AirTable fields (if needed)
+        if ( Object.keys(fields).length > 0 ) {
+          SetAirTableFields( calcItemId, fields );
         }
       }
 
@@ -515,18 +516,18 @@ async function myPipeline(req, res) {
         if ( qtyShippedCustomer >= totalQty ) {
           //set AT flag for shipped to customer
           console.log(`${x._id} full qty shipped to CUSTOMER`);
-          // SetAirTableField(x._id, 'Ready 2 Ship', true);
+          // SetAirTableFields(x._id, 'Ready 2 Ship', true);
         }
         if ( qtyShippedVendor >= totalQty ) {     //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
           //set AT Flag for shipped to customer
           console.log(`${x._id} full qty shipped to VENDOR`);
-          // SetAirTableField(x._id, 'Ready 4 EPP', true);
+          // SetAirTableFields(x._id, 'Ready 4 EPP', true);
         }
       }
       // const calcItemId = pipeline[0].calcItemId
 
-      // SetAirTableField('6321d773af41266e1fbe90df', 'Ready 4 EPP', true);
-      // SetAirTableField(calcItemId, 'Ready 4 EPP', true);
+      // SetAirTableFields('6321d773af41266e1fbe90df', 'Ready 4 EPP', true);
+      // SetAirTableFields(calcItemId, 'Ready 4 EPP', true);
       const data = {pipeline};
       data.pipeline2 = pipeline2;
       return {data};
