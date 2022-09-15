@@ -1,10 +1,13 @@
 const { Router } = require('express');
 const router = Router();
+const { LogError, ExpressHandler, HTTPError } = require('../utils');
+const IncomingDelivery = require('./model');    //causing an error
 
 router.get('/', getAll);
 router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
+// router.post('/createNew', CreateNew)
 
 module.exports = {
   router,
@@ -26,7 +29,26 @@ async function CreateNew(
   isDueBackOn,
   sourceShipmentId=undefined
 ) {
-  throw new Error('Not implemented.');
+  try {
+    const deliveryInfo = {
+      internalPurchaseOrderNumber,
+      createdBy: creatingUserId,
+      isDueBackOn,
+    };
+
+    if ( sourceShipmentId ) deliveryInfo.sourceShipmentId = sourceShipmentId;
+
+    const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
+    await newIncomingDelivery.save();
+
+    return [ , newIncomingDelivery._id];
+  } 
+  catch (error) {
+    LogError(error);
+    return [error];
+  }
+  
+  // throw new Error('Not implemented.');
 }
 
 /**
@@ -41,6 +63,31 @@ function getAll(req, res) {
  * Use this only for manual entries.
  */
 function createOne(req, res) {
+  ExpressHandler( 
+    async () => { 
+      const {
+        internalPurchaseOrderNumber,
+        isDueBackOn,
+        sourceShipmentId
+      } = req.body;
+
+      const { _id } = req.user;
+
+      const [err, incomingDeliveryId] = await CreateNew(
+        internalPurchaseOrderNumber,
+        _id,
+        isDueBackOn,
+        sourceShipmentId
+      );
+
+      if ( err ) return HTTPError('error creating new incoming delivery');
+
+      const data = { incomingDeliveryId };
+      return { data };
+    }, 
+    res, 
+    'creating an incoming delivery' 
+  );
 
 }
 
