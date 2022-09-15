@@ -7,7 +7,6 @@ router.get('/', getAll);
 router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
-// router.post('/createNew', CreateNew)
 
 module.exports = {
   router,
