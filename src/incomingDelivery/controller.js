@@ -54,6 +54,19 @@ async function CreateNew(
  * Fetch all incoming deliveries ever created.
  */
 function getAll(req, res) {
+  ExpressHandler( 
+    async () => { 
+      const allIncomingDeliveries = await IncomingDelivery.find()
+        .lean()
+        .select('sourceShipmentId')
+        .exec();
+
+      const data = { allIncomingDeliveries };
+      return { data };
+    }, 
+    res, 
+    'getting all incoming deliveries' 
+  );
 
 }
 
