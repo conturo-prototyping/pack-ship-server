@@ -38,6 +38,6 @@ const schema = new Schema({
   }
 });
 
-const Model = model("shipment", schema, "shipments");
+const Model = model("incomingDelivery", schema, "incomingDeliveries");
 
 module.exports = Model;
