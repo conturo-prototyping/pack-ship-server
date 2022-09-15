@@ -46,8 +46,6 @@ async function CreateNew(
     LogError(error);
     return [error];
   }
-  
-  // throw new Error('Not implemented.');
 }
 
 /**
