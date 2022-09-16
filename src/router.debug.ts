@@ -4,11 +4,12 @@ import { randomInt } from 'crypto';
 import { CustomerPartModel, ICustomerPart } from './customerPart/model';
 import { JobModel, IJob } from './job/model';
 import { LotModel } from './lot/model';
+import { RouteStepModel } from './routeStep/model';
+import { RouteTemplateModel } from './routeTemplate/model';
 
 const Customer = require('./customer/model');
 
 const router = express.Router();
-
 router.post('/reset', resetData);
 
 /**
@@ -19,7 +20,7 @@ async function resetData(_req: Request, res: Response) {
   console.debug('Resetting data...');
 
   try {
-    const [dropErr] = await dropAllCollections();
+    const [dropErr] = await DropAllCollections();
     if (dropErr) res.status(500).send(dropErr.message);
 
     const tags = ['ABC', 'DEF', 'GHI'];
@@ -74,8 +75,8 @@ async function createRandomSetupData(customers) {
         const externals = ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D'];
 
         const sliceStart = randomInt(0, externals.length);
-        const sliceEnd = randomInt(sliceStart, externals.length+1);
-  
+        const sliceEnd = randomInt(sliceStart, externals.length + 1);
+
         const newJob = new JobModel({
           partId: p,
           dueDate: new Date(Math.random() * Date.now()).toLocaleDateString(),
@@ -83,15 +84,15 @@ async function createRandomSetupData(customers) {
           material: ['Aluminum', 'Titanium', 'Stainless', 'Plastic'][randomInt(0, 3)],
           externalPostProcesses: externals.slice(sliceStart, sliceEnd),
         });
-  
+
         const newLot = new LotModel({
-          jobId:    newJob._id,
+          jobId: newJob._id,
           quantity: newJob.batchQty,
-          router: []
+          router: [],
         });
 
         await newLot.save();
-        newJob.lots = [ newLot._id ];
+        newJob.lots = [newLot._id];
 
         await newJob.save();
         allJobs.push(newJob);
@@ -105,10 +106,11 @@ async function createRandomSetupData(customers) {
 /**
  * Drop all collections.
  */
-async function dropAllCollections() {
+export async function DropAllCollections() {
   const dropCollection = async (model) => {
     try {
       await model.collection.drop();
+
       return true;
     } catch (e: any) {
       // collection doesn't exist; ok
@@ -125,6 +127,8 @@ async function dropAllCollections() {
     await dropCollection(CustomerPartModel),
     await dropCollection(JobModel),
     await dropCollection(LotModel),
+    await dropCollection(RouteStepModel),
+    await dropCollection(RouteTemplateModel)
   ];
 
   if (ok.some((x) => !x)) return [new Error('Error dropping collections')];
