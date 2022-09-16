@@ -15,7 +15,8 @@
     "no-restricted-syntax": ["error", "ForInStatement", "LabeledStatement", "WithStatement"],
     "prefer-const": ["error", {
       "destructuring": "all"
-    }]
+    }],
+    "linebreak-style": "off"
   },
   "env": {
     "es2021": true,
