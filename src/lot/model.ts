@@ -21,6 +21,8 @@ export interface ILot extends Document {
     stepCode: Number,
     stepDetails: String
   }];
+
+  rev: String;
 }
 
 export const LotSchema = new Schema<ILot>({
@@ -36,6 +38,8 @@ export const LotSchema = new Schema<ILot>({
     stepCode: Number,
     stepDetails: String,
   }],
+
+  rev: String,
 });
 
 export const LotModel = model<ILot>('lot', LotSchema);
