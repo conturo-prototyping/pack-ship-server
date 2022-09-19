@@ -262,14 +262,8 @@ function getAsPDF(req, res) {
 
       if (shopQErr) return shopQErr;
 
-      const fulfilledBlock = _pdf_makeFulfilledBlock(
-        packingSlips.map((x) => x.items).flat(),
-        shopQOrderInfo.itemsInOrder
-      );
-
       const data = _pdf_MakeDocDef(
         packingSlips.find((x) => String(x._id) === packingSlipId),
-        fulfilledBlock,
         shopQOrderInfo
       );
 
@@ -584,7 +578,7 @@ async function updatePackingSlipTrackingHistory(pid) {
   await editedPackingSlip.save();
 }
 
-function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {
+function _pdf_MakeDocDef(packingSlipDoc, shopQOrderInfo) {
   const { orderNumber, packingSlipId, items, dateCreated, createdBy } =
     packingSlipDoc;
   const { shippingContact, purchaseOrderNumber } = shopQOrderInfo;
@@ -600,12 +594,15 @@ function _pdf_MakeDocDef(packingSlipDoc, fulfilledBlock, shopQOrderInfo) {
   const signaturesBlock = _pdf_makeSignaturesBlock(createdBy);
 
   const docDefinition = {
+    watermark: {
+      text: 'PREVIEW ONLY',
+      color: 'red'
+    }, 
     content: [
       bannerBlock,
       shipToBlock,
       manifestBlock,
       signaturesBlock,
-      fulfilledBlock,
     ],
     header: {
       text: packingSlipId,
@@ -842,32 +839,11 @@ function _pdf_makeSignaturesBlock(packedByUsername) {
         ],
       ],
     },
-    pageBreak: "after",
     unbreakable: true,
   };
 }
 
-/**
- *
- */
-function _pdf_makeFulfilledBlock(allPackingSlipItems) {
-  let items = allPackingSlipItems.reduce((prev, curr) => {
-    const { item, qty } = curr;
-    const id = String(item._id);
 
-    if (id in prev === false) {
-      prev[id] = { item, qty: 0 };
-    }
-
-    prev[id].qty += qty;
-    return prev;
-  }, {});
-
-  return _pdf_makeManifestBlock(
-    Object.values(items),
-    "Items Shipped To Date (Including Above)"
-  );
-}
 
 /**
  * Instead of the method used by ShopQ that relies on awaiting fetching image from imgur,
