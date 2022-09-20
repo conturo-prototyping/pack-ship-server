@@ -26,6 +26,14 @@ const schema = new Schema({
     ref: 'shipment'
   },
 
+  // Used to track any potential loss
+  // best case:   just a copy of packing slip
+  // worst case:  copy of packing slip with all qty = 0 
+  receivedQuantities: [{
+    item: ObjectId,
+    qty: Number
+  }],
+
   // mm/dd/yyyy formatted Date of date due
   // This should always exist
   isDueBackOn: String,
