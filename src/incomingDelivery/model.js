@@ -10,6 +10,12 @@ const { ObjectId } = Schema.Types;
 
 const schema = new Schema({
   
+  // This should be <Source Shipment Label>-R<Optional Number>
+  // For example, if source shipment label is "AUR-SH103"
+  // This label should be "AUR-SH103-R"
+  // ** In case we get 2+ return shipments from the same source, just append R2, 3, 4, etc... skip 1
+  label: String,
+
   // the person that created this delivery
   createdBy: {
     type: ObjectId,
