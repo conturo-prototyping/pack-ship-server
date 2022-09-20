@@ -4,6 +4,11 @@
   "main": "index.js",
   "license": "MIT",
   "devDependencies": {
+    "@types/chai": "^4.3.3",
+    "@types/mocha": "^9.1.1",
+    "chai": "^4.3.6",
+    "chai-http": "^4.3.0",
+    "mocha": "^10.0.0",
     "nodemon": "^2.0.15"
   },
   "dependencies": {
@@ -20,6 +25,6 @@
   },
   "scripts": {
     "dev": "nodemon ./src/app.js",
-    "test": "mocha -r dotenv/config --exit"
+    "test": "mocha './tests/**/*.spec.js'"
   }
 }
