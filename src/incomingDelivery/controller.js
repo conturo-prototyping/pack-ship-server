@@ -110,7 +110,7 @@ function getQueue(req, res) {
         .exec();
 
       const ordersSet = new Set();    //use to track all workOrders that need to be fetched
-      const itesmObjs = {};
+      const itemsObjs = {};
       const promises = [];
 
       //map _deliveries into almost final format
@@ -124,7 +124,25 @@ function getQueue(req, res) {
            //check if ordersSet has order number already, add if not
           if ( ordersSet.has(m.orderNumber) === false ) {
             ordersSet.add(m.orderNumber)
-            promises.push( _populateItems(m.orderNumber) )
+            const _populateItems = async (orderNumber) => {
+              const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
+                .lean()
+                .select('Items')
+                .exec();
+
+              for ( const woItem of workOrder.Items ) {
+                const { OrderNumber, PartNumber, PartName, Revision, batchNumber } = woItem;
+                const _woItem = {
+                  orderNumber: OrderNumber,
+                  partNumber: PartNumber,
+                  partDescription: PartName,
+                  partRev: Revision,
+                  batch: batchNumber,
+                };
+                itemsObjs[woItem._id] = _woItem;
+              }
+            };
+            promises.push( _populateItems(m.orderNumber) );
           }
         }
 
@@ -140,36 +158,20 @@ function getQueue(req, res) {
 
       await Promise.all(promises)
 
-      //helper to get item info from workOrder
-      async function _populateItems(orderNumber) {
-        const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
-          .lean()
-          .select('Items')
-          .exec();
+      //loop through deliveries and create mutated ret array
+      const ret = deliveries.map( d => {
+        const _manifest = d.manifest.map( ({ item, qty }) => {
+          return {
+            item: itemsObjs[item],
+            qty
+          }
+        })
+        d.manifest = _manifest;
+        return d;
+      })
 
-        for ( const woItem of workOrder.Items ) {
-          const { OrderNumber, PartNumber, PartName, Revision, batchNumber } = woItem;
-          const _woItem = {
-            orderNumber: OrderNumber,
-            partNumber: PartNumber,
-            partDescription: PartName,
-            partRev: Revision,
-            batch: batchNumber,
-          };
-          itesmObjs[woItem._id] = _woItem;
-        }
-      };
 
-      //loop through deliveries and set item value
-      for ( const delivery of deliveries ) {
-        for ( m of delivery.manifest ) {
-          delete m._id;
-          const itemId = m.item;
-          m.item = itesmObjs[itemId];
-        }
-      }     
-
-      const data = { deliveries };
+      const data = { ret }
       return { data };
     }, 
     res, 
