@@ -150,29 +150,39 @@ async function getAllWithPackedQties(showFulfilled) {
           {
             $lookup: {
               from: "packingSlips",
-              // localField: "Items._id",
-              // foreignField: "items.item",
               as: "packingSlips",
               let: { workOrderItemId: '$Items._id', destinationCode: '$destinationCode' },
               pipeline: [
                 { $match: {
-                  // $expr: {
-                    $and: [
-                      { $expr: { $ne: ['$isPastVersion', true] } },                  // ignore edit histories
-                      { $expr: { $in: ['$$workOrderItemId', '$items.item'] } },      // pull all packing slips that contain this item (to count packed qties)
-                      { $or: [
-                        {
-                          $and: [
-                            { 'destinationCode': { $exists: false } },
-                            { $expr: { $eq: ['$$destinationCode', 'CUSTOMER-001'] } }
-                          ],
-                        },
-                        { $expr: { $eq: ['$destinationCode', '$$destinationCode'] } }
-                      ] }
-                      // { $eq: ['$destinationCode', '$$destinationCode']},  // match by router destination code
-                    ]
-                  // }
+                  $and: [
+                    { $expr: { $ne: ['$isPastVersion', true] } },                  // ignore edit histories
+                    { $expr: { $in: ['$$workOrderItemId', '$items.item'] } },      // pull all packing slips that contain this item (to count packed qties)
+                  ]
                 } },
+                { $unwind: '$items' },
+                { $match: {
+                  $or: [
+                    {
+                      $and: [
+                        { 'items.destinationCode': { $exists: false } },
+                        { $expr: { $eq: ['$$destinationCode', 'CUSTOMER-001'] } }
+                      ],
+                    },
+                    { $expr: { $eq: ['$items.destinationCode', '$$destinationCode'] } }
+                  ]
+                } },
+                { $group: {
+                  _id: '$_id',
+                  orderNumber:    { $first: '$orderNumber' },
+                  customer:       { $first: '$customer' },
+                  packingSlipId:  { $first: '$packingSlipId' },
+                  items:          { $push: '$items' },
+                  dateCreated:    { $first: '$dateCreated' },
+                  createdBy:      { $first: '$createdBy' },
+                  shipment:       { $first: '$shipment' },
+                  isPastVersion:  { $first: '$isPastVersion' },
+                  destination:    { $first: '$destination' }
+                } }
               ]
             },
           },
@@ -240,6 +250,8 @@ async function getAllWithPackedQties(showFulfilled) {
   try {
     const d = await ShopQueue.aggregate(agg);
     const data = d?.[0]?.activeWorkOrders;
+
+    console.debug(data.filter(x => x.orderNumber === 'WAABI1006'));
 
     const customerTags = new Set();
     data.forEach((x) => {
