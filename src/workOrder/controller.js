@@ -7,7 +7,12 @@ const Customer = require("../customer/model");
 router.get("/packingQueue", getPackingQueue);
 router.get("/", getAll);
 
-module.exports = router;
+const DEFAULT_DESTINATION_CODE = 'CUSTOMER-001';
+
+module.exports = {
+  router,
+  DEFAULT_DESTINATION_CODE,
+};
 
 /**
  * Get an array of all work orders along with their 'packedQty' values (qty in packing slips)
@@ -250,8 +255,6 @@ async function getAllWithPackedQties(showFulfilled) {
   try {
     const d = await ShopQueue.aggregate(agg);
     const data = d?.[0]?.activeWorkOrders;
-
-    console.debug(data.filter(x => x.orderNumber === 'WAABI1006'));
 
     const customerTags = new Set();
     data.forEach((x) => {
