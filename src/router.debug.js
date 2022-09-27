@@ -57,6 +57,21 @@ async function resetData(_req, res) {
           PartName:     'Dummy part for testing...',
           Revision:     ['A', 'B', 'C'][randomInt(0,2)],
           Quantity:     randomInt(1, 50),
+          partRouter:   [
+            {
+              step: { category: 'MACHINING', name: 'Machine Lot' },
+              stepCode: 100
+            },
+            {
+              step: { category: 'SHIPPING', name: 'Ship To Vendor' },
+              stepCode: 200
+            },
+            {
+              step: { category: 'SHIPPING', name: 'Ship To Customer' },
+              stepCode: 300
+            },
+          ],
+          released: true
         };
 
         for (let k = 1; k < randomInt(4); k++) {

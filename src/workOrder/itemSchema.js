@@ -11,6 +11,9 @@ const WorkOrderItemSchema = new mongoose.Schema({
   Revision:     String,
   Quantity:     Number,
   batchNumber:  { type: Number, default: 1 },
+
+  partRouter: [],
+  released: Boolean
 });
  
  module.exports = WorkOrderItemSchema;

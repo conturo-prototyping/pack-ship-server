@@ -59,27 +59,125 @@ async function getAllWithPackedQties(showFulfilled) {
             },
           },
           { $unwind: "$Items" },
+
+          // only keep:
+          // released && !onHold
+          { 
+            $match: {
+              $and: [
+                { $expr: { $eq: [ '$Items.released', true ] } },
+                { $expr: { $ne: [ '$Items.onHold', true ] } },
+              ]
+            }
+          },
+
+          // now we start making unique entries for every shipping step in the router
+          // Essentially, we only keep shipping steps & assign them a code
+          // then we tally everything up
+          {
+            $unwind: {
+              path: '$Items.partRouter',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+
+          // Filter out non-shipping steps
+          {
+            $match: {
+              $or: [
+                // Keep legacy items that do not have a partRouter[]
+                // We will insert a SHIP TO CUSTOMER step manually
+                { 'Items.partRouter': { $exists: false } },
+
+                {
+                  $and: [
+                    { $expr: {
+                      $eq: [ { $toUpper: '$Items.partRouter.step.category' }, 'SHIPPING' ]
+                    } },
+
+                    // If the shipping step was NULLED out, discard it
+                    { $expr: {
+                      $ne: [
+                        { $substr: [
+                          '$Items.partRouter.step.name', 0, 6
+                        ] },
+                        '-NULL-'
+                      ]
+                    } }
+                  ]
+                },
+              ]
+            } 
+          },
+
+          // add in destination and destinationCode fields
+          {
+            $addFields: {
+
+              // destination is either CUSTOMER or VENDOR
+              // default is CUSTOMER (if no router exists i.e. legacy orders)
+              destination: {
+                $cond: [
+                  { 
+                    $or: [
+                      { $eq: [ { $toUpper: '$Items.partRouter.step.name' }, 'SHIP TO CUSTOMER'] },
+                      { $not: ['$Items.partRouter'] }
+                    ] 
+                  },
+                  'CUSTOMER',
+                  'VENDOR'
+                ]
+              }, 
+
+              // destination code is <DESTINATION>-<STEP NUMBER>
+              // default is CUSTOMER-001 (i.e. for legacy orders)
+              destinationCode : {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: [ { $toUpper: '$Items.partRouter.step.name' }, 'SHIP TO CUSTOMER'] },
+                      { $not: ['$Items.partRouter'] }
+                    ]
+                  },
+                  { $concat: ['CUSTOMER-', { $toString: { $ifNull: ['$Items.partRouter.stepCode', '001'] } } ] },
+                  { $concat: ['VENDOR-', { $toString: '$Items.partRouter.stepCode' } ] }
+                ]
+              }
+            }
+          },
+
+          // match entries to their packing slips by itemId & destinationCode
           {
             $lookup: {
               from: "packingSlips",
               // localField: "Items._id",
               // foreignField: "items.item",
               as: "packingSlips",
-              let: { workOrderItemId: '$Items._id' },
+              let: { workOrderItemId: '$Items._id', destinationCode: '$destinationCode' },
               pipeline: [
                 { $match: {
-                  $expr: {
+                  // $expr: {
                     $and: [
-                      { $in: ['$$workOrderItemId', '$items.item'], },
-                      { $ne: ['$isPastVersion', true] }
+                      { $expr: { $ne: ['$isPastVersion', true] } },                  // ignore edit histories
+                      { $expr: { $in: ['$$workOrderItemId', '$items.item'] } },      // pull all packing slips that contain this item (to count packed qties)
+                      { $or: [
+                        {
+                          $and: [
+                            { 'destinationCode': { $exists: false } },
+                            { $expr: { $eq: ['$$destinationCode', 'CUSTOMER-001'] } }
+                          ],
+                        },
+                        { $expr: { $eq: ['$destinationCode', '$$destinationCode'] } }
+                      ] }
+                      // { $eq: ['$destinationCode', '$$destinationCode']},  // match by router destination code
                     ]
-                  }
+                  // }
                 } },
               ]
             },
           },
 
-          // unwind
+          // unwind packing slips & items[] so we can ditch duplicates
           {
             $unwind: {
               path: "$packingSlips",
@@ -92,6 +190,7 @@ async function getAllWithPackedQties(showFulfilled) {
               preserveNullAndEmptyArrays: true,
             },
           },
+          
 
           // get rid of duplicates
           // AND keep work orders with no packing slips
@@ -107,16 +206,13 @@ async function getAllWithPackedQties(showFulfilled) {
           // sum quantities
           {
             $group: {
-              _id: "$Items._id",
-              packedQty: {
-                $sum: {
-                  $cond: [
-                    { $eq: ['$packingSlips.destination', 'CUSTOMER'] },
-                    '$packingSlips.items.qty',
-                    0
-                  ]
-                },
+              _id: {
+                itemId: "$Items._id",
+                destinationCode: '$destinationCode'
               },
+
+              // sum of packed quantities
+              packedQty: { $sum: '$packingSlips.items.qty' },
               batchQty: { $first: "$Items.Quantity" },
 
               batch: { $first: "$Items.batchNumber" },
@@ -124,17 +220,19 @@ async function getAllWithPackedQties(showFulfilled) {
               partNumber: { $first: "$Items.PartNumber" },
               orderNumber: { $first: "$Items.OrderNumber" },
               partDescription: { $first: "$Items.PartName" },
+              released: { $first: '$Items.released' },
+              destination: { $first: '$destination'},
             },
           },
-        ],
-      },
+        ]
+      }
     },
   ];
 
   if (!showFulfilled) {
     agg[0].$lookup.pipeline.push({
       $match: {
-        $expr: { $gt: ["$batchQty", "$packedQty"] },
+        $expr: { $gte: ["$batchQty", "$packedQty"] },
       },
     });
   }
@@ -159,6 +257,10 @@ async function getAllWithPackedQties(showFulfilled) {
     data.forEach((x) => {
       const tagToMatch = _customerTagFromOrderNumber(x.orderNumber);
       x.customer = customerData.find((y) => y.tag === tagToMatch)?._id;
+      
+      // fix Id
+      x.destinationCode = x._id.destinationCode;
+      x._id = x._id.itemId;
     });
 
     return [null, data];

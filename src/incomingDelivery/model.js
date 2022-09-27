@@ -10,6 +10,12 @@ const { ObjectId } = Schema.Types;
 
 const schema = new Schema({
   
+  // This should be <Source Shipment Label>-R<Optional Number>
+  // For example, if source shipment label is "AUR-SH103"
+  // This label should be "AUR-SH103-R"
+  // ** In case we get 2+ return shipments from the same source, just append R2, 3, 4, etc... skip 1
+  label: String,
+
   // the person that created this delivery
   createdBy: {
     type: ObjectId,
@@ -25,6 +31,14 @@ const schema = new Schema({
     type: ObjectId,
     ref: 'shipment'
   },
+
+  // Used to track any potential loss
+  // best case:   just a copy of packing slip
+  // worst case:  copy of packing slip with all qty = 0 
+  receivedQuantities: [{
+    item: ObjectId,
+    qty: Number
+  }],
 
   // mm/dd/yyyy formatted Date of date due
   // This should always exist
