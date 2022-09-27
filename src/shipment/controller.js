@@ -225,9 +225,18 @@ async function getOne(req, res) {
       const [_, { allShipments }] = await getPopulatedShipmentData(sid);
       const shipment = allShipments[0];
 
+      let shipmentDollarValue = 0;
+      for ( m of shipment.manifest) {
+        for ( item of m.items) {
+          const { qty, unitRate } = item;
+          shipmentDollarValue += (qty * unitRate);
+        }
+      }
+
       return {
         data: {
           shipment,
+          shipmentDollarValue,
         },
       };
     },
@@ -419,6 +428,30 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                       $expr: { $eq: ["$Items._id", "$$packedItemIds"] },
                     },
                   },
+                  { $lookup: {
+                    from: 'genOrders-v2',
+                    let: {
+                      orderNumber: '$OrderNumber',
+                      calcItemId: '$Items.calcItemId'
+                    },
+                    pipeline: [
+                      { $match: {
+                        $expr: { $eq: ['$orderNumber', '$$orderNumber'] },
+                      } },
+                      { $unwind: '$content.order.items' },
+                      { $match: {
+                        $expr: { $eq: [ { $toString: '$content.order.items._id' }, '$$calcItemId' ] }
+                      } },
+                      { $addFields: {
+                        unitRate: '$content.order.items.calculations.header.unitRate'
+                      } },
+                      { $project: {
+                        unitRate: 1
+                      } }
+
+                    ], 
+                    as: 'genOrder'
+                  } },
                   {
                     $group: {
                       _id: "$Items._id",
@@ -428,10 +461,16 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                           orderNumber: "$Items.OrderNumber",
                           partNumber: "$Items.PartNumber",
                           partDescription: "$Items.PartName",
+                          calcItemId: '$Items.calcItemId',
                           partRev: "$Items.Revision",
                           batch: "$Items.batchNumber",
                           quantity: "$Items.Quantity", // batchQty
                         },
+                      },
+                      unitRate: { 
+                        $first: { 
+                          $arrayElemAt: ['$genOrder.unitRate', 0] 
+                        } 
                       },
                       packingSlipId: { $first: "$$packingSlipOID" },
                       packedQty: { $first: "$$packedItemQtys" },
@@ -460,6 +499,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                     _id: { $arrayElemAt: ["$items.rowId", 0] },
                     item: { $arrayElemAt: ["$items.item", 0] },
                     qty: { $arrayElemAt: ["$items.packedQty", 0] },
+                    unitRate: { $arrayElemAt: ["$items.unitRate", 0] },
                   },
                 },
                 customer: { $first: "$customer" },
