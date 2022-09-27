@@ -103,7 +103,7 @@ function getQueue(req, res) {
 function setReceived(req, res) {
   ExpressHandler( 
     async () => { 
-      const { _id } = req.body;
+      const { _id, receivedQuantities } = req.body;
       const userId = req.user._id
       
       const incomingDelivery = await IncomingDelivery.findOne({ _id });
@@ -111,14 +111,13 @@ function setReceived(req, res) {
 
       incomingDelivery.receivedOn = new Date();
       incomingDelivery.receivedBy = userId;
+      incomingDelivery.receivedQuantities = receivedQuantities;
 
       await incomingDelivery.save();
-      const data = { message: 'sucess' };
+      const data = { message: 'success' };
       return { data };
     }, 
     res, 
     'setting received data for incoming delivery' 
   );
-
-
 }
