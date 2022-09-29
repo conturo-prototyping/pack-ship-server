@@ -125,7 +125,10 @@ function getOne(req, res) {
         .lean()
         .exec();
 
+      if ( !incomingDelivery ) return HTTPError('delivery not found');
+
       if ( !incomingDelivery.createdBy ) incomingDelivery.createdBy = 'AUTO';
+      incomingDelivery.source = 'VENDOR';
 
       const data = {incomingDelivery};
       return { data };
