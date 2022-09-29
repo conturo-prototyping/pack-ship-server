@@ -66,7 +66,7 @@ const schema = new Schema({
     default: 'CUSTOMER'
   },
 
-  destinationCode: String,
+  // destinationCode: String,
 });
 
 const Model = model("packingSlip", schema, "packingSlips");
