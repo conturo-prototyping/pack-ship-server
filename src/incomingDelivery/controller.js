@@ -3,6 +3,7 @@ const router = Router();
 const { LogError, ExpressHandler, HTTPError } = require('../utils');
 const IncomingDelivery = require('./model');    //causing an error
 const WorkOrder = require('../workOrder/model');
+const Shipment = require('../shipment/model');
 
 router.get('/', getAll);
 router.put('/', createOne);
@@ -27,6 +28,7 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
+  label,
   sourceShipmentId=undefined
 ) {
   try {
@@ -34,9 +36,11 @@ async function CreateNew(
       internalPurchaseOrderNumber,
       createdBy: creatingUserId,
       isDueBackOn,
+      sourceShipmentId,
+      label,
     };
 
-    if ( sourceShipmentId ) deliveryInfo.sourceShipmentId = sourceShipmentId;
+    if ( !sourceShipmentId ) return [ { message: 'no shipment id sent', code: 501 }, ];
 
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
@@ -73,14 +77,22 @@ function createOne(req, res) {
 
       const { _id } = req.user;
 
-      const [err, incomingDeliveryId] = await CreateNew(
+      const [err, ret] = await _getSourceShipmentLabel(sourceShipmentId);
+      if ( err ) return HTTPError('error getting source shipment info');
+
+      const { numberOfDeliveries, shipmentId } = ret;
+      let label = shipmentId + '-R';
+      if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
+
+      const [err2, incomingDeliveryId] = await CreateNew(
         internalPurchaseOrderNumber,
         _id,
         isDueBackOn,
-        sourceShipmentId
+        label,
+        sourceShipmentId,
       );
 
-      if ( err ) return HTTPError('error creating new incoming delivery');
+      if ( err2 ) HTTPError('error creating new incoming delivery');
 
       const data = { incomingDeliveryId };
       return { data };
@@ -171,7 +183,9 @@ function getQueue(req, res) {
       })
 
 
-      const data = { ret }
+      const data = { 
+        incomingDeliveries: ret 
+      };
       return { data };
     }, 
     res, 
@@ -184,4 +198,34 @@ function getQueue(req, res) {
  */
 function setReceived(req, res) {
 
+}
+
+async function _getSourceShipmentLabel(id) {
+  try {
+    const shipment = await Shipment.findOne({ _id: id })
+      .lean()
+      .select('shipmentId')
+      .exec();
+
+    const { shipmentId } = shipment;
+
+    const query = { 
+      label: { 
+        $regex: shipmentId, 
+        $options: 'i' 
+      } 
+    };
+
+    const numberOfDeliveries = await IncomingDelivery.countDocuments( query );
+
+    const ret = {
+      numberOfDeliveries,
+      shipmentId
+    }
+    return [ , ret];
+  } 
+  catch (error) {
+    LogError(error);
+    return [error];
+  }
 }
