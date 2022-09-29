@@ -7,6 +7,7 @@ router.get('/', getAll);
 router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
+router.get('/allReceived', getAllReceived);
 
 module.exports = {
   router,
@@ -102,4 +103,32 @@ function getQueue(req, res) {
  */
 function setReceived(req, res) {
 
+}
+
+
+/**
+ * used to get all incoming deliveries that have been delivered
+ */
+function getAllReceived(req, res) {
+  ExpressHandler(
+    async () => {
+      const query = { receivedOn: { $exists: true } };
+      const ret = await IncomingDelivery.find(query)
+        .lean()
+        .select('label source receivedOn')
+        .exec()
+
+      const receivedDeliveries = ret.map( x => {
+        x.source = 'VENDOR';
+        const _roDate = x.receivedOn.toISOString();   //not sure if this is needed
+        x.receivedOn = _roDate;
+        return x;
+      })
+
+      const data = { receivedDeliveries };
+      return { data };
+    },
+    res,
+    'getting all received incoming deliveries'
+  );
 }
