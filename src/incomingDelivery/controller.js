@@ -7,6 +7,7 @@ router.get('/', getAll);
 router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
+router.get('/getOne', getOne);
 
 module.exports = {
   router,
@@ -102,4 +103,34 @@ function getQueue(req, res) {
  */
 function setReceived(req, res) {
 
+}
+
+/**
+ * 
+ */
+function getOne(req, res) {
+  ExpressHandler(
+    async () => {
+      const { _id } = req.body;
+      console.log(req.body)
+      const incomingDelivery = await IncomingDelivery.findOne({ _id })
+        // .populate('sourceShipmentId')    //wasnt sure if how deep we wanted the populate
+        .populate({
+          path: 'sourceShipmentId',
+          populate: {
+            path: 'manifest',
+            model: 'packingSlip'
+          }
+        })
+        .lean()
+        .exec();
+
+      if ( !incomingDelivery.createdBy ) incomingDelivery.createdBy = 'AUTO';
+
+      const data = {incomingDelivery};
+      return { data };
+    },
+    res,
+    'fetching incoming delivery'
+  );
 }
