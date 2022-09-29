@@ -53,7 +53,8 @@ module.exports = {
         { $group: {
           _id: '$_id',
           items: { $push: '$items' },
-          packingSlipId: { $first: '$packingSlipId' }
+          packingSlipId: { $first: '$packingSlipId' },
+          destination: { $first: '$destination' }
         } }
       ])
       .toArray();
@@ -62,11 +63,37 @@ module.exports = {
     for (const p of packingSlips) {
       for (const i of p.items) {
 
-        if ( i.item?.partRouter?.length ) continue;
+        // No part router -> insert default code
+        if ( !i.item?.partRouter?.length ) {
+          i.destinationCode = DEFAULT_DESTINATION_CODE;
+        }
 
-        i.destinationCode = DEFAULT_DESTINATION_CODE;
+        // part router exists, find appropriate code
+        else {
+          // if destination = CUSTOMER -> attach i.destinationCode = last router step
+          if (p.destination === 'CUSTOMER') {
+            i.destinationCode = 'CUSTOMER-' + (i.item.partRouter.at(-1)).stepCode;
+          }
+          else if (p.destination === 'VENDOR' ) {
+
+            const numVendorSteps = i.item.partRouter.filter(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')?.length || 0;
+
+            // only 1 vendor step, easy fix
+            if ( numVendorSteps === 1 ) {
+              i.destinationCode = 'VENDOR-' + (i.item.partRouter.find(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')).stepCode;
+            }
+            else if (numVendorSteps === 0) {
+              console.debug(`No VENDOR steps found: ${p.packingSlipId} - ${JSON.stringify(i.item._id)}`);
+            }
+            else {
+              console.debug("Multiple VENDOR steps found: " + p.packingSlipId);
+            }
+          }
+        }
+
         i.item = i.item._id;
       }
+      // console.debug(p.items);
     }
 
     const promises = packingSlips.map(async (p) => {
@@ -83,9 +110,14 @@ module.exports = {
     await Promise.all(promises);
   },
 
-  async down(db, client) {
-    // TODO write the statements to rollback your migration (if possible)
-    // Example:
-    // await db.collection('albums').updateOne({artist: 'The Beatles'}, {$set: {blacklisted: false}});
+  async down(db, _client) {
+    await db
+      .collection( TARGET_COLLECTION )
+      .updateMany(
+        { },
+        { $unset: {
+          'items.destinationCode': 1
+        } }
+      );
   }
 };
