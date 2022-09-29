@@ -114,7 +114,6 @@ function getOne(req, res) {
       const { _id } = req.body;
       console.log(req.body)
       const incomingDelivery = await IncomingDelivery.findOne({ _id })
-        // .populate('sourceShipmentId')    //wasnt sure if how deep we wanted the populate
         .populate({
           path: 'sourceShipmentId',
           populate: {
