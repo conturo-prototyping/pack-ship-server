@@ -2,6 +2,7 @@ const { Router } = require('express');
 const router = Router();
 const { LogError, ExpressHandler, HTTPError } = require('../utils');
 const IncomingDelivery = require('./model');    //causing an error
+const WorkOrder = require('../workOrder/model');
 
 router.get('/', getAll);
 router.put('/', createOne);
@@ -112,7 +113,6 @@ function getOne(req, res) {
   ExpressHandler(
     async () => {
       const { _id } = req.body;
-      console.log(req.body)
       const incomingDelivery = await IncomingDelivery.findOne({ _id })
         .populate({
           path: 'sourceShipmentId',
@@ -126,8 +126,31 @@ function getOne(req, res) {
 
       if ( !incomingDelivery ) return HTTPError('delivery not found');
 
+      const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
+
+      // mutate data as needed
+      const newManifest = incomingDelivery.sourceShipmentId.manifest.map( ps => ps.items ).flat();
+      incomingDelivery.sourceShipmentId.manifest = newManifest;
       if ( !incomingDelivery.createdBy ) incomingDelivery.createdBy = 'AUTO';
       incomingDelivery.source = 'VENDOR';
+
+      //get item information from workOrder
+      const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
+        .lean()
+        .select('Items')
+        .exec();
+
+      if ( !workOrder ) return HTTPError('workOrder not found');
+
+      // update manifest[].item to item info (can reduce what info is set to reduce the amount of data being sent)
+      for ( mItem of incomingDelivery.sourceShipmentId.manifest ) {
+        const itemId = mItem.item.toString();
+        const _item = workOrder.Items.find( x => x._id.toString() === itemId );
+
+        // only send some data
+        const { PartNumber, PartName, Revision, Quantity } = _item;
+        mItem.item = { PartNumber, PartName, Revision, Quantity };
+      }
 
       const data = {incomingDelivery};
       return { data };
