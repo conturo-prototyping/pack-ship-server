@@ -113,17 +113,10 @@ function getAllReceived(req, res) {
   ExpressHandler(
     async () => {
       const query = { receivedOn: { $exists: true } };
-      const ret = await IncomingDelivery.find(query)
+      const receivedDeliveries = await IncomingDelivery.find(query)
         .lean()
         .select('label source receivedOn')
         .exec()
-
-      const receivedDeliveries = ret.map( x => {
-        // x.source = 'VENDOR';                       //wasn't sure where this should come from, commented out for now
-        const _roDate = x.receivedOn.toISOString();   //not sure if this is needed
-        x.receivedOn = _roDate;
-        return x;
-      })
 
       const data = { receivedDeliveries };
       return { data };
