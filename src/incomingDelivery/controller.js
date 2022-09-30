@@ -67,15 +67,20 @@ function createOne(req, res) {
       const {
         internalPurchaseOrderNumber,
         isDueBackOn,
-        sourceShipmentId
+        sourceShipmentId,
+        isDueBack,
       } = req.body;
 
       const { _id } = req.user;
 
+      const _isDueBackOn = ( isDueBack ) 
+        ? isDueBackOn
+        : undefined;
+
       const [err, incomingDeliveryId] = await CreateNew(
         internalPurchaseOrderNumber,
         _id,
-        isDueBackOn,
+        _isDueBackOn,
         sourceShipmentId
       );
 
