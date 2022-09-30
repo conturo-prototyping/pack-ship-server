@@ -335,23 +335,7 @@ async function editOne(req, res) {
             const [err, internalPurchaseOrderNumber ] = await getPO_NumberFromShipmentId(sid);
             if ( err ) return HTTPError(err);
 
-            //USING MODELS
-            //-------------------------
-            // const shipment = await Shipment.findOne({ _id: sid })
-            //   .lean()
-            //   .populate('manifest')
-            //   .select('manifest')
-            //   .exec();
-
-            // const OrderNumber = shipment.manifest[0].orderNumber;
-            // const workOrder = await WorkOrder.findOne({ OrderNumber })
-            //   .lean()
-            //   .select('purchaseOrderNumber')
-            //   .exec();
-            //-------------------------
-
             const _newIncomingDelivery = {
-              // internalPurchaseOrderNumber: workOrder.purchaseOrderNumber,    //if getting from workOrder
               internalPurchaseOrderNumber,
               creatingUserId: _id,
               isDueBackOn,
