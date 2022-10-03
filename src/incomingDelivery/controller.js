@@ -101,5 +101,23 @@ function getQueue(req, res) {
  * 
  */
 function setReceived(req, res) {
+  ExpressHandler( 
+    async () => { 
+      const { _id, receivedQuantities } = req.body;
+      const userId = req.user._id
+      
+      const incomingDelivery = await IncomingDelivery.findOne({ _id });
+      if ( incomingDelivery.receivedOn ) return HTTPError('delivery already received');
 
+      incomingDelivery.receivedOn = new Date();
+      incomingDelivery.receivedBy = userId;
+      incomingDelivery.receivedQuantities = receivedQuantities;
+
+      await incomingDelivery.save();
+      const data = { message: 'success' };
+      return { data };
+    }, 
+    res, 
+    'setting received data for incoming delivery' 
+  );
 }
