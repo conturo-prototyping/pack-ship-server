@@ -112,8 +112,6 @@ function getQueue(req, res) {
           }
         })
         .exec();
-
-      console.debug(_deliveries);
       
       const ordersSet = new Set();    //use to track all workOrders that need to be fetched
       const itemsObjs = {};
