@@ -353,21 +353,18 @@ async function updateShipmentTrackingHistory(sid) {
 
 /**
  *
- * @param {any[]} packingSlipId Id of packing slip to assign
+ * @param {any[]} label Id of packing slip to assign
  * @param {string} shipmentId _id of Shipment to assign to packing slip
  */
-async function assignPackingSlipToShipment(packingSlipId, shipmentId) {
+async function assignPackingSlipToShipment(label, shipmentId) {
   await PackingSlip.updateOne(
-    { _id: packingSlipId },
+    { _id: label },
     { $set: { shipment: shipmentId } }
   );
 }
 
-async function unassignPackingSlipFromShipment(packingSlipId) {
-  await PackingSlip.updateOne(
-    { _id: packingSlipId },
-    { $unset: { shipment: 1 } }
-  );
+async function unassignPackingSlipFromShipment(label) {
+  await PackingSlip.updateOne({ _id: label }, { $unset: { shipment: 1 } });
 }
 
 /**
@@ -433,7 +430,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                           quantity: "$Items.Quantity", // batchQty
                         },
                       },
-                      packingSlipId: { $first: "$$packingSlipOID" },
+                      label: { $first: "$$packingSlipOID" },
                       packedQty: { $first: "$$packedItemQtys" },
                       rowId: { $first: "$$arrayItemIds" },
                       isPastVersion: {
@@ -454,7 +451,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
             },
             {
               $group: {
-                _id: { $arrayElemAt: ["$items.packingSlipId", 0] },
+                _id: { $arrayElemAt: ["$items.label", 0] },
                 items: {
                   $push: {
                     _id: { $arrayElemAt: ["$items.rowId", 0] },
@@ -464,7 +461,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                 },
                 customer: { $first: "$customer" },
                 orderNumber: { $first: "$orderNumber" },
-                packingSlipId: { $first: "$packingSlipId" },
+                label: { $first: "$label" },
                 createdBy: { $first: "$createdBy" },
                 dateCreated: { $first: "$dateCreated" },
                 shipment: { $first: "$shipment" },
@@ -514,78 +511,91 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
 async function getAsPdf(req, res) {
   ExpressHandler(
     async () => {
-      const { manifest, customer, dateCreated, shipmentId, deliveryMethod } = req.body;
+      const { manifest, customer, dateCreated, shipmentId, deliveryMethod } =
+        req.body;
       const { title } = customer;
 
-      const orderNumbers = new Set( manifest.map( x => x.orderNumber ) );
+      const orderNumbers = new Set(manifest.map((x) => x.orderNumber));
 
       const manifestBlocks = [];
       const purchaseOrderNumbers = [];
       const allShipmentsInfo = [];
 
       let idx = 0;
-      for ( const orderNumber of orderNumbers ) {
+      for (const orderNumber of orderNumbers) {
         const promises = [];
 
-        promises.push( WorkOrder.findOne({ OrderNumber: orderNumber })
-          .lean()
-          .select('purchaseOrderNumber')
-          .exec()
+        promises.push(
+          WorkOrder.findOne({ OrderNumber: orderNumber })
+            .lean()
+            .select("purchaseOrderNumber")
+            .exec()
         );
 
-        promises.push(GetOrderFulfillmentInfo(orderNumber))
+        promises.push(GetOrderFulfillmentInfo(orderNumber));
 
-        const [woDoc, [shippingError, shipmentInfo] ] = await Promise.all(promises);
+        const [woDoc, [shippingError, shipmentInfo]] = await Promise.all(
+          promises
+        );
         const { purchaseOrderNumber } = woDoc;
         purchaseOrderNumbers.push(purchaseOrderNumber);
 
-        if ( shippingError ) HTTPError('getting shipping contact information');
-        
+        if (shippingError) HTTPError("getting shipping contact information");
+
         allShipmentsInfo.push(shipmentInfo);
 
         const _report = {};
-        const packingSlips = manifest.filter( x => x.orderNumber === orderNumber );
-        for ( const ps of packingSlips ) {
+        const packingSlips = manifest.filter(
+          (x) => x.orderNumber === orderNumber
+        );
+        for (const ps of packingSlips) {
           const { items } = ps;
-      
-          for (const i of items ) {
+
+          for (const i of items) {
             const { item, qty } = i;
             const { _id } = item;
-            
-            if ( _id in _report === false ) {
+
+            if (_id in _report === false) {
               _report[_id] = item;
               _report[_id].qtyShipped = qty;
-            }
-            else {
+            } else {
               _report[_id].qtyShipped += qty;
             }
           }
         }
 
-        const items = Object.values(_report); 
+        const items = Object.values(_report);
 
-        const pageBreakAfter =  ( orderNumbers.size !== 1 && idx !== (orderNumbers.size - 1) );
+        const pageBreakAfter =
+          orderNumbers.size !== 1 && idx !== orderNumbers.size - 1;
 
-        const tableTitleArr = [ `ORDER: ${orderNumber}` ];
-        ( purchaseOrderNumber )  ?
-          tableTitleArr.push(`PO: ${purchaseOrderNumber}`) :
-          tableTitleArr.push('');
+        const tableTitleArr = [`ORDER: ${orderNumber}`];
+        purchaseOrderNumber
+          ? tableTitleArr.push(`PO: ${purchaseOrderNumber}`)
+          : tableTitleArr.push("");
 
-        manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitleArr, pageBreakAfter));
+        manifestBlocks.push(
+          _pdf_makeManifestBlock(items, tableTitleArr, pageBreakAfter)
+        );
         idx += 1;
       }
-      
 
-      if ( !allShipmentsInfo[0]?.shippingContact || allShipmentsInfo.length === 0 ) { 
-        return HTTPError('No shipping contact info ')
+      if (
+        !allShipmentsInfo[0]?.shippingContact ||
+        allShipmentsInfo.length === 0
+      ) {
+        return HTTPError("No shipping contact info ");
       }
 
       //because all packing ships on a shipment SHOULD be shipping to the same address/contact info
-      const shippingBlock = _pdf_makePackingBlock(title, allShipmentsInfo[0].shippingContact);
-      const bannerBlock = _pdf_makeBannerBlock( new Date(dateCreated) );
+      const shippingBlock = _pdf_makePackingBlock(
+        title,
+        allShipmentsInfo[0].shippingContact
+      );
+      const bannerBlock = _pdf_makeBannerBlock(new Date(dateCreated));
 
       const signatureBlock = _pdf_makeSignaturesBlock(deliveryMethod);
-      
+
       const docDefinition = {
         content: [
           bannerBlock,
@@ -605,17 +615,17 @@ async function getAsPdf(req, res) {
           bold: true,
         },
       };
-    
+
       const filename = shipmentId + ".pdf";
       const data = { docDefinition, filename };
       return { data };
     },
     res,
-    'creating shipment pdf layout'
+    "creating shipment pdf layout"
   );
 }
 
-function _pdf_makeBannerBlock( dateCreated) {
+function _pdf_makeBannerBlock(dateCreated) {
   const table = {
     widths: ["auto", "*", "auto"],
     body: [
@@ -649,8 +659,6 @@ function _pdf_makeBannerBlock( dateCreated) {
 
   return ret;
 }
-
-
 
 function _pdf_makePackingBlock(customerTitle, shippingContact) {
   const bypassShipToCheck =
@@ -688,9 +696,8 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
  * Make signature block
  * @param {String} packedByuUsernam
  */
- function _pdf_makeSignaturesBlock(deliveryMethod) {
-
-  const _table =  { 
+function _pdf_makeSignaturesBlock(deliveryMethod) {
+  const _table = {
     table: {
       widths: ["*", "*"],
     },
@@ -699,13 +706,12 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
 
   let deliveryTypeString;
   let secondColumnSignoff;
-  if ( ['DROPOFF', 'PICKUP'].includes(deliveryMethod) ) {
-    deliveryTypeString = 'Received by:';
+  if (["DROPOFF", "PICKUP"].includes(deliveryMethod)) {
+    deliveryTypeString = "Received by:";
     secondColumnSignoff = "X __________________________";
-  }
-  else {
-    deliveryTypeString = '';
-    secondColumnSignoff = '';
+  } else {
+    deliveryTypeString = "";
+    secondColumnSignoff = "";
   }
 
   _table.table.body = [
@@ -742,7 +748,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
  * This includes only the line items in the
  * @param {any[]} items Items in the packing slip
  */
- function _pdf_makeManifestBlock(items, tableTitleArr, pageBreak) {
+function _pdf_makeManifestBlock(items, tableTitleArr, pageBreak) {
   const body = [
     [
       {
@@ -779,7 +785,6 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
 
   let lineNumber = 0;
   for (const i of items) {
-
     // here, 'quantity' refers to the quantity ordered in the PO
     const { partNumber, partDescription, partRev, quantity, qtyShipped } = i;
     const qtyOrdered = quantity;
@@ -813,7 +818,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
     table,
     margin: [0, 20, 0, 20],
   };
-  if ( pageBreak ) ret.pageBreak = 'after';
+  if (pageBreak) ret.pageBreak = "after";
 
   return ret;
 }

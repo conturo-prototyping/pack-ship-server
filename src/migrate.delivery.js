@@ -1,109 +1,116 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const Delivery = require('./model.delivery');
-const PackingSlip = require('./packingSlip/model');
-const Shipment = require('./shipment/model');
-const Customer = require('./customer/model');
-const WorkOrder = require('./workOrder/model');
+const Delivery = require("./model.delivery");
+const PackingSlip = require("./packingSlip/model");
+const Shipment = require("./shipment/model");
+const Customer = require("./customer/model");
+const WorkOrder = require("./workOrder/model");
 
 module.exports = router;
 
-router.post('/first', async (_req, res) => {
+router.post("/first", async (_req, res) => {
   let deliveries = [];
   try {
     deliveries = await Delivery.find().lean().exec();
-  }
-  catch (e) {
-    res.status(500).send('Unexpected error fetching deliveries.');
+  } catch (e) {
+    res.status(500).send("Unexpected error fetching deliveries.");
   }
 
   const customerShipmentCounts = {};
 
   const _makeNewDocs = async (deliveryDoc) => {
     try {
-      const { orderNumber, packedBy, packDate, delivery, itemsShipped } = deliveryDoc;
-  
+      const { orderNumber, packedBy, packDate, delivery, itemsShipped } =
+        deliveryDoc;
+
       const customer = await _getCustomerFromOrderNumber(orderNumber);
       const { tag } = customer;
-      customerShipmentCounts[tag] = (customerShipmentCounts[tag] || 0) +1;
-  
+      customerShipmentCounts[tag] = (customerShipmentCounts[tag] || 0) + 1;
+
       const items = await _getDeliveryItemsAsRefs(orderNumber, itemsShipped);
 
       const newPackingSlip = new PackingSlip({
         orderNumber,
         customer,
-        packingSlipId: delivery.slipId || (orderNumber + '-PS1'),
+        label: delivery.slipId || orderNumber + "-PS1",
         items,
-  
-        dateCreated:  packDate,
-        createdBy:    packedBy,
+
+        dateCreated: packDate,
+        createdBy: packedBy,
       });
-  
+
       const newShipment = new Shipment({
         customer,
-        shipmentId: newPackingSlip.packingSlipId.replace('-PS', '-SH'),
-        manifest: [ newPackingSlip._id ],
-  
-        customerHandoffName: 'LEGACY DOCUMENT -- UNTRACKED',
-        
-        deliveryMethod:       delivery.method,
-        carrier:              delivery.carrier,
-        deliverySpeed:        delivery.speed,
-        customerAccountUsed:  (delivery.useCustomerAccount ? delivery.customerAccountNumber : customer.defaultCarrierAccount),
-        trackingNumber:       delivery.trackingNumber,
-        cost:                 delivery.shippingCost,
-  
+        shipmentId: newPackingSlip.label.replace("-PS", "-SH"),
+        manifest: [newPackingSlip._id],
+
+        customerHandoffName: "LEGACY DOCUMENT -- UNTRACKED",
+
+        deliveryMethod: delivery.method,
+        carrier: delivery.carrier,
+        deliverySpeed: delivery.speed,
+        customerAccountUsed: delivery.useCustomerAccount
+          ? delivery.customerAccountNumber
+          : customer.defaultCarrierAccount,
+        trackingNumber: delivery.trackingNumber,
+        cost: delivery.shippingCost,
+
         dateCreated: packDate,
-        createdBy: packedBy
+        createdBy: packedBy,
       });
-  
-      while(1) {
+
+      while (1) {
         try {
           await newPackingSlip.save();
           break;
-        }
-        catch (ee) {
+        } catch (ee) {
           // duplicate, +1 and move on
-          if (ee.code !== '11000') {
+          if (ee.code !== "11000") {
             console.error(ee);
             break;
           }
 
-          console.debug(`Fixing duplicate key ${newPackingSlip.packingSlipId}...`);
+          console.debug(`Fixing duplicate key ${newPackingSlip.label}...`);
 
-          psId = newPackingSlip.packingSlipId;
+          psId = newPackingSlip.label;
 
-          const num = Number.parseInt( psId.indexOf('-PS')+3 );
+          const num = Number.parseInt(psId.indexOf("-PS") + 3);
 
-          newPackingSlip.packingSlipId = psId.substring(0, psId.indexOf('-PS')) + (num+1);
-          newShipment.shipmentId = newPackingSlip.packingSlipId.replace('-PS', '-SH');
+          newPackingSlip.label =
+            psId.substring(0, psId.indexOf("-PS")) + (num + 1);
+          newShipment.shipmentId = newPackingSlip.label.replace("-PS", "-SH");
         }
       }
-  
+
       await newShipment.save();
       newPackingSlip.shipment = newShipment._id;
       await newPackingSlip.save();
 
-      const customerUpdates = Object.entries(customerShipmentCounts).map( ([tag, count]) => {
-        return {
-          query: { tag },
-          update: { $set: {
-            numShipments: count,
-            numPackingSlips: count
-          } }
+      const customerUpdates = Object.entries(customerShipmentCounts).map(
+        ([tag, count]) => {
+          return {
+            query: { tag },
+            update: {
+              $set: {
+                numShipments: count,
+                numPackingSlips: count,
+              },
+            },
+          };
         }
-      } );
+      );
 
-      await Promise.all( customerUpdates.map( ({ query, update }) =>
-        Customer.updateOne(query, update)
-      ) );
-    }
-    catch (e) {
+      await Promise.all(
+        customerUpdates.map(({ query, update }) =>
+          Customer.updateOne(query, update)
+        )
+      );
+    } catch (e) {
       console.error(e);
     }
   };
 
-  const promises = deliveries.map(x => _makeNewDocs(x));
+  const promises = deliveries.map((x) => _makeNewDocs(x));
   await Promise.all(promises);
 
   console.debug(`Done migrating ${promises.length} documents...`);
@@ -119,30 +126,27 @@ async function _getCustomerFromOrderNumber(orderNumber) {
   return customer;
 }
 
-async function _getDeliveryItemsAsRefs(OrderNumber, itemsShipped=[]) {
-
+async function _getDeliveryItemsAsRefs(OrderNumber, itemsShipped = []) {
   const items = await Promise.all(
-    itemsShipped.map(async x => {
+    itemsShipped.map(async (x) => {
       const wo = await WorkOrder.findOne({
         OrderNumber,
         Items: {
           $elemMatch: {
-            $or: [
-              { PartNumber: x.partId },
-              { PartName: x.partId }
-            ]
-          }
-        }
-      }).lean().exec();
-      
-      const itemMatch = wo.Items.find(y =>
-        y.PartName === x.partId ||
-        y.PartNumber === x.partId
+            $or: [{ PartNumber: x.partId }, { PartName: x.partId }],
+          },
+        },
+      })
+        .lean()
+        .exec();
+
+      const itemMatch = wo.Items.find(
+        (y) => y.PartName === x.partId || y.PartNumber === x.partId
       );
 
       if (!itemMatch) {
-        console.log('No match for ' + x.partId);
-        console.log('Skipping...');
+        console.log("No match for " + x.partId);
+        console.log("Skipping...");
         return null;
       }
 
@@ -153,5 +157,5 @@ async function _getDeliveryItemsAsRefs(OrderNumber, itemsShipped=[]) {
     })
   );
 
-  return items.filter(x => !!x);
+  return items.filter((x) => !!x);
 }

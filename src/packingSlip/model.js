@@ -2,7 +2,7 @@
 // Schema for new packing slip which is part of the split shipping modules (2.19^)
 // A packing slip consists of:
 // - orderNumber    (to aggregate easily)
-// - packingSlipId  (unique human-readable identifier)
+// - label  (unique human-readable identifier)
 // - items          (refs to work order items & qty in packing slip)
 // - shipment       (ref to shipment-if any-that contains this packing slip--can only be one)
 
@@ -17,7 +17,7 @@ const schema = new Schema({
     ref: "oldClient-v2",
   },
 
-  packingSlipId: {
+  label: {
     type: String,
     required: true,
   },
@@ -59,7 +59,7 @@ const schema = new Schema({
 
   destination: {
     type: String,
-    default: 'CUSTOMER'
+    default: "CUSTOMER",
   },
 
   destinationCode: String,
