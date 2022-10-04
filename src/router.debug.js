@@ -120,7 +120,7 @@ async function dropAllCollections() {
       return true;
     } catch (e) {
       // collection doesn't exist; ok
-      if (e.name === "MongoServerError" && e.code === 26) {
+      if (e.code === 26) {
         return true;
       } else {
         console.error(e);
