@@ -3,6 +3,7 @@ const router = Router();
 const { LogError, ExpressHandler, HTTPError } = require('../utils');
 const IncomingDelivery = require('./model');    //causing an error
 const WorkOrder = require('../workOrder/model');
+const Shipment = require('../shipment/model');
 
 router.get('/', getAll);
 router.put('/', createOne);
@@ -28,6 +29,7 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
+  label,
   sourceShipmentId=undefined
 ) {
   try {
@@ -35,9 +37,11 @@ async function CreateNew(
       internalPurchaseOrderNumber,
       createdBy: creatingUserId,
       isDueBackOn,
+      sourceShipmentId,
+      label,
     };
 
-    if ( sourceShipmentId ) deliveryInfo.sourceShipmentId = sourceShipmentId;
+    if ( !sourceShipmentId ) return [ { message: 'no shipment id sent', code: 501 }, ];
 
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
@@ -74,14 +78,22 @@ function createOne(req, res) {
 
       const { _id } = req.user;
 
-      const [err, incomingDeliveryId] = await CreateNew(
+      const [err, ret] = await _getSourceShipmentLabel(sourceShipmentId);
+      if ( err ) return HTTPError('error getting source shipment info');
+
+      const { numberOfDeliveries, shipmentId } = ret;
+      let label = shipmentId + '-R';
+      if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
+
+      const [err2, incomingDeliveryId] = await CreateNew(
         internalPurchaseOrderNumber,
         _id,
         isDueBackOn,
-        sourceShipmentId
+        label,
+        sourceShipmentId,
       );
 
-      if ( err ) return HTTPError('error creating new incoming delivery');
+      if ( err2 ) HTTPError('error creating new incoming delivery');
 
       const data = { incomingDeliveryId };
       return { data };
@@ -96,14 +108,152 @@ function createOne(req, res) {
  * Get the queue of incoming deliveries that have not yet been received.
  */
 function getQueue(req, res) {
+  ExpressHandler( 
+    async () => { 
+      const query = {
+        receivedOn: {
+          $exists: false
+        },
+        isPastVersion: { $ne: true }
+      };
+      const _deliveries = await IncomingDelivery.find(query)
+        .lean()
+        .populate({
+          path: 'sourceShipmentId',
+          populate: {
+            path: 'manifest',
+            model: 'packingSlip',
+          }
+        })
+        .exec();
 
+      console.debug(_deliveries);
+      
+      const ordersSet = new Set();    //use to track all workOrders that need to be fetched
+      const itemsObjs = {};
+      const promises = [];
+
+      //map _deliveries into almost final format
+      const deliveries = _deliveries.map( (x) => {
+        const { _id, label, sourceShipmentId } = x;
+        
+        const manifestArr = [];
+        for ( m of sourceShipmentId.manifest ) {
+          manifestArr.push(...m.items)
+
+           //check if ordersSet has order number already, add if not
+          if ( ordersSet.has(m.orderNumber) === false ) {
+            ordersSet.add(m.orderNumber)
+            const _populateItems = async (orderNumber) => {
+              const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
+                .lean()
+                .select('Items')
+                .exec();
+
+              for ( const woItem of workOrder.Items ) {
+                const { OrderNumber, PartNumber, PartName, Revision, batchNumber } = woItem;
+                const _woItem = {
+                  orderNumber: OrderNumber,
+                  partNumber: PartNumber,
+                  partDescription: PartName,
+                  partRev: Revision,
+                  batch: batchNumber,
+                };
+                itemsObjs[woItem._id] = _woItem;
+              }
+            };
+            promises.push( _populateItems(m.orderNumber) );
+          }
+        }
+
+        const _obj = {
+          _id,
+          label,
+          manifest: manifestArr, 
+          source: m.destination,
+        };
+
+        return _obj;
+      })
+
+      await Promise.all(promises)
+
+      //loop through deliveries and create mutated ret array
+      const ret = deliveries.map( d => {
+        const _manifest = d.manifest.map( ({ item, qty }) => {
+          return {
+            item: itemsObjs[item],
+            qty
+          }
+        })
+        d.manifest = _manifest;
+        return d;
+      })
+
+
+      const data = { 
+        incomingDeliveries: ret 
+      };
+      return { data };
+    }, 
+    res, 
+    'fetching incoming deliveries queue' 
+  );
 }
 
 /**
  * 
  */
 function setReceived(req, res) {
+  ExpressHandler( 
+    async () => { 
+      const { _id, receivedQuantities } = req.body;
+      const userId = req.user._id
+      
+      const incomingDelivery = await IncomingDelivery.findOne({ _id });
+      if ( incomingDelivery.receivedOn ) return HTTPError('delivery already received');
 
+      incomingDelivery.receivedOn = new Date();
+      incomingDelivery.receivedBy = userId;
+      incomingDelivery.receivedQuantities = receivedQuantities;
+
+      await incomingDelivery.save();
+      const data = { message: 'success' };
+      return { data };
+    }, 
+    res, 
+    'setting received data for incoming delivery' 
+  );
+}
+
+async function _getSourceShipmentLabel(id) {
+  try {
+    const shipment = await Shipment.findOne({ _id: id })
+      .lean()
+      .select('shipmentId')
+      .exec();
+
+    const { shipmentId } = shipment;
+
+    const query = { 
+      label: { 
+        $regex: shipmentId, 
+        $options: 'i' 
+      } 
+    };
+
+    const numberOfDeliveries = await IncomingDelivery.countDocuments( query );
+
+    const ret = {
+      numberOfDeliveries,
+      shipmentId
+    }
+    return [ , ret];
+  } 
+  catch (error) {
+    LogError(error);
+    return [error];
+  }
 }
 
 /**

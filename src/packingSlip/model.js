@@ -31,6 +31,10 @@ const schema = new Schema({
 
       // quantity in the packing slip
       qty: Number,
+
+      // this determins which router step the item was packed for
+      // for example: 3"00 - SHIP TO VENDOR" will be "VENDOR-300"
+      destinationCode: String,
     },
   ],
 
@@ -62,7 +66,7 @@ const schema = new Schema({
     default: 'CUSTOMER'
   },
 
-  destinationCode: String,
+  // destinationCode: String,
 });
 
 const Model = model("packingSlip", schema, "packingSlips");

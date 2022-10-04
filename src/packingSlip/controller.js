@@ -390,7 +390,7 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer, destination, destinationCode } = req.body;
+      const { items, orderNumber, customer, destination } = req.body;
 
       if (destination !== "VENDOR" && destination !== "CUSTOMER") {
         return HTTPError("Destination must be either vendor or customer.", 400);
@@ -408,7 +408,6 @@ async function createPackingSlip(req, res) {
         items,
         createdBy: req.user._id,
         destination,
-        destinationCode,
       });
 
       await packingSlip.save();
