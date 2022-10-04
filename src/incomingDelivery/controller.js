@@ -264,10 +264,18 @@ function getAllReceived(req, res) {
   ExpressHandler(
     async () => {
       const query = { receivedOn: { $exists: true } };
-      const receivedDeliveries = await IncomingDelivery.find(query)
+      const _receivedDeliveries = await IncomingDelivery.find(query)
         .lean()
-        .select('label source receivedOn')
+        .select('label source receivedOn sourceShipmentId')
+        .populate('sourceShipmentId')
         .exec()
+
+      const receivedDeliveries = _receivedDeliveries
+        .filter( x => x.sourceShipmentId?.isPastVersion !== true )
+        .map( d => {
+          delete d.sourceShipmentId;
+          return d;
+        } );
 
       const data = { receivedDeliveries };
       return { data };
