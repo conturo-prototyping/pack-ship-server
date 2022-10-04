@@ -9,6 +9,7 @@ router.get('/', getAll);
 router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
+router.get('/:deliveryId', getOne);
 
 module.exports = {
   router,
@@ -253,4 +254,64 @@ async function _getSourceShipmentLabel(id) {
     LogError(error);
     return [error];
   }
+}
+
+/**
+ * Get one incomingDelivery by its _id field.
+ * Get incomingDelivery, mutate manifest data to only have packing slip items, ...
+ * ... auto generate createdBy (if needed) and source field (for now it will be ...
+ * ... "VENDOR"), get workOrder infomation, set manifest.item infomation to ...
+ * ... workOrder item information (only applicable fields for FE use)
+ */
+function getOne(req, res) {
+  ExpressHandler(
+    async () => {
+      const { deliveryId } = req.params;
+      const incomingDelivery = await IncomingDelivery.findOne({ _id: deliveryId })
+        .populate({
+          path: 'sourceShipmentId',
+          populate: {
+            path: 'manifest',
+            model: 'packingSlip'
+          }
+        })
+        .lean()
+        .exec();
+
+      if ( !incomingDelivery ) return HTTPError('delivery not found');
+
+      const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
+
+      // mutate data as needed
+      const newManifest = incomingDelivery.sourceShipmentId.manifest.map( ps => ps.items ).flat();
+      incomingDelivery.sourceShipmentId.manifest = newManifest;
+      if ( !incomingDelivery.createdBy ) incomingDelivery.createdBy = 'AUTO';
+      incomingDelivery.source = 'VENDOR';
+
+      //get item information from workOrder
+      const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
+        .lean()
+        .select('Items')
+        .exec();
+
+      if ( !workOrder ) return HTTPError('workOrder not found');
+      if ( workOrder.Items.length === 0 ) return HTTPError('no workOrder items found on workOrder');
+
+      // update manifest[].item to item info (can reduce what info is set to reduce the amount of data being sent)
+      for ( const mItem of incomingDelivery.sourceShipmentId.manifest ) {
+        const itemId = mItem.item.toString();
+        const _item = workOrder.Items.find( x => x._id.toString() === itemId );
+        if ( !_item ) return HTTPError(`item not found on workOrder ${orderNumber}`);
+
+        // only send some data
+        const { PartNumber, PartName, Revision, Quantity, batchNumber } = _item;
+        mItem.item = { PartNumber, PartName, Revision, Quantity, batchNumber };
+      }
+
+      const data = {incomingDelivery};
+      return { data };
+    },
+    res,
+    'fetching incoming delivery'
+  );
 }
