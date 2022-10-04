@@ -26,7 +26,7 @@ async function putRouteStep(
       const newRouteStep = new RouteStepModel( { category, name });
       await newRouteStep.save();
       
-      const data = 'some words';
+      const data = { message: 'success' };
       return { data };
     },
     res,
