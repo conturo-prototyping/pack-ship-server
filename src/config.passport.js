@@ -3,7 +3,7 @@
  */
 
 const GoogleStrategy = require('passport-google-oauth2').Strategy;
-const UserModel = require('./user/model');
+const { UserModel } = require('./user/model');
 
 const {
   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL, ALLOWED_LOGIN_DOMAIN,
@@ -62,6 +62,8 @@ module.exports = function (passport) {
 
             const newUser = new UserModel({
               UserName: profile.displayName,
+
+              IsActive: true,
 
               google: {
                 accessToken,
