@@ -13,7 +13,7 @@ router.delete('/', deleteRouteStep);
 
 //functions
 function deleteRouteStep(
-  req: { body: { routeStepId: any; }; }, 
+  req: { body: { routeStepId: string; }; }, 
   res: any
   ) {
   ExpressHandler(
