@@ -49,7 +49,8 @@ app.use('/workOrders', require('./workOrder/controller'));
 app.use('/shipments', require('./shipment/controller'));
 app.use('/users', require('./user/controller'));
 app.use('/routeSteps', require('./routeStep/controller'));
-app.use('/lots', LotRouter );
+
+app.use('/lots', LotRouter);
 
 app.all('*', (_req, res) => res.sendStatus(404));
 
