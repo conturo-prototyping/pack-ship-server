@@ -1,12 +1,12 @@
 require('dotenv').config();
 
-import { Express } from 'express';
-import { ObjectId } from 'mongoose';
-import { UserModel } from '../src/user/model';
+import { Express, NextFunction, Request, Response } from 'express';
 import { DropAllCollections } from '../src/router.debug';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import { join } from 'path';
+import { stub } from 'sinon';
+import passport from 'passport';
 
 process.env.MONGO_DB_URI += '--TEST';
 process.env.NODE_ENV = 'TEST';
@@ -16,11 +16,6 @@ process.env.NODE_ENV = 'TEST';
 chai.use(chaiHttp);
 let app: Express;
 
-// We can't pull models into runtime until we've made a connection to the usual DB
-//  copied critical collections over, and then change the connection back.
-let User: typeof UserModel;
-
-
 // @ts-ignore
 require.main.require = name => {
   const newPath = join(__dirname, '../src', name);
@@ -29,7 +24,6 @@ require.main.require = name => {
 
 // SETUP
 // Set up a temp DB
-let TEST_USER_ID: ObjectId;
 before(async () => {
   // Use a test DB & copy essential collections to it
   let dbUrl = process.env.MONGO_DB_URI;
@@ -49,16 +43,26 @@ after(async () => await DropAllCollections() );
 // ----------------------------------------------------------
 // ----------------------------------------------------------
 
-export function GetUserId() {
-  return TEST_USER_ID;
-}
+// export function GetUserId() {
+//   return TEST_USER_ID;
+// }
 
 export async function ChaiRequest(method, url, payload={}, throwError = true) {
-  const user = await User.findOne();
-  if (!user) throw Error('No users found. Create at least one user with Google OAuth2 to proceed.');
+  // app.request.user = user;
+  // app.request.isAuthenticated = function() { return true; };
+  
+  stub(passport, 'authenticate').callsFake( (_strategy, _options, callback) => {
+    const fakeUser = {
+      UserName: 'Frank the Tank',
+      Groups: '',
+      IsActive: true,
+    };
 
-  app.request.user = user;
-  app.request.isAuthenticated = function() { return true; };
+    callback!(null, fakeUser, null);
+
+    return (_req: Request, _res: Response, _next: NextFunction) => {};
+  } );
+
 
   const res = await chai.request(app)
     [method](url)
