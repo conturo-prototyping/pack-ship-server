@@ -7,6 +7,7 @@ import { DropAllCollections } from '../src/router.debug';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import { join } from 'path';
+import app from '../src/app'      // hacky add to run test
 
 process.env.MONGO_DB_URI += '--TEST';
 process.env.NODE_ENV = 'TEST';
@@ -14,7 +15,7 @@ process.env.NODE_ENV = 'TEST';
 
 // This lets us avoid requiring app in every single test directory & subdirectory.
 chai.use(chaiHttp);
-let app: Express;
+// let app: Express;    //ERROR: had to remove since now importing app
 
 // We can't pull models into runtime until we've made a connection to the usual DB
 //  copied critical collections over, and then change the connection back.
@@ -36,7 +37,7 @@ before(async () => {
   dbUrl = dbUrl!.substring(0, dbUrl!.lastIndexOf('--TEST') );
 
   // Load app here, so it's cached for future tests
-  app = require('../src/app');
+  // app = require('../src/app');     //ERROR: had to remove this and pull it out of the scop of this function (using import app from ....)
 });
 
 // TEAR DOWN
@@ -54,7 +55,9 @@ export function GetUserId() {
 }
 
 export async function ChaiRequest(method, url, payload={}, throwError = true) {
-  const user = await User.findOne();
+  // const user = await User.findOne();     // ERROR: this does not work, user comes out as undefined
+  const user = await UserModel.findOne();     // hacky add to run test
+
   if (!user) throw Error('No users found. Create at least one user with Google OAuth2 to proceed.');
 
   app.request.user = user;
