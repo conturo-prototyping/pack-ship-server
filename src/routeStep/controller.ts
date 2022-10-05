@@ -1,18 +1,15 @@
 import express = require('express');
 import { ExpressHandler } from '../utils';
-const router = express.Router();
 import { RouteStepModel } from './model';
 
+const router = express.Router();
+export default router;
 
-module.exports = router;
-
-//routes
+// routes
 router.get('/', allRouteSteps);
 
-
-
-//functions
-function allRouteSteps(_req: any, res: any) {
+// functions
+function allRouteSteps(_req: express.Request, res: express.Response) {
   ExpressHandler(
     async () => {
       const routeSteps = await RouteStepModel.find()
@@ -24,6 +21,6 @@ function allRouteSteps(_req: any, res: any) {
       return { data };
     },
     res,
-    'getting all routeSteps'
+    'getting all routeSteps',
   );
 }
