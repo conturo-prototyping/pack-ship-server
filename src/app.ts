@@ -13,7 +13,7 @@ require('dotenv').config();
 require('./config.passport')(passport);
 
 const app = express();
-export default app;
+export { app };
 
 app.use(cors({
   origin: [
