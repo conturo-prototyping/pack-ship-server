@@ -9,6 +9,7 @@ router.get('/', getAll);
 router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
+router.get('/:deliveryId', getOne);
 router.get('/allReceived', getAllReceived);
 
 module.exports = {
@@ -29,10 +30,18 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
-  label,
   sourceShipmentId=undefined
 ) {
   try {
+    if ( !sourceShipmentId ) return [ HTTPError('Shipment ID not sent.', 400) ];
+
+    const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
+    if ( err ) return [ err ];
+  
+    const { numberOfDeliveries, shipmentId } = ret;
+    let label = shipmentId + '-R';
+    if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
+  
     const deliveryInfo = {
       internalPurchaseOrderNumber,
       createdBy: creatingUserId,
@@ -40,20 +49,15 @@ async function CreateNew(
       sourceShipmentId,
       label,
     };
-
+  
     if ( !sourceShipmentId ) return [ { message: 'no shipment id sent', code: 501 }, ];
 
-    const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
-    await newIncomingDelivery.save();
-
-    return [ , newIncomingDelivery._id];
+    return [ , { incomingDelivery }];
   } 
   catch (error) {
     LogError(error);
-    return [error];
+    return [ HTTPError('Unexpected error creating incoming delivery.') ];
   }
-  
-  // throw new Error('Not implemented.');
 }
 
 /**
@@ -76,26 +80,9 @@ function createOne(req, res) {
         sourceShipmentId
       } = req.body;
 
-      const { _id } = req.user;
+      const [err, data] = await CreateNew(internalPurchaseOrderNumber, req.user._id, isDueBackOn, sourceShipmentId);
+      if ( err ) return err;
 
-      const [err, ret] = await _getSourceShipmentLabel(sourceShipmentId);
-      if ( err ) return HTTPError('error getting source shipment info');
-
-      const { numberOfDeliveries, shipmentId } = ret;
-      let label = shipmentId + '-R';
-      if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
-
-      const [err2, incomingDeliveryId] = await CreateNew(
-        internalPurchaseOrderNumber,
-        _id,
-        isDueBackOn,
-        label,
-        sourceShipmentId,
-      );
-
-      if ( err2 ) HTTPError('error creating new incoming delivery');
-
-      const data = { incomingDeliveryId };
       return { data };
     }, 
     res, 
@@ -126,8 +113,6 @@ function getQueue(req, res) {
           }
         })
         .exec();
-
-      console.debug(_deliveries);
       
       const ordersSet = new Set();    //use to track all workOrders that need to be fetched
       const itemsObjs = {};
@@ -226,7 +211,7 @@ function setReceived(req, res) {
   );
 }
 
-async function _getSourceShipmentLabel(id) {
+async function getSourceShipmentLabel(id) {
   try {
     const shipment = await Shipment.findOne({ _id: id })
       .lean()
@@ -252,8 +237,68 @@ async function _getSourceShipmentLabel(id) {
   } 
   catch (error) {
     LogError(error);
-    return [error];
+    return [ HTTPError('Unexpected error fetching shipment info for labeling.') ];
   }
+}
+
+/**
+ * Get one incomingDelivery by its _id field.
+ * Get incomingDelivery, mutate manifest data to only have packing slip items, ...
+ * ... auto generate createdBy (if needed) and source field (for now it will be ...
+ * ... "VENDOR"), get workOrder infomation, set manifest.item infomation to ...
+ * ... workOrder item information (only applicable fields for FE use)
+ */
+function getOne(req, res) {
+  ExpressHandler(
+    async () => {
+      const { deliveryId } = req.params;
+      const incomingDelivery = await IncomingDelivery.findOne({ _id: deliveryId })
+        .populate({
+          path: 'sourceShipmentId',
+          populate: {
+            path: 'manifest',
+            model: 'packingSlip'
+          }
+        })
+        .lean()
+        .exec();
+
+      if ( !incomingDelivery ) return HTTPError('delivery not found');
+
+      const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
+
+      // mutate data as needed
+      const newManifest = incomingDelivery.sourceShipmentId.manifest.map( ps => ps.items ).flat();
+      incomingDelivery.sourceShipmentId.manifest = newManifest;
+      if ( !incomingDelivery.createdBy ) incomingDelivery.createdBy = 'AUTO';
+      incomingDelivery.source = 'VENDOR';
+
+      //get item information from workOrder
+      const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
+        .lean()
+        .select('Items')
+        .exec();
+
+      if ( !workOrder ) return HTTPError('workOrder not found');
+      if ( workOrder.Items.length === 0 ) return HTTPError('no workOrder items found on workOrder');
+
+      // update manifest[].item to item info (can reduce what info is set to reduce the amount of data being sent)
+      for ( const mItem of incomingDelivery.sourceShipmentId.manifest ) {
+        const itemId = mItem.item.toString();
+        const _item = workOrder.Items.find( x => x._id.toString() === itemId );
+        if ( !_item ) return HTTPError(`item not found on workOrder ${orderNumber}`);
+
+        // only send some data
+        const { PartNumber, PartName, Revision, Quantity, batchNumber } = _item;
+        mItem.item = { PartNumber, PartName, Revision, Quantity, batchNumber };
+      }
+
+      const data = {incomingDelivery};
+      return { data };
+    },
+    res,
+    'fetching incoming delivery'
+  );
 }
 
 

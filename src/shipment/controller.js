@@ -9,6 +9,7 @@ const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
+const { CreateNew } = require("../incomingDelivery/controller");
 
 module.exports = router;
 
@@ -168,7 +169,13 @@ async function createOne(req, res) {
         customerAccount,
         customerHandoffName,
         shippingAddress,
+        isDueBack,
+        isDueBackOn
       } = req.body;
+
+      if (isDueBack && !isDueBackOn) {
+        return HTTPError('Return due date is missing.');
+      }
 
       const customerDoc = await Customer.findOne({ _id: customer });
       const { tag, numShipments } = customerDoc;
@@ -203,6 +210,11 @@ async function createOne(req, res) {
       promises.push(customerDoc.save());
 
       await Promise.all(promises);
+
+      if (isDueBack) {
+        const [returnErr, ] = await CreateNew(undefined, req.user._id, isDueBackOn, shipment._id);
+        if (returnErr) return [ returnErr ];
+      }
 
       return {
         data: {
