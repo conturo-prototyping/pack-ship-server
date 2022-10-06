@@ -9,6 +9,7 @@ const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
+const currency = require('currency.js');
 
 module.exports = router;
 
@@ -228,8 +229,8 @@ async function getOne(req, res) {
       let shipmentDollarValue = 0;
       for ( m of shipment.manifest) {
         for ( item of m.items) {
-          const { qty, unitRate } = item;
-          shipmentDollarValue += (qty * unitRate);
+          const { qty, finalUnitRate } = item;
+          shipmentDollarValue = currency(shipmentDollarValue).add( currency(finalUnitRate).multiply(qty) ).value;
         }
       }
 
@@ -443,10 +444,10 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                         $expr: { $eq: [ { $toString: '$content.order.items._id' }, '$$calcItemId' ] }
                       } },
                       { $addFields: {
-                        unitRate: '$content.order.items.calculations.header.unitRate'
+                        finalUnitRate: '$content.order.items.calculations.header.finalUnitRate'
                       } },
                       { $project: {
-                        unitRate: 1
+                        finalUnitRate: 1
                       } }
 
                     ], 
@@ -467,9 +468,9 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                           quantity: "$Items.Quantity", // batchQty
                         },
                       },
-                      unitRate: { 
+                      finalUnitRate: { 
                         $first: { 
-                          $arrayElemAt: ['$genOrder.unitRate', 0] 
+                          $arrayElemAt: ['$genOrder.finalUnitRate', 0] 
                         } 
                       },
                       packingSlipId: { $first: "$$packingSlipOID" },
@@ -499,7 +500,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                     _id: { $arrayElemAt: ["$items.rowId", 0] },
                     item: { $arrayElemAt: ["$items.item", 0] },
                     qty: { $arrayElemAt: ["$items.packedQty", 0] },
-                    unitRate: { $arrayElemAt: ["$items.unitRate", 0] },
+                    finalUnitRate: { $arrayElemAt: ["$items.finalUnitRate", 0] },
                   },
                 },
                 customer: { $first: "$customer" },
