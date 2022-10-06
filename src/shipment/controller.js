@@ -172,6 +172,7 @@ async function createOne(req, res) {
       } = req.body;
 
       const customerDoc = await Customer.findOne({ _id: customer });
+      if ( !customerDoc ) return HTTPError('Customer not found.');
       const { tag, numShipments } = customerDoc;
 
       const shipmentId = `${tag}-SH${numShipments + 1}`;
@@ -221,11 +222,13 @@ async function createOne(req, res) {
       await Promise.all(promises);
       const orderNumbersArr = Array.from(orderNumbers);
 
-      //aggregation
+      // aggregation used to determine if items on the new packing slip are fully completed ...
+      // ... and need are ready for EPP or ready to be shipped. Data is then used to ...
+      // ... set AirTable fields as needed ('Ready 2 Ship' and 'Ready 4 EPP').
       const agg = [
         { $match: {
           customer: new ObjectId(customerId),
-          isPastVersion: false,
+          isPastVersion: { $ne: true },
         } },
         { $unwind: '$manifest'},
         { $lookup: {
@@ -292,11 +295,11 @@ async function createOne(req, res) {
         } }
       ];
 
-      const pipeline = await Shipment.aggregate(agg);
+      const jobShippingData = await Shipment.aggregate(agg);
 
       //loop through pipeline data and check if AT fields need set
-      const fields = {};
-      for ( x of pipeline ) {
+      for ( x of JobShippingData ) {
+        const fields = {};
         const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } = x;
 
         if ( qtyShippedCustomer >= totalQty ) {
