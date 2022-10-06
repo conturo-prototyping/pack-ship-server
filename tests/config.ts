@@ -1,43 +1,30 @@
 require('dotenv').config();
 
 import { Express } from 'express';
-import { ObjectId } from 'mongoose';
-import { UserModel } from '../src/user/model';
 import { DropAllCollections } from '../src/router.debug';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
-import { join } from 'path';
-import app from '../src/app'      // hacky add to run test
+
+const passportStub = require('passport-stub-es6');
 
 process.env.MONGO_DB_URI += '--TEST';
 process.env.NODE_ENV = 'TEST';
 // console.log = function() {};
 
 // This lets us avoid requiring app in every single test directory & subdirectory.
+let APP: Express;
+
 chai.use(chaiHttp);
-// let app: Express;    //ERROR: had to remove since now importing app
-
-// We can't pull models into runtime until we've made a connection to the usual DB
-//  copied critical collections over, and then change the connection back.
-let User: typeof UserModel;
-
-
-// @ts-ignore
-require.main.require = name => {
-  const newPath = join(__dirname, '../src', name);
-  return require(newPath);
-};
 
 // SETUP
-// Set up a temp DB
-let TEST_USER_ID: ObjectId;
+// Start the app with the fake DB path & stub a fake user for all auth endpoints.
 before(async () => {
-  // Use a test DB & copy essential collections to it
-  let dbUrl = process.env.MONGO_DB_URI;
-  dbUrl = dbUrl!.substring(0, dbUrl!.lastIndexOf('--TEST') );
+  const { app } = await import('../src/app');
 
-  // Load app here, so it's cached for future tests
-  // app = require('../src/app');     //ERROR: had to remove this and pull it out of the scop of this function (using import app from ....)
+  passportStub.install(app);
+  passportStub.login({ UserName: 'Frank the Tank' });
+
+  APP = app;
 });
 
 // TEAR DOWN
@@ -50,21 +37,14 @@ after(async () => await DropAllCollections() );
 // ----------------------------------------------------------
 // ----------------------------------------------------------
 
-export function GetUserId() {
-  return TEST_USER_ID;
-}
-
-export async function ChaiRequest(method, url, payload={}, throwError = true) {
-  // const user = await User.findOne();     // ERROR: this does not work, user comes out as undefined
-  const user = await UserModel.findOne();     // hacky add to run test
-
-  if (!user) throw Error('No users found. Create at least one user with Google OAuth2 to proceed.');
-
-  app.request.user = user;
-  app.request.isAuthenticated = function() { return true; };
-
-  const res = await chai.request(app)
-    [method](url)
+export async function ChaiRequest(
+  method: string,
+  url: string,
+  payload: Object = {},
+  throwError: Boolean = true,
+) {
+  const res = await chai
+    .request(APP)[method](url)
     .send(payload);
 
   if  (throwError && res.status !== 200 && res.status !== 201 ){
