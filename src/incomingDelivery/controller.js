@@ -29,31 +29,35 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
-  label,
   sourceShipmentId=undefined
 ) {
+  if ( !sourceShipmentId ) return [ HTTPError('Shipment ID not sent.', 400) ];
+
+  const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
+  if ( err ) return [ err ];
+
+  const { numberOfDeliveries, shipmentId } = ret;
+  let label = shipmentId + '-R';
+  if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
+
+  const deliveryInfo = {
+    internalPurchaseOrderNumber,
+    createdBy: creatingUserId,
+    isDueBackOn,
+    sourceShipmentId,
+    label,
+  };
+
   try {
-    const deliveryInfo = {
-      internalPurchaseOrderNumber,
-      createdBy: creatingUserId,
-      isDueBackOn,
-      sourceShipmentId,
-      label,
-    };
+    const incomingDelivery = new IncomingDelivery(deliveryInfo);
+    await incomingDelivery.save();
 
-    if ( !sourceShipmentId ) return [ { message: 'no shipment id sent', code: 501 }, ];
-
-    const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
-    await newIncomingDelivery.save();
-
-    return [ , newIncomingDelivery._id];
+    return [ , { incomingDelivery }];
   } 
   catch (error) {
     LogError(error);
-    return [error];
+    return [ HTTPError('Unexpected error creating incoming delivery.') ];
   }
-  
-  // throw new Error('Not implemented.');
 }
 
 /**
@@ -76,26 +80,9 @@ function createOne(req, res) {
         sourceShipmentId
       } = req.body;
 
-      const { _id } = req.user;
+      const [err, data] = await CreateNew(internalPurchaseOrderNumber, req.user._id, isDueBackOn, sourceShipmentId);
+      if ( err ) return err;
 
-      const [err, ret] = await _getSourceShipmentLabel(sourceShipmentId);
-      if ( err ) return HTTPError('error getting source shipment info');
-
-      const { numberOfDeliveries, shipmentId } = ret;
-      let label = shipmentId + '-R';
-      if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
-
-      const [err2, incomingDeliveryId] = await CreateNew(
-        internalPurchaseOrderNumber,
-        _id,
-        isDueBackOn,
-        label,
-        sourceShipmentId,
-      );
-
-      if ( err2 ) HTTPError('error creating new incoming delivery');
-
-      const data = { incomingDeliveryId };
       return { data };
     }, 
     res, 
@@ -126,8 +113,6 @@ function getQueue(req, res) {
           }
         })
         .exec();
-
-      console.debug(_deliveries);
       
       const ordersSet = new Set();    //use to track all workOrders that need to be fetched
       const itemsObjs = {};
@@ -226,7 +211,7 @@ function setReceived(req, res) {
   );
 }
 
-async function _getSourceShipmentLabel(id) {
+async function getSourceShipmentLabel(id) {
   try {
     const shipment = await Shipment.findOne({ _id: id })
       .lean()
@@ -252,7 +237,7 @@ async function _getSourceShipmentLabel(id) {
   } 
   catch (error) {
     LogError(error);
-    return [error];
+    return [ HTTPError('Unexpected error fetching shipment info for labeling.') ];
   }
 }
 
