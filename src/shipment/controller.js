@@ -524,6 +524,7 @@ async function getAsPdf(req, res) {
       const allShipmentsInfo = [];
 
       let idx = 0;
+      let lineItemNumber = 1;
       for ( const orderNumber of orderNumbers ) {
         const promises = [];
 
@@ -572,6 +573,8 @@ async function getAsPdf(req, res) {
           tableTitleArr.push('');
 
         manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitleArr, pageBreakAfter));
+
+
         idx += 1;
       }
       
@@ -779,6 +782,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
 
   let lineNumber = 0;
   for (const i of items) {
+    ++lineNumber;
 
     // here, 'quantity' refers to the quantity ordered in the PO
     const { partNumber, partDescription, partRev, quantity, qtyShipped } = i;
@@ -792,7 +796,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
       lineText += "\n " + partDescription;
 
     const row = [
-      { text: lineNumber + 1, alignment: "center" },
+      { text: lineNumber, alignment: "center" },
       { text: lineText },
       { text: `${qtyOrdered}`, alignment: "right" },
       { text: `${qtyShipped}`, alignment: "right" },
