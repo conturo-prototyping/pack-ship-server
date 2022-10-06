@@ -1,10 +1,10 @@
+const AirTable = require('airtable');
+const { LogError } = require('./utils');
+const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME } = process.env;
 
 module.exports = {
   SetAirTableFields,
 }
-
-const AirTable = require('airtable')
-const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME } = process.env;
 
 /**
  * Used to update values in AirTable by searching by calcItemId === 'ShopQ Item Id'
@@ -25,6 +25,7 @@ async function SetAirTableFields(calcItemId, fields) {
       .all()
 
     const recordId = records[0].id;   //since there will only be one record
+    if ( !recordId ) return LogError('Record Id not found (AirTable)');
 
     //update record
     base(AIRTABLE_TABLE_NAME)
@@ -35,14 +36,14 @@ async function SetAirTableFields(calcItemId, fields) {
         }
       ], function (err, _records) {
         if (err) {
-          console.log('error updateing');   //TODO: might need to handle this error differently
+          LogError('error updating');
           return;
         }
         // _records.forEach( x => console.log(x.get('Job')))
       })
   }
   catch (e) {
-    console.log(e)
+    LogError(e)
   }
 
 }
