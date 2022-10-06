@@ -81,7 +81,7 @@ function createOne(req, res) {
       } = req.body;
 
       const [err, data] = await CreateNew(internalPurchaseOrderNumber, req.user._id, isDueBackOn, sourceShipmentId);
-      if ( err ) HTTPError('Error creating new incoming delivery.');
+      if ( err ) return err;
 
       return { data };
     }, 
