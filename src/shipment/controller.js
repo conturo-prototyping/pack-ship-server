@@ -9,7 +9,7 @@ const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
-const { SetAirTableFields } =  require('../service.airtable'); 
+const { SetAirTableFields, FIELD_NAMES } =  require('../service.airtable'); 
 
 module.exports = router;
 
@@ -298,19 +298,20 @@ async function createOne(req, res) {
       const jobShippingData = await Shipment.aggregate(agg);
 
       //loop through pipeline data and check if AT fields need set
-      for ( x of JobShippingData ) {
+      for ( x of jobShippingData ) {
         const fields = {};
         const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } = x;
 
         if ( qtyShippedCustomer >= totalQty ) {
           //set fields key/value to be set in AT
-          fields['Ready 2 Ship'] = true;
+          fields[ FIELD_NAMES.READY_TO_SHIP ] = true;
+          fields[ FIELD_NAMES.SHIPPED ] = true;
         }
 
         //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
         if ( qtyShippedVendor >= totalQty ) {
           //set fields key/value to be set in AT
-          fields['Ready 4 EPP'] = true;
+          fields[ FIELD_NAMES.READY_FOR_EPP ] = true;
         }
 
         //set AirTable fields (if needed)
