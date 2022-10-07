@@ -2,8 +2,16 @@ const AirTable = require('airtable');
 const { LogError } = require('./utils');
 const { AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME } = process.env;
 
+// Common field names as they appear in the Operations/All POs AirTable
+const FIELD_NAMES = {
+  READY_TO_SHIP:  'Ready 2 Ship',
+  READY_FOR_EPP:  'Ready 4 EPP',
+  SHIPPED:        'Shipped'
+};
+
 module.exports = {
   SetAirTableFields,
+  FIELD_NAMES
 }
 
 /**
@@ -24,8 +32,11 @@ async function SetAirTableFields(calcItemId, fields) {
       })
       .all()
 
-    const recordId = records[0].id;   //since there will only be one record
-    if ( !recordId ) return LogError('Record Id not found (AirTable)');
+    const recordId = records?.[0]?.id;   //since there will only be one record
+    if ( !recordId ) {
+      LogError('Record Id not found (AirTable)');
+      return;
+    }
 
     //update record
     base(AIRTABLE_TABLE_NAME)
@@ -39,11 +50,9 @@ async function SetAirTableFields(calcItemId, fields) {
           LogError('error updating');
           return;
         }
-        // _records.forEach( x => console.log(x.get('Job')))
       })
   }
   catch (e) {
     LogError(e)
   }
-
 }
