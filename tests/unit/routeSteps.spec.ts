@@ -1,28 +1,22 @@
-import { expect } from "chai";
-import { describe, it } from "mocha";
-import { ChaiRequest } from "../config";
+import { expect } from 'chai';
+import { describe, it } from 'mocha';
 import { MongoClient } from 'mongodb';
+import { ChaiRequest } from '../config';
+
 require('../config'); // recommended way of loading root hooks
 
 const URL = '/routeSteps';
 
-// set up DB_URL
-let DB_URL = process.env.MONGO_DB_URI;
-console.debug(DB_URL)
-DB_URL = DB_URL!.substring(0, DB_URL!.lastIndexOf('--TEST') )
-// console.debug(DB_URL)
-const _DB_URL = DB_URL?.split('?');
-console.debug(_DB_URL);
-DB_URL = _DB_URL[0] + '-test?' + _DB_URL[1];
-console.debug(DB_URL)
+// set up DB_URL - NOTE: this only works with a local db, if not set up use the /debug/reset route to generate data (this might not be needed)
+const DB_URL: string = process.env.MONGO_DB_URI || '';
+console.debug(DB_URL);
 
-//FYI for this there is a permission issue of trying to go to a new db, currently I don't have a local db set up
+// FYI for this there is a permission issue of trying to go to a new db, currently I don't have a local db set up
 
-const CLIENT = new MongoClient( DB_URL, { useUnifiedTopology: true } );
+const CLIENT = new MongoClient(DB_URL, { useUnifiedTopology: true });
 
 describe('# ROUTE STEPS', () => {
-  it('Should find 1 inserted routeStep from collection.' , async () => {
-
+  it('Should find 1 inserted routeStep from collection.', async () => {
     // set up connection to db
     // await CLIENTConnect();
     await CLIENT.connect();
@@ -30,14 +24,14 @@ describe('# ROUTE STEPS', () => {
     // create routeStep using mongodb driver
     const doc = {
       name: 'for testing',
-      category: 'testing...'
+      category: 'testing...',
     };
     await CLIENT.db().collection('routeSteps').insertOne(doc);
 
     // hit endpoint to get all routeSteps in collection
-    const res = await ChaiRequest('get', URL + '/');
+    const res = await ChaiRequest('get', `${URL}/`);
     const numOfRouteSteps = res.body.routeSteps.length;
 
     expect(numOfRouteSteps).to.be.eq(1);
-  })
-})
+  });
+});
