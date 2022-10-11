@@ -19,20 +19,7 @@ module.exports = {
  */
 async function getAll(_req, res) {
   const [err, data] = await getAllWithPackedQties(true);
-
-  // const filtered = data.filter( x => x.packedQty >= x.batchQty && x.orderNumber === 'FOGRO1007' )
-
-  const filtered = data.filter( x => x.orderNumber === 'FOGRO1007')
-
-  console.log(filtered)
-
-
-
-
   if (err) res.status(err.status).send(err.message);
-
-  
-
   else res.send(data);
 }
 
