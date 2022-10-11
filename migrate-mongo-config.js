@@ -1,7 +1,7 @@
 const config = {
   mongodb: {
     // TODO Change (or review) the url to your MongoDB:
-    url: "INSERT DB HERE",
+    url: "mongodb+srv://mitch:9zmXeBdBGglcgL1M@cluster0.hkmlopq.mongodb.net/dev-shop?retryWrites=true&w=majority",
 
     // TODO Change this to your database name:
     // databaseName: "YOURDATABASENAME",
