@@ -6,11 +6,12 @@ const WorkOrder = require("../workOrder/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
 
-router.get("/", getAll);
-router.put("/", createOne);
-router.get("/queue", getQueue);
-router.post("/receive", setReceived);
-router.get("/:deliveryId", getOne);
+router.get('/', getAll);
+router.put('/', createOne);
+router.get('/queue', getQueue);
+router.post('/receive', setReceived);
+router.get('/:deliveryId', getOne);
+router.get('/allReceived', getAllReceived);
 
 module.exports = {
   router,
@@ -30,10 +31,19 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
-  label,
-  sourceShipmentId = undefined
+  sourceShipmentId=undefined
 ) {
   try {
+    if ( !sourceShipmentId ) return [ HTTPError('Shipment ID not sent.', 400) ];
+    if ( !dayjs(isDueBackOn).isValid() ) return [ HTTPError('Please provide a valid string that represents a date.', 400) ];
+
+    const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
+    if ( err ) return [ err ];
+  
+    const { numberOfDeliveries, shipmentId } = ret;
+    let label = shipmentId + '-R';
+    if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
+  
     const deliveryInfo = {
       internalPurchaseOrderNumber,
       createdBy: creatingUserId,
@@ -42,19 +52,15 @@ async function CreateNew(
       label,
     };
 
-    if (!sourceShipmentId)
-      return [{ message: "no shipment id sent", code: 501 }];
-
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
 
-    return [, newIncomingDelivery._id];
-  } catch (error) {
+    return [ , { incomingDelivery }];
+  } 
+  catch (error) {
     LogError(error);
-    return [error];
+    return [ HTTPError('Unexpected error creating incoming delivery.') ];
   }
-
-  // throw new Error('Not implemented.');
 }
 
 /**
@@ -72,32 +78,9 @@ function createOne(req, res) {
       const { internalPurchaseOrderNumber, isDueBackOn, sourceShipmentId } =
         req.body;
 
-      const { _id } = req.user;
+      const [err, data] = await CreateNew(internalPurchaseOrderNumber, req.user._id, isDueBackOn, sourceShipmentId);
+      if ( err ) return err;
 
-      const [err, ret] = await _getSourceShipmentLabel(sourceShipmentId);
-      if (err) return HTTPError("error getting source shipment info");
-
-      if (!dayjs(isDueBackOn).isValid()) {
-        return HTTPError(
-          "Please provide a valid string that represents a date"
-        );
-      }
-
-      const { numberOfDeliveries, shipmentId } = ret;
-      let label = shipmentId + "-R";
-      if (numberOfDeliveries > 0) label += `${numberOfDeliveries + 1}`;
-
-      const [err2, incomingDeliveryId] = await CreateNew(
-        internalPurchaseOrderNumber,
-        _id,
-        isDueBackOn,
-        label,
-        sourceShipmentId
-      );
-
-      if (err2) HTTPError("error creating new incoming delivery");
-
-      const data = { incomingDeliveryId };
       return { data };
     },
     res,
@@ -127,10 +110,8 @@ function getQueue(req, res) {
           },
         })
         .exec();
-
-      console.debug(_deliveries);
-
-      const ordersSet = new Set(); //use to track all workOrders that need to be fetched
+      
+      const ordersSet = new Set();    //use to track all workOrders that need to be fetched
       const itemsObjs = {};
       const promises = [];
 
@@ -235,7 +216,7 @@ function setReceived(req, res) {
   );
 }
 
-async function _getSourceShipmentLabel(id) {
+async function getSourceShipmentLabel(id) {
   try {
     const shipment = await Shipment.findOne({ _id: id })
       .lean()
@@ -260,7 +241,7 @@ async function _getSourceShipmentLabel(id) {
     return [, ret];
   } catch (error) {
     LogError(error);
-    return [error];
+    return [ HTTPError('Unexpected error fetching shipment info for labeling.') ];
   }
 }
 
@@ -327,5 +308,33 @@ function getOne(req, res) {
     },
     res,
     "fetching incoming delivery"
+  );
+}
+
+/**
+ * used to get all incoming deliveries that have been delivered
+ */
+function getAllReceived(req, res) {
+  ExpressHandler(
+    async () => {
+      const query = { receivedOn: { $exists: true } };
+      const _receivedDeliveries = await IncomingDelivery.find(query)
+        .lean()
+        .select('label source receivedOn sourceShipmentId')
+        .populate('sourceShipmentId')
+        .exec()
+
+      const receivedDeliveries = _receivedDeliveries
+        .filter( x => x.sourceShipmentId?.isPastVersion !== true )
+        .map( d => {
+          delete d.sourceShipmentId;
+          return d;
+        } );
+
+      const data = { receivedDeliveries };
+      return { data };
+    },
+    res,
+    'getting all received incoming deliveries'
   );
 }
