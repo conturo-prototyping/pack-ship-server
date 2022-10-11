@@ -88,10 +88,16 @@ router.post('/stuff', async (req, res) => {
   for (const p of a) {
     const { orderNumber } = p;
     const show = ( orderNumber === 'FOGRO1007' );
+    if (show) console.log('-----------------  --------------------------');
     for (const i of p.items) {
 
       // No part router -> insert default code
-      if ( !i.item?.partRouter?.length ) {
+      if ( !i?.partRouter?.length ) {
+        if (show) {
+          console.log('-----------------  --------------------------');
+          console.log(' in if statement')
+          console.log(i)}
+
         // console.log(p.orderNumber)
         i.destinationCode = DEFAULT_DESTINATION_CODE;
       }
@@ -102,6 +108,7 @@ router.post('/stuff', async (req, res) => {
         if (p.destination === 'CUSTOMER') {
           // i.destinationCode = 'CUSTOMER-' + (i.item.partRouter.at(-1)).stepCode;   //OLD CODE
           i.destinationCode = 'CUSTOMER-' + (i.partRouter.at(-1).stepCode);
+          // if (show) console.log(i.partRouter.at(-1).stepCode);
         }
         else if (p.destination === 'VENDOR' ) {
 
@@ -111,7 +118,7 @@ router.post('/stuff', async (req, res) => {
           // only 1 vendor step, easy fix
           if ( numVendorSteps === 1 ) {
             // i.destinationCode = 'VENDOR-' + (i.item.partRouter.find(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')).stepCode;
-            i.destinationCode = 'VENDOR-' + (i.item.partRouter.find(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')).stepCode;
+            i.destinationCode = 'VENDOR-' + (i.partRouter.find(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')).stepCode;
           }
           else if (numVendorSteps === 0) {
             console.debug(`No VENDOR steps found: ${p.packingSlipId} - ${JSON.stringify(i.item._id)}`);
@@ -123,32 +130,35 @@ router.post('/stuff', async (req, res) => {
       }
 
       // i.item = i.item._id;    //not needed for my code
+
+      // remove partRouter
+      delete i.partRouter;
     }
     // console.debug(p.items);
   }
 
-  // const promises = a.map(async (p) => {
-  //   await db
-  //     .collection( TARGET_COLLECTION )
-  //     .updateOne(
-  //       { _id: p._id },
-  //       { $set: {
-  //         items: p.items
-  //       } }
-  //     );
-  // });
+  const promises = a.map(async (p) => {
+    await PackingSlip.updateOne(
+      { _id: p._id },
+      { $set: {
+        items: p.items
+      } }
+    );
+  });
 
-  // await Promise.all(promises);
+  await Promise.all(promises);
 
 
 
 
   
-  const b = a.filter( x => x.orderNumber === 'FOGRO1007')
+  // const b = a.filter( x => x.items[0].partRouter.length > 0)
+  // const b = a.filter( x => x.items[0].destinationCode.split('-')[1] +0  > 0)
+  const b = a.filter( x => !x.items[0].destinationCode )
   // a.forEach( x => console.log(x))
   // console.log(a[0])
   console.log(b.length)
-  res.send(b[0])
+  res.send(b)
 
 
 })
