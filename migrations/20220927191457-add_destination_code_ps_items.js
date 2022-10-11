@@ -93,7 +93,6 @@ module.exports = {
         // remove partRouter
         delete i.partRouter;
       }
-      // console.debug(p.items);
     }
   
     const promises = packingSlips.map(async (p) => {
@@ -133,7 +132,5 @@ module.exports = {
     };
 
     await Promise.all(promises);
-
-    // console.log(packingSlips.length);
   }
 };
