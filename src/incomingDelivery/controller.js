@@ -10,6 +10,7 @@ router.put('/', createOne);
 router.get('/queue', getQueue);
 router.post('/receive', setReceived);
 router.get('/:deliveryId', getOne);
+router.get('/allReceived', getAllReceived);
 
 module.exports = {
   router,
@@ -31,26 +32,25 @@ async function CreateNew(
   isDueBackOn,
   sourceShipmentId=undefined
 ) {
-  if ( !sourceShipmentId ) return [ HTTPError('Shipment ID not sent.', 400) ];
-
-  const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
-  if ( err ) return [ err ];
-
-  const { numberOfDeliveries, shipmentId } = ret;
-  let label = shipmentId + '-R';
-  if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
-
-  const deliveryInfo = {
-    internalPurchaseOrderNumber,
-    createdBy: creatingUserId,
-    isDueBackOn,
-    sourceShipmentId,
-    label,
-  };
-
   try {
-    const incomingDelivery = new IncomingDelivery(deliveryInfo);
-    await incomingDelivery.save();
+    if ( !sourceShipmentId ) return [ HTTPError('Shipment ID not sent.', 400) ];
+
+    const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
+    if ( err ) return [ err ];
+  
+    const { numberOfDeliveries, shipmentId } = ret;
+    let label = shipmentId + '-R';
+    if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
+  
+    const deliveryInfo = {
+      internalPurchaseOrderNumber,
+      createdBy: creatingUserId,
+      isDueBackOn,
+      sourceShipmentId,
+      label,
+    };
+  
+    if ( !sourceShipmentId ) return [ { message: 'no shipment id sent', code: 501 }, ];
 
     return [ , { incomingDelivery }];
   } 
@@ -298,5 +298,34 @@ function getOne(req, res) {
     },
     res,
     'fetching incoming delivery'
+  );
+}
+
+
+/**
+ * used to get all incoming deliveries that have been delivered
+ */
+function getAllReceived(req, res) {
+  ExpressHandler(
+    async () => {
+      const query = { receivedOn: { $exists: true } };
+      const _receivedDeliveries = await IncomingDelivery.find(query)
+        .lean()
+        .select('label source receivedOn sourceShipmentId')
+        .populate('sourceShipmentId')
+        .exec()
+
+      const receivedDeliveries = _receivedDeliveries
+        .filter( x => x.sourceShipmentId?.isPastVersion !== true )
+        .map( d => {
+          delete d.sourceShipmentId;
+          return d;
+        } );
+
+      const data = { receivedDeliveries };
+      return { data };
+    },
+    res,
+    'getting all received incoming deliveries'
   );
 }
