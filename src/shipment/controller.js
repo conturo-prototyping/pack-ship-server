@@ -26,6 +26,58 @@ router.get("/:sid", getOne);
 router.patch("/:sid", editOne);
 router.delete("/:sid", deleteOne);
 
+
+// TODO: REMOVE THIS FAKE ROUTE
+router.get('/fake/route', async (req, res) => {
+  console.log('-----------------  --------------------------');
+  const _packingSlips = await PackingSlip.find( {orderNumber: 'FOGRO1007' } )
+  // console.log(packingSlips)
+  const packingSlips = _packingSlips.filter( x => x.shipment )
+
+  const obj = {};
+
+  for (x of packingSlips) {
+    for ( item of x.items ) {
+      if (item.item in obj ){
+        qty += item.qty;
+      }
+      else {
+        obj[item.item] = { item: item.item, qty: item.qty}
+      }
+    }
+    
+  }
+  console.log(obj)
+  const workOrder = await WorkOrder.findOne({ OrderNumber: 'FOGRO1007' })
+  // console.log(workOrder)
+  const { Items } = workOrder;
+  for ( item of Items ) {
+    const  { _id, PartNumber, Quantity, batchNumber } = item;
+
+    if ( _id.toString() in obj ) {
+      obj[_id.toString()].PartNumber = PartNumber;
+      obj[_id.toString()].Quantity = Quantity;
+      obj[_id.toString()].batchNumber = batchNumber;
+    }
+    else {
+      console.log(`${_id} not in object`)   
+    }
+    
+  }
+
+  console.log(Object.values(obj) )
+  const _res =[];
+  Object.values(obj).forEach( x => {
+    if ( x.Quantity <= x.qty ) _res.push(x)
+  })
+
+  
+
+  const data = { packingSlips };
+  res.send(data)
+  // return {data}
+})
+
 /**
  * Compute a search of shipment documents that match either a given order or a given part.
  * Further, results should be paginated according to the parameters
