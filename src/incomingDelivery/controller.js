@@ -10,8 +10,8 @@ router.get("/", getAll);
 router.put("/", createOne);
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
-router.get("/:deliveryId", getOne);
 router.get("/allReceived", getAllReceived);
+router.get("/:deliveryId", getOne);
 
 module.exports = {
   router,
@@ -327,6 +327,7 @@ function getOne(req, res) {
 function getAllReceived(req, res) {
   ExpressHandler(
     async () => {
+      console.log("ere");
       const query = { receivedOn: { $exists: true } };
       const _receivedDeliveries = await IncomingDelivery.find(query)
         .lean()
