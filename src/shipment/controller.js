@@ -199,12 +199,15 @@ async function createOne(req, res) {
         specialShippingAddress: shippingAddress,
       });
 
+      await shipment.save();
+
       if (isDueBack) {
         const [returnErr, ] = await CreateNew(undefined, req.user._id, isDueBackOn, shipment._id);
-        if (returnErr) return returnErr;
+        if (returnErr) {
+          await shipment.delete();
+          return returnErr;
+        }
       }
-
-      await shipment.save();
 
       // update all packing slips in manifest w/ this shipment's id
       const promises = manifest.map((x) =>

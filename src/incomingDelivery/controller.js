@@ -55,7 +55,7 @@ async function CreateNew(
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
 
-    return [ , { incomingDelivery }];
+    return [ , { incomingDelivery: newIncomingDelivery }];
   } 
   catch (error) {
     LogError(error);
