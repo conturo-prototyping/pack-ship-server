@@ -58,8 +58,9 @@ async function CreateNew(
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
 
-    return [, { incomingDelivery }];
-  } catch (error) {
+    return [ , { incomingDelivery: newIncomingDelivery }];
+  } 
+  catch (error) {
     LogError(error);
     return [HTTPError("Unexpected error creating incoming delivery.")];
   }
