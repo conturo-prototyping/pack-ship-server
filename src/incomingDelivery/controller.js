@@ -327,7 +327,6 @@ function getOne(req, res) {
 function getAllReceived(req, res) {
   ExpressHandler(
     async () => {
-      console.log("ere");
       const query = { receivedOn: { $exists: true } };
       const _receivedDeliveries = await IncomingDelivery.find(query)
         .lean()
