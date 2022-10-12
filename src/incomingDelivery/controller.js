@@ -6,12 +6,12 @@ const WorkOrder = require("../workOrder/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
 
-router.get('/', getAll);
-router.put('/', createOne);
-router.get('/queue', getQueue);
-router.post('/receive', setReceived);
-router.get('/:deliveryId', getOne);
-router.get('/allReceived', getAllReceived);
+router.get("/", getAll);
+router.put("/", createOne);
+router.get("/queue", getQueue);
+router.post("/receive", setReceived);
+router.get("/allReceived", getAllReceived);
+router.get("/:deliveryId", getOne);
 
 module.exports = {
   router,
@@ -31,19 +31,22 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
-  sourceShipmentId=undefined
+  sourceShipmentId = undefined
 ) {
   try {
-    if ( !sourceShipmentId ) return [ HTTPError('Shipment ID not sent.', 400) ];
-    if ( !dayjs(isDueBackOn).isValid() ) return [ HTTPError('Please provide a valid string that represents a date.', 400) ];
+    if (!sourceShipmentId) return [HTTPError("Shipment ID not sent.", 400)];
+    if (!dayjs(isDueBackOn).isValid())
+      return [
+        HTTPError("Please provide a valid string that represents a date.", 400),
+      ];
 
     const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
-    if ( err ) return [ err ];
-  
+    if (err) return [err];
+
     const { numberOfDeliveries, shipmentId } = ret;
-    let label = shipmentId + '-R';
-    if ( numberOfDeliveries > 0 ) label += `${numberOfDeliveries + 1}`;
-  
+    let label = shipmentId + "-R";
+    if (numberOfDeliveries > 0) label += `${numberOfDeliveries + 1}`;
+
     const deliveryInfo = {
       internalPurchaseOrderNumber,
       createdBy: creatingUserId,
@@ -59,7 +62,7 @@ async function CreateNew(
   } 
   catch (error) {
     LogError(error);
-    return [ HTTPError('Unexpected error creating incoming delivery.') ];
+    return [HTTPError("Unexpected error creating incoming delivery.")];
   }
 }
 
@@ -78,8 +81,13 @@ function createOne(req, res) {
       const { internalPurchaseOrderNumber, isDueBackOn, sourceShipmentId } =
         req.body;
 
-      const [err, data] = await CreateNew(internalPurchaseOrderNumber, req.user._id, isDueBackOn, sourceShipmentId);
-      if ( err ) return err;
+      const [err, data] = await CreateNew(
+        internalPurchaseOrderNumber,
+        req.user._id,
+        isDueBackOn,
+        sourceShipmentId
+      );
+      if (err) return err;
 
       return { data };
     },
@@ -110,8 +118,8 @@ function getQueue(req, res) {
           },
         })
         .exec();
-      
-      const ordersSet = new Set();    //use to track all workOrders that need to be fetched
+
+      const ordersSet = new Set(); //use to track all workOrders that need to be fetched
       const itemsObjs = {};
       const promises = [];
 
@@ -136,6 +144,7 @@ function getQueue(req, res) {
 
               for (const woItem of workOrder.Items) {
                 const {
+                  _id,
                   OrderNumber,
                   PartNumber,
                   PartName,
@@ -143,6 +152,7 @@ function getQueue(req, res) {
                   batchNumber,
                 } = woItem;
                 const _woItem = {
+                  _id,
                   orderNumber: OrderNumber,
                   partNumber: PartNumber,
                   partDescription: PartName,
@@ -170,8 +180,9 @@ function getQueue(req, res) {
 
       //loop through deliveries and create mutated ret array
       const ret = deliveries.map((d) => {
-        const _manifest = d.manifest.map(({ item, qty }) => {
+        const _manifest = d.manifest.map(({ _id, item, qty }) => {
           return {
+            _id,
             item: itemsObjs[item],
             qty,
           };
@@ -241,7 +252,7 @@ async function getSourceShipmentLabel(id) {
     return [, ret];
   } catch (error) {
     LogError(error);
-    return [ HTTPError('Unexpected error fetching shipment info for labeling.') ];
+    return [HTTPError("Unexpected error fetching shipment info for labeling.")];
   }
 }
 
@@ -320,21 +331,21 @@ function getAllReceived(req, res) {
       const query = { receivedOn: { $exists: true } };
       const _receivedDeliveries = await IncomingDelivery.find(query)
         .lean()
-        .select('label source receivedOn sourceShipmentId')
-        .populate('sourceShipmentId')
-        .exec()
+        .select("label source receivedOn sourceShipmentId")
+        .populate("sourceShipmentId")
+        .exec();
 
       const receivedDeliveries = _receivedDeliveries
-        .filter( x => x.sourceShipmentId?.isPastVersion !== true )
-        .map( d => {
+        .filter((x) => x.sourceShipmentId?.isPastVersion !== true)
+        .map((d) => {
           delete d.sourceShipmentId;
           return d;
-        } );
+        });
 
       const data = { receivedDeliveries };
       return { data };
     },
     res,
-    'getting all received incoming deliveries'
+    "getting all received incoming deliveries"
   );
 }
