@@ -6,12 +6,10 @@ const Customer = require("../customer/model");
 const WorkOrder = require("../workOrder/model");
 const IncomingDelivery = require('../incomingDelivery/model');
 const { CreateNew } = require('../incomingDelivery/controller');
-const User = require("../user/model");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
-var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
-const { CreateNew } = require("../incomingDelivery/controller");
+const ObjectId = require("mongodb").ObjectId;
 
 module.exports = router;
 
