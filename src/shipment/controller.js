@@ -230,7 +230,10 @@ async function getOne(req, res) {
       for ( m of shipment.manifest) {
         for ( item of m.items) {
           const { qty, finalUnitRate } = item;
-          shipmentDollarValue = currency(shipmentDollarValue).add( currency(finalUnitRate).multiply(qty) ).value;
+          shipmentDollarValue = currency(shipmentDollarValue)
+            .add( currency(finalUnitRate)
+            .multiply(qty) )
+            .format();
         }
       }
 
