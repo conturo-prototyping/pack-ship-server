@@ -8,6 +8,7 @@ import passport from 'passport';
 import mongoose from 'mongoose';
 import debugRouter from './router.debug';
 import { LotRouter } from './lot/controller';
+import RouteStepRouter from './routeStep/controller';
 
 require('dotenv').config();
 require('./config.passport')(passport);
@@ -48,7 +49,10 @@ app.use('/packingSlips', require('./packingSlip/controller').router);
 app.use('/workOrders', require('./workOrder/controller'));
 app.use('/shipments', require('./shipment/controller'));
 app.use('/users', require('./user/controller'));
-app.use('/lots', LotRouter );
+
+app.use('/routeSteps', RouteStepRouter);
+
+app.use('/lots', LotRouter);
 
 app.all('*', (_req, res) => res.sendStatus(404));
 

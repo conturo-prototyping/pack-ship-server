@@ -1,9 +1,9 @@
-require('dotenv').config();
-
 import { Express } from 'express';
-import { DropAllCollections } from '../src/router.debug';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
+import { DropAllCollections } from '../src/router.debug';
+
+require('dotenv').config();
 
 const passportStub = require('passport-stub-es6');
 
@@ -29,7 +29,7 @@ before(async () => {
 
 // TEAR DOWN
 // Clear out all TEST DB collections
-after(async () => await DropAllCollections() );
+after(async () => DropAllCollections());
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
@@ -47,17 +47,17 @@ export async function ChaiRequest(
     .request(APP)[method](url)
     .send(payload);
 
-  if  (throwError && res.status !== 200 && res.status !== 201 ){
+  if (throwError && res.status !== 200 && res.status !== 201) {
     throw res.data;
-  };
+  }
 
   return res;
-};
+}
 
 /**
  * Used to push any special teardown routines.
  * For example, if a test suite updated a critical collection, and we want to reset some fields.
- * 
+ *
  * Used by LocalReset.
  */
 let TEARDOWN_CALLBACKS: Function[] = [];
@@ -65,7 +65,7 @@ export function SetTeardowns(...teardownCallbacks: Function[]) {
   TEARDOWN_CALLBACKS = [];
   TEARDOWN_CALLBACKS.push(...teardownCallbacks);
 }
- 
+
 /**
 * Useful function to do a hard reset between test suites.
 * If there are special teardowns that need to happen (e.g. change update critical collections)
@@ -73,5 +73,5 @@ export function SetTeardowns(...teardownCallbacks: Function[]) {
 */
 export async function LocalReset() {
   await DropAllCollections();
-  await Promise.all(TEARDOWN_CALLBACKS.map(x => x()));
-};
+  await Promise.all(TEARDOWN_CALLBACKS.map((x) => x()));
+}
