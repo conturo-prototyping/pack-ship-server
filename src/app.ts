@@ -8,6 +8,7 @@ import passport from 'passport';
 import mongoose from 'mongoose';
 import debugRouter from './router.debug';
 import { LotRouter } from './lot/controller';
+import JobRouter from './job/controller';
 import RouteStepRouter from './routeStep/controller';
 
 require('dotenv').config();
@@ -16,19 +17,21 @@ require('./config.passport')(passport);
 const app = express();
 export { app };
 
-app.use(cors({
-  origin: [
-    process.env.CORS_CLIENT_URL!,
-  ],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [process.env.CORS_CLIENT_URL!],
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieSession({
-  name: process.env.SESSION_NAME,
-  keys: [process.env.SESSION_SECRET!],
-}));
+app.use(
+  cookieSession({
+    name: process.env.SESSION_NAME,
+    keys: [process.env.SESSION_SECRET!],
+  }),
+);
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -49,10 +52,9 @@ app.use('/packingSlips', require('./packingSlip/controller').router);
 app.use('/workOrders', require('./workOrder/controller'));
 app.use('/shipments', require('./shipment/controller'));
 app.use('/users', require('./user/controller'));
-
 app.use('/routeSteps', RouteStepRouter);
-
 app.use('/lots', LotRouter);
+app.use('/jobs', JobRouter);
 
 app.all('*', (_req, res) => res.sendStatus(404));
 
