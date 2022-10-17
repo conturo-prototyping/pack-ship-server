@@ -71,32 +71,37 @@ async function createRandomSetupData(customers) {
   const allJobs: IJob[] = [];
   for (const p of allParts) {
     for (let i = 0; i < randomInt(3); i++) {
-      promises.push((async () => {
-        const externals = ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D'];
+      promises.push(
+        (async () => {
+          const externals = ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D'];
+          const sliceStart = randomInt(0, externals.length);
+          const sliceEnd = randomInt(sliceStart, externals.length + 1);
 
-        const sliceStart = randomInt(0, externals.length);
-        const sliceEnd = randomInt(sliceStart, externals.length + 1);
+          const newJob = new JobModel({
+            partId: p,
+            released: [true, false][randomInt(0, 2)],
+            canceled: [true, false][randomInt(0, 2)],
+            dueDate: new Date(Math.random() * Date.now()).toLocaleDateString(),
+            batchQty: randomInt(1, 20),
+            material: ['Aluminum', 'Titanium', 'Stainless', 'Plastic'][
+              randomInt(0, 3)
+            ],
+            externalPostProcesses: externals.slice(sliceStart, sliceEnd),
+          });
 
-        const newJob = new JobModel({
-          partId: p,
-          dueDate: new Date(Math.random() * Date.now()).toLocaleDateString(),
-          batchQty: randomInt(1, 20),
-          material: ['Aluminum', 'Titanium', 'Stainless', 'Plastic'][randomInt(0, 3)],
-          externalPostProcesses: externals.slice(sliceStart, sliceEnd),
-        });
+          const newLot = new LotModel({
+            jobId: newJob._id,
+            quantity: newJob.batchQty,
+            router: [],
+          });
 
-        const newLot = new LotModel({
-          jobId: newJob._id,
-          quantity: newJob.batchQty,
-          router: [],
-        });
+          await newLot.save();
+          newJob.lots = [newLot._id];
 
-        await newLot.save();
-        newJob.lots = [newLot._id];
-
-        await newJob.save();
-        allJobs.push(newJob);
-      })());
+          await newJob.save();
+          allJobs.push(newJob);
+        })(),
+      );
     }
   }
 
