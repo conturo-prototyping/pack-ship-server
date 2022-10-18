@@ -8,7 +8,6 @@ import { ICustomerPart } from '../customerPart/model';
 import { ILot } from '../lot/model';
 
 export interface IJob extends Document {
-
   // The customer part that this job is for
   partId: ICustomerPart['_id'];
 
@@ -49,10 +48,12 @@ export const JobSchema = new Schema<IJob>({
   material: String,
   externalPostProcesses: [String],
 
-  lots: [{
-    type: Schema.Types.ObjectId,
-    ref: 'lots',
-  }],
+  lots: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: 'lots',
+    },
+  ],
 
   released: Boolean,
 

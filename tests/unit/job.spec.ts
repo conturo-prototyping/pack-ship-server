@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { ChaiRequest } from '../config';
 
 require('../config'); // recommended way of loading root hooks
@@ -108,5 +108,136 @@ describe('# JOB', () => {
 
     // drop collection to maintain stateless tests
     await CLIENT.db().collection('jobs').drop();
+  });
+
+  it('Should hold a job.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+
+    // create a planning released job
+    const doc = {
+      _id: id,
+      partId: '222222222222222222222222',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: true,
+      onHold: false,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    // hit endpoint to get the job and check if onHold is true
+    const res = await ChaiRequest('post', `${URL}/hold`, {
+      jobId,
+    });
+    const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
+    expect(actual.onHold).to.be.eq(true);
+
+    // drop collection to maintain stateless tests
+    await CLIENT.db().collection('jobs').drop();
+  });
+
+  it('Should fail with no jobId provided.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    try {
+      await ChaiRequest('post', `${URL}/hold`);
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.eq('Please provide a jobId');
+    }
+  });
+
+  it('Should fail where jobId is provided but does not exist.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+    const jobId = '111111111111111111111111';
+    try {
+      await ChaiRequest('post', `${URL}/hold`, {
+        jobId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.eq(`Job ${jobId} not found`);
+    }
+  });
+
+  it('Should fail since the job is not released.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    const doc = {
+      _id: id,
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: ['pp2', 'pp1'],
+      lots: ['lotId1', 'lotid2'],
+      released: false,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    try {
+      await ChaiRequest('post', `${URL}/hold`, {
+        jobId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.eq(`Job ${jobId} has not been released yet`);
+    } finally {
+      // drop collection to maintain stateless tests
+      await CLIENT.db().collection('jobs').drop();
+    }
+  });
+
+  it('Should fail since the job is onHold already.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    const doc = {
+      _id: id,
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: ['pp2', 'pp1'],
+      lots: ['lotId1', 'lotid2'],
+      released: true,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    try {
+      await ChaiRequest('post', `${URL}/hold`, {
+        jobId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.eq(`Job ${jobId} is already on hold`);
+    } finally {
+      // drop collection to maintain stateless tests
+      await CLIENT.db().collection('jobs').drop();
+    }
   });
 });
