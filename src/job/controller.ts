@@ -51,7 +51,8 @@ async function holdJob(req: express.Request, res: express.Response) {
 
       // Find the job and if it doesnt exist, raise an error
       const job = await JobModel.findById(jobId);
-      //Check if the job exists
+
+      // Check if the job exists
       if (!job) {
         return HTTPError(`Job ${jobId} not found`, 404);
       }
