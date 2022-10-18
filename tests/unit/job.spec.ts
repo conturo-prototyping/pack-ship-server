@@ -240,4 +240,67 @@ describe('# JOB', () => {
       await CLIENT.db().collection('jobs').drop();
     }
   });
+
+  it('Should fail with no jobId provided.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    try {
+      await ChaiRequest('post', `${URL}/release`);
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.eq('Please provide a jobId');
+    }
+  });
+
+  it('Should fail where jobId is provided but does not exist.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+    const jobId = '111111111111111111111111';
+    try {
+      await ChaiRequest('post', `${URL}/release`, {
+        jobId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.eq(`Job ${jobId} not found`);
+    }
+  });
+
+  it('Should release job from on hold.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    const doc = {
+      _id: id,
+      partId: '222222222222222222222222',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: false,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    // hit endpoint to get the job and check if onHold is true
+    const res = await ChaiRequest('post', `${URL}/release`, {
+      jobId,
+    });
+
+    const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
+    expect(actual.onHold, 'onhold should be false').to.be.eq(false);
+    expect(actual.released, 'released should be true').to.be.eq(true);
+
+    // drop collection to maintain stateless tests
+    await CLIENT.db().collection('jobs').drop();
+  });
 });

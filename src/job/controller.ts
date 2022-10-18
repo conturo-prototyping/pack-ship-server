@@ -6,6 +6,7 @@ const JobRouter = express.Router();
 JobRouter.get('/', getJobs);
 JobRouter.get('/planningReleased', getPlanningReleased);
 JobRouter.post('/hold', holdJob);
+JobRouter.post('/release', releaseJob);
 
 async function getJobs(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -75,6 +76,35 @@ async function holdJob(req: express.Request, res: express.Response) {
     },
     res,
     'holding job',
+  );
+}
+
+async function releaseJob(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { jobId } = req.body;
+
+      // Make sure jobId is provided
+      if (!jobId) {
+        return HTTPError('Please provide a jobId', 400);
+      }
+
+      // Find the job and if it doesnt exist, raise an error
+      const job = await JobModel.findById(jobId);
+
+      // Check if the job exists
+      if (!job) {
+        return HTTPError(`Job ${jobId} not found`, 404);
+      }
+
+      // update job onHold status
+      job.onHold = false;
+      job.released = true;
+      job.save();
+      return {};
+    },
+    res,
+    'release job',
   );
 }
 
