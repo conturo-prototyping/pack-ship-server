@@ -152,10 +152,9 @@ describe('# JOB', () => {
     await CLIENT.connect().catch(console.error);
 
     const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
-
-    for (let index = 0; index < routes.length; index++) {
+    for (const i in routes) {
       try {
-        await ChaiRequest('post', routes[index]);
+        await ChaiRequest('post', routes[i]);
       } catch (err) {
         expect(err.status).to.be.eq(400);
         expect(err.text).to.be.equal('Please provide a jobId');
@@ -170,9 +169,9 @@ describe('# JOB', () => {
 
     const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
 
-    for (let index = 0; index < routes.length; index++) {
+    for (const i in routes) {
       try {
-        await ChaiRequest('post', routes[index], {
+        await ChaiRequest('post', routes[i], {
           jobId,
         });
       } catch (err) {
