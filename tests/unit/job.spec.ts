@@ -151,26 +151,35 @@ describe('# JOB', () => {
     // set up connection to db
     await CLIENT.connect().catch(console.error);
 
-    try {
-      await ChaiRequest('post', `${URL}/hold`);
-    } catch (err) {
-      expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.eq('Please provide a jobId');
-    }
+    const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
+
+    routes.forEach(async (route) => {
+      try {
+        await ChaiRequest('post', route);
+      } catch (err) {
+        expect(err.status).to.be.eq(400);
+        expect(err.text).to.be.eq('Please provide a jobId');
+      }
+    });
   });
 
   it('Should fail where jobId is provided but does not exist.', async () => {
     // set up connection to db
     await CLIENT.connect().catch(console.error);
     const jobId = '111111111111111111111111';
-    try {
-      await ChaiRequest('post', `${URL}/hold`, {
-        jobId,
-      });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.eq(`Job ${jobId} not found`);
-    }
+
+    const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
+
+    routes.forEach(async (route) => {
+      try {
+        await ChaiRequest('post', `${URL}/hold`, {
+          jobId,
+        });
+      } catch (err) {
+        expect(err.status).to.be.eq(400);
+        expect(err.text).to.be.eq('Please provide a jobId');
+      }
+    });
   });
 
   it('Should fail since the job is not released.', async () => {
@@ -241,32 +250,6 @@ describe('# JOB', () => {
     }
   });
 
-  it('Should fail with no jobId provided.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
-    try {
-      await ChaiRequest('post', `${URL}/release`);
-    } catch (err) {
-      expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.eq('Please provide a jobId');
-    }
-  });
-
-  it('Should fail where jobId is provided but does not exist.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-    const jobId = '111111111111111111111111';
-    try {
-      await ChaiRequest('post', `${URL}/release`, {
-        jobId,
-      });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.eq(`Job ${jobId} not found`);
-    }
-  });
-
   it('Should release job from on hold.', async () => {
     // set up connection to db
     await CLIENT.connect().catch(console.error);
@@ -302,5 +285,39 @@ describe('# JOB', () => {
 
     // drop collection to maintain stateless tests
     await CLIENT.db().collection('jobs').drop();
+  });
+
+  it('Should fail since the job is already cancled.', async () => {
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    const doc = {
+      _id: id,
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: ['pp2', 'pp1'],
+      lots: ['lotId1', 'lotid2'],
+      released: true,
+      onHold: true,
+      canceled: true,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    try {
+      await ChaiRequest('post', `${URL}/cancel`, {
+        jobId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.eq(`Job ${jobId} has already been canceled`);
+    } finally {
+      // drop collection to maintain stateless tests
+      await CLIENT.db().collection('jobs').drop();
+    }
   });
 });
