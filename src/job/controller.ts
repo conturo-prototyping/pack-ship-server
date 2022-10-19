@@ -2,6 +2,7 @@ import express from 'express';
 import { ObjectId } from 'mongodb';
 import { JobModel } from './model';
 import { ExpressHandler, HTTPError } from '../utils';
+import { CustomerPartModel } from '../customerPart/model';
 
 const JobRouter = express.Router();
 JobRouter.get('/', getJobs);
@@ -50,16 +51,60 @@ async function getJobs(_req: express.Request, res: express.Response) {
 }
 
 async function getPlanningReleased(
-  _req: express.Request,
+  req: express.Request,
   res: express.Response,
 ) {
   ExpressHandler(
     async () => {
-      const jobs = await JobModel.find({
-        released: true,
-        canceled: false,
-      }).lean();
+      const { regexFilter } = req.body;
 
+      // Ensure it is a valid regex filter
+      if (regexFilter) {
+        try {
+          new RegExp(regexFilter);
+        } catch (e) {
+          return HTTPError(
+            `${regexFilter} is not a valid regex expression`,
+            405,
+          );
+        }
+      }
+
+      // Find the jobs
+      const jobs = await JobModel.aggregate([
+        {
+          $lookup: {
+            from: CustomerPartModel.collection.collectionName,
+            localField: 'partId',
+            foreignField: '_id',
+            as: 'customerParts',
+          },
+        },
+        {
+          $match: {
+            $and: [
+              { released: true },
+              { canceled: false },
+              {
+                $or: [
+                  {
+                    'customerParts.partNumber': {
+                      $regex: regexFilter || '',
+                      $options: 'i',
+                    },
+                  },
+                  {
+                    'customerParts.partDescription': {
+                      $regex: regexFilter || '',
+                      $options: 'i',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ]);
       const data = { jobs };
       return { data };
     },
