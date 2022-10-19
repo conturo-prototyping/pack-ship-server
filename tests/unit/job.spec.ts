@@ -153,14 +153,14 @@ describe('# JOB', () => {
 
     const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
 
-    routes.forEach(async (route) => {
+    for (let index = 0; index < routes.length; index++) {
       try {
-        await ChaiRequest('post', route);
+        await ChaiRequest('post', routes[index]);
       } catch (err) {
         expect(err.status).to.be.eq(400);
-        expect(err.text).to.be.eq('Please provide a jobId');
+        expect(err.text).to.be.equal('Please provide a jobId');
       }
-    });
+    }
   });
 
   it('Should fail where jobId is provided but does not exist.', async () => {
@@ -170,16 +170,16 @@ describe('# JOB', () => {
 
     const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
 
-    routes.forEach(async (route) => {
+    for (let index = 0; index < routes.length; index++) {
       try {
-        await ChaiRequest('post', `${URL}/hold`, {
+        await ChaiRequest('post', routes[index], {
           jobId,
         });
       } catch (err) {
-        expect(err.status).to.be.eq(400);
-        expect(err.text).to.be.eq('Please provide a jobId');
+        expect(err.status).to.be.eq(404);
+        expect(err.text).to.equal(`Job ${jobId} not found`);
       }
-    });
+    }
   });
 
   it('Should fail since the job is not released.', async () => {
