@@ -74,16 +74,16 @@ export async function verifyStepId(
     res.status(400).send('Please provide a stepId');
   } else if (!ObjectId.isValid(stepId)) {
     // Verify if id is valid
-    res.status(404).send(`Lot ${stepId} not found`);
+    res.status(404).send(`Router Step ${stepId} not found`);
   } else {
-    // Find the lot and if it doesnt exist, raise an error
-    const lot = await model.findById(stepId);
+    // Find the step and if it doesnt exist, raise an error
+    const step = await model.findById(stepId);
 
-    // Check if the lot exists
-    if (!lot) {
-      res.status(404).send(`Lot ${stepId} not found`);
+    // Check if the step exists
+    if (!step) {
+      res.status(404).send(`Router Step ${stepId} not found`);
     } else {
-      res.locals.lot = lot;
+      res.locals.step = step;
       next();
     }
   }

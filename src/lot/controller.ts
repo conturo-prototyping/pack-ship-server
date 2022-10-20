@@ -54,7 +54,7 @@ async function patchStep(req: express.Request, res: express.Response) {
     async () => {
       const { lot } = res.locals;
       const { stepDetails } = req.body;
-
+      console.log(lot);
       if (!stepDetails) {
         return HTTPError(`stepDetails is empty.`, 404);
       }
