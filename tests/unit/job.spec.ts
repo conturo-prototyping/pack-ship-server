@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient } from 'mongodb';
+import { DropAllCollections } from '../../src/router.debug';
 import { ChaiRequest } from '../config';
 
 require('../config'); // recommended way of loading root hooks
@@ -12,10 +13,13 @@ const DB_URL: string = process.env.MONGO_DB_URI!;
 const CLIENT = new MongoClient(DB_URL);
 
 describe('# JOB', () => {
-  it('Should find 1 inserted job.', async () => {
-    // set up connection to db
+  before(async function () {
     await CLIENT.connect().catch(console.error);
-
+  });
+  afterEach(async function () {
+    await DropAllCollections();
+  });
+  it('Should find 1 inserted job.', async () => {
     // create job using mongodb driver
     const doc = {
       partId: 'partId',
@@ -46,15 +50,9 @@ describe('# JOB', () => {
     expect(job.released).to.be.eq(false);
     expect(job.onHold).to.be.eq(true);
     expect(job.stdLotSize).to.be.eq(1);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 
   it('Should find 1 released planning job.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     // create a planning released job
     const doc = {
       partId: 'partId',
@@ -78,15 +76,9 @@ describe('# JOB', () => {
     const job = res.body.jobs[0];
     expect(job.released).to.be.eq(true);
     expect(job.canceled).to.be.eq(false);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 
   it('Should find 0 released planning job.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     // create a planning released job
     const doc = {
       partId: 'partId',
@@ -105,8 +97,5 @@ describe('# JOB', () => {
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/planningReleased`);
     expect(res.body.jobs.length).to.be.eq(0);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 });
