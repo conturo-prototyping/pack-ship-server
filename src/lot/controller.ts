@@ -41,7 +41,7 @@ async function scrapLot(_req: express.Request, res: express.Response) {
       const currentRev: string = lot.rev;
       const revN = getRevNumber(currentRev);
       lot.rev = getRevCode(revN + 1);
-      await lot.save();
+      lot.save();
       return {};
     },
     res,

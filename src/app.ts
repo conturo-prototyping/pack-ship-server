@@ -7,7 +7,7 @@ import cookieSession from 'cookie-session';
 import passport from 'passport';
 import mongoose from 'mongoose';
 import debugRouter from './router.debug';
-import { LotRouter } from './lot/controller';
+import LotRouter from './lot/controller';
 import JobRouter from './job/controller';
 import RouteStepRouter from './routeStep/controller';
 
