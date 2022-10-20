@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient, ObjectId } from 'mongodb';
+import { DropAllCollections } from '../../src/router.debug';
 import { ChaiRequest } from '../config';
 
 require('../config'); // recommended way of loading root hooks
@@ -12,10 +13,13 @@ const DB_URL: string = process.env.MONGO_DB_URI!;
 const CLIENT = new MongoClient(DB_URL);
 
 describe('# JOB', () => {
-  it('Should find 1 inserted job.', async () => {
-    // set up connection to db
+  before(async function () {
     await CLIENT.connect().catch(console.error);
-
+  });
+  afterEach(async function () {
+    await DropAllCollections();
+  });
+  it('Should find 1 inserted job.', async () => {
     // create job using mongodb driver
     const doc = {
       partId: 'partId',
@@ -46,15 +50,9 @@ describe('# JOB', () => {
     expect(job.released).to.be.eq(false);
     expect(job.onHold).to.be.eq(true);
     expect(job.stdLotSize).to.be.eq(1);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 
   it('Should find 1 released planning job.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     // create a planning released job
     const doc = {
       partId: 'partId',
@@ -78,15 +76,9 @@ describe('# JOB', () => {
     const job = res.body.jobs[0];
     expect(job.released).to.be.eq(true);
     expect(job.canceled).to.be.eq(false);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 
   it('Should find 0 released planning job.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     // create a planning released job
     const doc = {
       partId: 'partId',
@@ -105,15 +97,9 @@ describe('# JOB', () => {
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/planningReleased`);
     expect(res.body.jobs.length).to.be.eq(0);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 
   it('Should hold a job.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
 
@@ -142,21 +128,16 @@ describe('# JOB', () => {
     });
     const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
     expect(actual.onHold).to.be.eq(true);
-
-    // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
   });
 
   it('Should fail with no jobId provided.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     const routes = [
       `${URL}/hold`,
       `${URL}/release`,
       `${URL}/cancel`,
       `${URL}/lotSize`,
     ];
+
     for (const i in routes) {
       try {
         await ChaiRequest('post', routes[i]);
@@ -168,8 +149,6 @@ describe('# JOB', () => {
   });
 
   it('Should fail where jobId is provided but does not exist.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
     const jobId = '111111111111111111111111';
 
     const routes = [
@@ -192,9 +171,6 @@ describe('# JOB', () => {
   });
 
   it('Should fail since the job is not released.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     const doc = {
@@ -219,16 +195,10 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} has not been released yet`);
-    } finally {
-      // drop collection to maintain stateless tests
-      await CLIENT.db().collection('jobs').drop();
     }
   });
 
   it('Should fail since the job is onHold already.', async () => {
-    // set up connection to db
-    await CLIENT.connect().catch(console.error);
-
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     const doc = {
