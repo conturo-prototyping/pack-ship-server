@@ -131,7 +131,6 @@ describe('# LOT', () => {
       try {
         await ChaiRequest('post', routes[i]);
       } catch (err) {
-        console.log('A', err);
         expect(err.status).to.be.eq(400);
         expect(err.text).to.be.equal('Please provide a lotId');
       }

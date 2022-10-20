@@ -13,7 +13,6 @@ LotRouter.post(['/scrap'], async (req, res, next) => {
   const { lotId } = req.body;
   if (!lotId) {
     // Make sure lotId is provided
-    console.log('EE', lotId);
     res.status(400).send('Please provide a lotId');
   } else if (!ObjectId.isValid(lotId)) {
     // Verify if id is valid
@@ -47,7 +46,6 @@ async function scrapLot(_req: express.Request, res: express.Response) {
 
       // Do not edit if job is not-released
       if (job.released) {
-        console.log('c', `Job ${job._id}`);
         return HTTPError(
           `Job ${job._id} has already been released. Can't scrap lot.`,
           405,
