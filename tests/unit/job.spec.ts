@@ -55,20 +55,34 @@ describe('# JOB', () => {
     // set up connection to db
     await CLIENT.connect().catch(console.error);
 
+    // Create a part and a job
+    const partId = new ObjectId('222222222222222222222222');
+    const partDoc = {
+      _id: partId,
+      customerId: '111111111111111111111111',
+      partNumber: 'PN-004',
+      partDescription: 'dummy',
+      partRev: 'A',
+    };
+    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+
     // create a planning released job
-    const doc = {
-      partId: 'partId',
+    const jobDoc = {
+      partId: partId,
       dueDate: '2022/10/14',
       batchQty: 1,
       material: 'moondust',
-      externalPostProcesses: ['pp2', 'pp1'],
-      lots: ['lotId1', 'lotid2'],
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
       released: true,
       onHold: true,
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await CLIENT.db().collection('jobs').insertOne(jobDoc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/planningReleased`);
