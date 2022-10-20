@@ -1,0 +1,30 @@
+export function getRevCode(n: number) {
+  if (n < 1) {
+    throw new Error('n must be 1 or greater');
+  }
+
+  let chars = '';
+  let revN = n;
+  while (revN !== 0) {
+    // 'A' starts at 65th char
+    const char = String.fromCharCode(((revN - 1) % 26) + 65);
+    chars = char + chars;
+    revN = Math.floor((n - 1) / 26);
+  }
+  return chars;
+}
+
+export function getRevNumber(rev: string | null) {
+  if (!rev) {
+    return 0;
+  }
+
+  const revCode = rev.toUpperCase();
+
+  let num = 0;
+  for (let i = 0; i < revCode.length; i++) {
+    num += (revCode.charCodeAt(i) - 64) * 26 ** (revCode.length - i - 1);
+  }
+
+  return num;
+}
