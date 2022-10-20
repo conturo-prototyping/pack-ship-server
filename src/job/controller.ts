@@ -9,32 +9,36 @@ JobRouter.get('/planningReleased', getPlanningReleased);
 
 // Middleware to verify jobId exists in the req body
 // as well as if the jobId pertains to a valid job
-JobRouter.post(['/hold', '/release', '/cancel'], async (req, res, next) => {
-  const { jobId } = req.body;
+JobRouter.post(
+  ['/hold', '/release', '/cancel', '/lotSize'],
+  async (req, res, next) => {
+    const { jobId } = req.body;
 
-  if (!jobId) {
-    // Make sure jobId is provided
-    res.status(400).send('Please provide a jobId');
-  } else if (!ObjectId.isValid(jobId)) {
-    // Verify if id is valid
-    res.status(404).send(`Job ${jobId} not found`);
-  } else {
-    // Find the job and if it doesnt exist, raise an error
-    const job = await JobModel.findById(jobId);
-
-    // Check if the job exists
-    if (!job) {
+    if (!jobId) {
+      // Make sure jobId is provided
+      res.status(400).send('Please provide a jobId');
+    } else if (!ObjectId.isValid(jobId)) {
+      // Verify if id is valid
       res.status(404).send(`Job ${jobId} not found`);
     } else {
-      res.locals.job = job;
-      next();
+      // Find the job and if it doesnt exist, raise an error
+      const job = await JobModel.findById(jobId);
+
+      // Check if the job exists
+      if (!job) {
+        res.status(404).send(`Job ${jobId} not found`);
+      } else {
+        res.locals.job = job;
+        next();
+      }
     }
-  }
-});
+  },
+);
 
 JobRouter.post('/hold', holdJob);
 JobRouter.post('/release', releaseJob);
 JobRouter.post('/cancel', cancelJob);
+JobRouter.post('/lotSize', setStdLotSize);
 
 async function getJobs(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -125,6 +129,42 @@ async function cancelJob(_req: express.Request, res: express.Response) {
     },
     res,
     'cancel job',
+  );
+}
+
+async function setStdLotSize(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { jobId, lotSize } = req.body;
+
+      console.error(jobId, lotSize);
+
+      // If there is no Job ID, we can't do anything
+      if (lotSize === undefined) {
+        return HTTPError(`Please provide a lotSize`, 400);
+      } else if (lotSize <= 0) {
+        return HTTPError(`lotSize must be > 0`, 400);
+      }
+
+      const job = await JobModel.findById(`${jobId}`);
+
+      if (job?.released) {
+        return HTTPError(`Job cannot be released.`, 405);
+      }
+
+      await JobModel.updateOne(
+        { _id: jobId },
+        {
+          $set: {
+            stdLotSize: lotSize,
+          },
+        },
+      );
+
+      return {};
+    },
+    res,
+    'job std lot',
   );
 }
 

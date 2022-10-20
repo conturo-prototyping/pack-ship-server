@@ -151,7 +151,12 @@ describe('# JOB', () => {
     // set up connection to db
     await CLIENT.connect().catch(console.error);
 
-    const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
+    const routes = [
+      `${URL}/hold`,
+      `${URL}/release`,
+      `${URL}/cancel`,
+      `${URL}/lotSize`,
+    ];
     for (const i in routes) {
       try {
         await ChaiRequest('post', routes[i]);
@@ -167,7 +172,12 @@ describe('# JOB', () => {
     await CLIENT.connect().catch(console.error);
     const jobId = '111111111111111111111111';
 
-    const routes = [`${URL}/hold`, `${URL}/release`, `${URL}/cancel`];
+    const routes = [
+      `${URL}/hold`,
+      `${URL}/release`,
+      `${URL}/cancel`,
+      `${URL}/lotSize`,
+    ];
 
     for (const i in routes) {
       try {
@@ -314,6 +324,162 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} has already been canceled`);
+    } finally {
+      // drop collection to maintain stateless tests
+      await CLIENT.db().collection('jobs').drop();
+    }
+  });
+
+  it('Should find non-zero lot size.', async () => {
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    // create job using mongodb driver
+    const doc = {
+      _id: id,
+      partId: '222222222222222222222222',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: false,
+      onHold: true,
+      canceled: true,
+      stdLotSize: 0,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    // hit endpoint to get update lot size
+    await ChaiRequest('post', `${URL}/lotSize`, {
+      jobId,
+      lotSize: 12,
+    });
+
+    const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
+
+    // check data
+    expect(actual.stdLotSize).to.be.eq(12);
+
+    // drop collection to maintain stateless tests
+    await CLIENT.db().collection('jobs').drop();
+  });
+
+  it('lot size needs to be included.', async () => {
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    // create job using mongodb driver
+    const doc = {
+      _id: id,
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: false,
+      onHold: true,
+      canceled: true,
+      stdLotSize: 0,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    try {
+      // hit endpoint to get update lot size
+      await ChaiRequest('post', `${URL}/lotSize`, {
+        jobId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.eq(`Please provide a lotSize`);
+    } finally {
+      // drop collection to maintain stateless tests
+      await CLIENT.db().collection('jobs').drop();
+    }
+  });
+
+  it('lot size cannot be edited for released job.', async () => {
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    // create job using mongodb driver
+    const doc = {
+      _id: id,
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: ['pp2', 'pp1'],
+      lots: ['lotId1', 'lotid2'],
+      released: true,
+      onHold: true,
+      canceled: true,
+      stdLotSize: 0,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    try {
+      // hit endpoint to get update lot size
+      await ChaiRequest('post', `${URL}/lotSize`, {
+        jobId,
+        lotSize: 12,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.eq(`Job cannot be released.`);
+    } finally {
+      // drop collection to maintain stateless tests
+      await CLIENT.db().collection('jobs').drop();
+    }
+  });
+
+  it('lot size must be greater than 0.', async () => {
+    const jobId = '111111111111111111111111';
+    const id = new ObjectId(jobId);
+    // set up connection to db
+    await CLIENT.connect().catch(console.error);
+
+    // create job using mongodb driver
+    const doc = {
+      _id: id,
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: false,
+      onHold: true,
+      canceled: true,
+      stdLotSize: 0,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    try {
+      // hit endpoint to get update lot size
+      await ChaiRequest('post', `${URL}/lotSize`, {
+        jobId,
+        lotSize: 0,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.eq(`lotSize must be > 0`);
     } finally {
       // drop collection to maintain stateless tests
       await CLIENT.db().collection('jobs').drop();
