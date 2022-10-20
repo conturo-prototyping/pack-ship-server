@@ -51,7 +51,9 @@
     "test": "ts-mocha -p ./tsconfig.json --bail --recursive --exit --timeout 5000 tests/**/*.spec.ts",
     "lint": "eslint ."
   },
-  "eslintIgnore": ["tests"],
+  "eslintIgnore": [
+    "tests"
+  ],
   "prettier": {
     "jsxSingleQuote": true,
     "singleQuote": true,

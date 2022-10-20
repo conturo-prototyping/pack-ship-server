@@ -7,13 +7,15 @@ import cookieSession from 'cookie-session';
 import passport from 'passport';
 import mongoose from 'mongoose';
 import debugRouter from './router.debug';
-import LotRouter from './lot/controller';
+import { LotRouter } from './lot/controller';
+import JobRouter from './job/controller';
 import RouteStepRouter from './routeStep/controller';
 
 require('dotenv').config();
 require('./config.passport')(passport);
 
 const app = express();
+// eslint-disable-next-line import/prefer-default-export
 export { app };
 
 app.use(
@@ -53,8 +55,8 @@ app.use('/shipments', require('./shipment/controller'));
 app.use('/users', require('./user/controller'));
 
 app.use('/routeSteps', RouteStepRouter);
-
 app.use('/lots', LotRouter);
+app.use('/jobs', JobRouter);
 
 app.all('*', (_req, res) => res.sendStatus(404));
 
