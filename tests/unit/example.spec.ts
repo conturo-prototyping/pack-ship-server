@@ -1,5 +1,6 @@
-import { expect } from "chai";
-import { describe, it } from "mocha";
+import { expect } from 'chai';
+import { describe, it } from 'mocha';
+
 require('../config'); // recommended way of loading root hooks
 
 describe('It should work...', () => {

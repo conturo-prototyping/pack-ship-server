@@ -1894,6 +1894,18 @@ mongodb@4.9.1:
   optionalDependencies:
     saslprep "^1.0.3"
 
+mongodb@^4.10.0:
+  version "4.10.0"
+  resolved "https://registry.yarnpkg.com/mongodb/-/mongodb-4.10.0.tgz#49fc509c928ff126577d628ab09aaf1e5855cd22"
+  integrity sha512-My2QxLTw0Cc1O9gih0mz4mqo145Jq4rLAQx0Glk/Ha9iYBzYpt4I2QFNRIh35uNFNfe8KFQcdwY1/HKxXBkinw==
+  dependencies:
+    bson "^4.7.0"
+    denque "^2.1.0"
+    mongodb-connection-string-url "^2.5.3"
+    socks "^2.7.0"
+  optionalDependencies:
+    saslprep "^1.0.3"
+
 mongoose@^6.5.4:
   version "6.6.1"
   resolved "https://registry.yarnpkg.com/mongoose/-/mongoose-6.6.1.tgz#8aec30924b1a524924d9de4eb4746951f6aadd26"
@@ -2091,6 +2103,11 @@ passport-strategy@1.x.x:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/passport-strategy/-/passport-strategy-1.0.0.tgz#b5539aa8fc225a3d1ad179476ddf236b440f52e4"
   integrity sha512-CB97UUvDKJde2V0KDWWB3lyf6PC3FaZP7YxZ2G8OAtn9p4HI9j9JLP9qjOGZFvyl8uwNT8qM+hGnz/n16NI7oA==
+
+passport-stub-es6@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/passport-stub-es6/-/passport-stub-es6-1.0.0.tgz#e0f5e294b88061af5cf0a3a6a633ae7b6fba57ca"
+  integrity sha512-A+VO2Q7rtmx0ewTps+Nw0vTyu7tqmxYl7zSBJini+u/qDeKGVOn3sJ62SdkhFcvXa/d7UKqcTLrAo4Xjt3BvXA==
 
 passport@0.5.3:
   version "0.5.3"

@@ -4,6 +4,7 @@ const router = Router();
 // const WorkOrder = require('./model');
 const ShopQueue = require('../shopQ/shopQueue.model');
 const Customer = require('../customer/model');
+const { LogError } = require('../utils');
 
 router.get('/packingQueue', getPackingQueue);
 router.get('/', getAll);
@@ -169,7 +170,7 @@ async function getAllWithPackedQties(showFulfilled) {
 
     return [null, data];
   } catch (e) {
-    console.error(e);
+    LogError(e);
     return [{ status: 500, message: e.message }];
   }
 }
