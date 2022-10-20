@@ -47,7 +47,7 @@ async function scrapLot(_req: express.Request, res: express.Response) {
 
       // Do not edit if job is not-released
       if (job.released) {
-        console.log('A', job);
+        console.log('c', `Job ${job._id}`);
         return HTTPError(
           `Job ${job._id} has already been released. Can't scrap lot.`,
           405,
