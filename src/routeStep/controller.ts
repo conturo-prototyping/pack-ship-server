@@ -1,14 +1,38 @@
 import express from 'express';
-import { ExpressHandler } from '../utils';
+import { ExpressHandler, HTTPError } from '../utils';
 import { RouteStepModel } from './model';
 
 const router = express.Router();
 export default router;
 
-// routes
+router.put('/', putRouteStep);
 router.get('/', allRouteSteps);
 
-// functions
+/**
+ * Insert a RouteStep with the given category and name.
+ */
+function putRouteStep(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { category, name } = req.body;
+
+      if (!category) return HTTPError('Step category must be specified.');
+      if (!name) return HTTPError('Step name must be specified.');
+
+      const newRouteStep = new RouteStepModel({ category, name });
+      await newRouteStep.save();
+
+      const data = { message: 'success' };
+      return { data };
+    },
+    res,
+    'putting route step',
+  );
+}
+
+/**
+ * Get all existing Route Steps.
+ */
 function allRouteSteps(_req: express.Request, res: express.Response) {
   ExpressHandler(
     async () => {

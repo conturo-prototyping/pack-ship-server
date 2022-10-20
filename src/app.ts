@@ -51,7 +51,6 @@ app.use('/shipments', require('./shipment/controller'));
 app.use('/users', require('./user/controller'));
 
 app.use('/routeSteps', RouteStepRouter);
-
 app.use('/lots', LotRouter);
 
 app.all('*', (_req, res) => res.sendStatus(404));
