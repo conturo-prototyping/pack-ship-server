@@ -16,8 +16,8 @@ function putRouteStep(req: express.Request, res: express.Response) {
     async () => {
       const { category, name } = req.body;
 
-      if (!category) return HTTPError('no step category');
-      if (!name) return HTTPError('no step name');
+      if (!category) return HTTPError('Step category must be specified.');
+      if (!name) return HTTPError('Step name must be specified.');
 
       const newRouteStep = new RouteStepModel({ category, name });
       await newRouteStep.save();
