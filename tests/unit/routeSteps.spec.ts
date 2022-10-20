@@ -39,11 +39,19 @@ describe('# ROUTE STEPS', () => {
   });
 
   it('PUT /routeStep should insert 1 successfully.', async () => {
-    console.debug(COLLECTION_NAME);
-
     await ChaiRequest('put', ENDPOINT_ROOT_URL, { category: 'cat', name: 'nam' });
     const sniff = await CLIENT.db().collection(COLLECTION_NAME).find().toArray();
 
     expect(sniff.length).to.be.eq(1);
   });
+
+  it('DELETE /routeStep should delete 1 successfully.', async () => {
+    await CLIENT.db().collection(COLLECTION_NAME).insertOne({ category: 'cat', name: 'nam' });
+    const doc = await CLIENT.db().collection(COLLECTION_NAME).findOne();
+
+    await ChaiRequest('delete', ENDPOINT_ROOT_URL, { routeStepId: doc!._id });
+    const sniff = await CLIENT.db().collection(COLLECTION_NAME).find().toArray();
+
+    expect(sniff.length).to.be.eq(0);
+  })
 });
