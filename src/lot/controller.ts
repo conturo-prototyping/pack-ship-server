@@ -1,37 +1,23 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { ExpressHandler, HTTPError } from '../utils';
 import { LotModel } from './model';
 import { JobModel } from '../job/model';
-import { getRevCode, getRevNumber } from './utils';
+import { getRevCode, getRevNumber, verifyLotId, verifyStepId } from './utils';
+import { RouteStepModel } from '../routeStep/model';
 
 const LotRouter = express.Router();
 
-// Middleware to verify lotId exists in the req body
-// as well as if the lotId pertains to a valid lot
-LotRouter.post(['/scrap'], async (req, res, next) => {
-  const { lotId } = req.body;
-  if (!lotId) {
-    // Make sure lotId is provided
-    res.status(400).send('Please provide a lotId');
-  } else if (!ObjectId.isValid(lotId)) {
-    // Verify if id is valid
-    res.status(404).send(`Lot ${lotId} not found`);
-  } else {
-    // Find the lot and if it doesnt exist, raise an error
-    const lot = await LotModel.findById(lotId);
-
-    // Check if the lot exists
-    if (!lot) {
-      res.status(404).send(`Lot ${lotId} not found`);
-    } else {
-      res.locals.lot = lot;
-      next();
-    }
-  }
+// Middleware to verify ids exists in the req body
+// as well as if the it pertains to a valid object
+LotRouter.post(['/scrap', '/step'], async (req, res, next) => {
+  verifyLotId(req, res, next, LotModel);
+});
+LotRouter.post(['/step'], async (req, res, next) => {
+  verifyStepId(req, res, next, RouteStepModel);
 });
 
 LotRouter.post('/scrap', scrapLot);
+LotRouter.patch('/step', patchStep);
 
 async function scrapLot(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -56,6 +42,24 @@ async function scrapLot(_req: express.Request, res: express.Response) {
       const revN = getRevNumber(currentRev);
       lot.rev = getRevCode(revN + 1);
       await lot.save();
+      return {};
+    },
+    res,
+    'scrap lot',
+  );
+}
+
+async function patchStep(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { lot } = res.locals;
+      const { stepDetails } = req.body;
+
+      if (!stepDetails) {
+        return HTTPError(`stepDetails is empty.`, 404);
+      }
+
+      //TODO
       return {};
     },
     res,

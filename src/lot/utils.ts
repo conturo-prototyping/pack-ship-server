@@ -1,3 +1,9 @@
+import express, { NextFunction } from 'express';
+import { ObjectId } from 'mongodb';
+import { Model } from 'mongoose';
+import { IRouteStep } from '../routeStep/model';
+import { ILot } from './model';
+
 export function getRevCode(n: number) {
   if (n < 1) {
     throw new Error('n must be 1 or greater');
@@ -27,4 +33,58 @@ export function getRevNumber(rev: string | null) {
   }
 
   return num;
+}
+
+export async function verifyLotId(
+  req: express.Request,
+  res: express.Response,
+  next: NextFunction,
+  model: Model<ILot, {}, {}, {}, any>,
+) {
+  const { lotId } = req.body;
+  if (!lotId) {
+    // Make sure lotId is provided
+    res.status(400).send('Please provide a lotId');
+  } else if (!ObjectId.isValid(lotId)) {
+    // Verify if id is valid
+    res.status(404).send(`Lot ${lotId} not found`);
+  } else {
+    // Find the lot and if it doesnt exist, raise an error
+    const lot = await model.findById(lotId);
+
+    // Check if the lot exists
+    if (!lot) {
+      res.status(404).send(`Lot ${lotId} not found`);
+    } else {
+      res.locals.lot = lot;
+      next();
+    }
+  }
+}
+
+export async function verifyStepId(
+  req: express.Request,
+  res: express.Response,
+  next: NextFunction,
+  model: Model<IRouteStep, {}, {}, {}, any>,
+) {
+  const { stepId } = req.body;
+  if (!stepId) {
+    // Make sure stepId is provided
+    res.status(400).send('Please provide a stepId');
+  } else if (!ObjectId.isValid(stepId)) {
+    // Verify if id is valid
+    res.status(404).send(`Lot ${stepId} not found`);
+  } else {
+    // Find the lot and if it doesnt exist, raise an error
+    const lot = await model.findById(stepId);
+
+    // Check if the lot exists
+    if (!lot) {
+      res.status(404).send(`Lot ${stepId} not found`);
+    } else {
+      res.locals.lot = lot;
+      next();
+    }
+  }
 }
