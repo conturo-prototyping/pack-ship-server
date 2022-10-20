@@ -7,6 +7,7 @@ export default router;
 
 router.put('/', putRouteStep);
 router.get('/', allRouteSteps);
+router.delete('/', deleteRouteStep);
 
 /**
  * Insert a RouteStep with the given category and name.
@@ -46,5 +47,25 @@ function allRouteSteps(_req: express.Request, res: express.Response) {
     },
     res,
     'getting all routeSteps',
+  );
+}
+
+/**
+ * Delete a single RouteStep given a routeStep._id
+ */
+function deleteRouteStep(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { routeStepId } = req.body;
+      if (!routeStepId) return HTTPError('Route Step ID must be specified.', 400);
+
+      const deletedRouteStep = await RouteStepModel.findByIdAndDelete(routeStepId);
+      if (!deletedRouteStep) return HTTPError('No Route Step found.', 404);
+
+      const data = { deletedRouteStep };
+      return { data };
+    },
+    res,
+    'deleting route step',
   );
 }

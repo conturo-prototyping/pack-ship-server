@@ -14,6 +14,7 @@ require('dotenv').config();
 require('./config.passport')(passport);
 
 const app = express();
+// eslint-disable-next-line import/prefer-default-export
 export { app };
 
 app.use(cors({
