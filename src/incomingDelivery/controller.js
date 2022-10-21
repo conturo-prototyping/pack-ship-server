@@ -43,8 +43,8 @@ async function CreateNew(
     const [err, ret] = await getSourceShipmentLabel(sourceShipmentId);
     if (err) return [err];
 
-    const { numberOfDeliveries, shipmentId } = ret;
-    let label = shipmentId + "-R";
+    const { numberOfDeliveries } = ret;
+    let label = ret.label + "-R";
     if (numberOfDeliveries > 0) label += `${numberOfDeliveries + 1}`;
 
     const deliveryInfo = {
@@ -231,14 +231,14 @@ async function getSourceShipmentLabel(id) {
   try {
     const shipment = await Shipment.findOne({ _id: id })
       .lean()
-      .select("shipmentId")
+      .select("label")
       .exec();
 
-    const { shipmentId } = shipment;
+    const { label } = shipment;
 
     const query = {
       label: {
-        $regex: shipmentId,
+        $regex: label,
         $options: "i",
       },
     };
@@ -247,7 +247,7 @@ async function getSourceShipmentLabel(id) {
 
     const ret = {
       numberOfDeliveries,
-      shipmentId,
+      label,
     };
     return [, ret];
   } catch (error) {
