@@ -4,11 +4,12 @@ const Shipment = require("./model");
 const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
 const WorkOrder = require("../workOrder/model");
-const User = require("../user/model");
+const IncomingDelivery = require('../incomingDelivery/model');
+const { CreateNew } = require('../incomingDelivery/controller');
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
-var ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
+const ObjectId = require("mongodb").ObjectId;
 
 module.exports = router;
 
@@ -168,16 +169,22 @@ async function createOne(req, res) {
         customerAccount,
         customerHandoffName,
         shippingAddress,
+        isDueBack,
+        isDueBackOn
       } = req.body;
+
+      if (isDueBack && !isDueBackOn) {
+        return HTTPError('Return due date is missing.');
+      }
 
       const customerDoc = await Customer.findOne({ _id: customer });
       const { tag, numShipments } = customerDoc;
 
-      const shipmentId = `${tag}-SH${numShipments + 1}`;
+      const label = `${tag}-SH${numShipments + 1}`;
 
       const shipment = new Shipment({
         customer,
-        shipmentId,
+        label,
         manifest,
 
         deliveryMethod,
@@ -193,6 +200,14 @@ async function createOne(req, res) {
       });
 
       await shipment.save();
+
+      if (isDueBack) {
+        const [returnErr, ] = await CreateNew(undefined, req.user._id, isDueBackOn, shipment._id);
+        if (returnErr) {
+          await shipment.delete();
+          return returnErr;
+        }
+      }
 
       // update all packing slips in manifest w/ this shipment's id
       const promises = manifest.map((x) =>
@@ -254,6 +269,8 @@ async function editOne(req, res) {
         deletedPackingSlips,
         newPackingSlips,
         shippingAddress,
+        isDueBack,        //for incomingDeliveries
+        isDueBackOn,      //for incomingDeliveries
       } = req.body;
 
       const p_deleted =
@@ -305,6 +322,51 @@ async function editOne(req, res) {
 
       const promises = p_deleted.concat(p_added);
       await Promise.all(promises);
+
+      //if no updates are needed return out 
+      if ( isDueBack || ( !isDueBack && !isDueBackOn ) ) return;
+
+      //update incoming deliveries as needed
+      const incomingDeliveries = await IncomingDelivery.find( {
+        sourceShipmentId: sid,
+        receivedOn: { $exists: false }, 
+      } );
+
+      let deliveryIds = [];
+
+      if ( !isDueBack ) {
+        deliveryIds = incomingDeliveries.map( x => x._id );
+
+        IncomingDelivery.deleteMany( {
+          _id: { $in: deliveryIds }
+        } );
+      }
+
+      // if it isDueBack and isDueBackOn then we want to either create a new incomingDelivery or modify existing ones
+      else if ( isDueBack && isDueBackOn ) {
+        if ( incomingDeliveries.length === 0 ) {
+
+          //create new incomingDelivery
+          const { _id } = req.user;
+          const [err, internalPurchaseOrderNumber ] = await getPoNumberFromShipmentId(sid);
+          if ( err ) return HTTPError(err);
+
+          const _newIncomingDelivery = {
+            internalPurchaseOrderNumber,
+            creatingUserId: _id,
+            isDueBackOn,
+            sourceShipmentId: sid,
+          }
+          
+          await CreateNew( _newIncomingDelivery );
+        }
+        else {
+          //modify incomingDelivery
+          deliveryIds = incomingDeliveries.map( x => x._id );
+          IncomingDelivery.updateMany(query2, { isDueBackOn } );
+        }
+      }
+      
     },
     res,
     "editing shipment"
@@ -353,12 +415,12 @@ async function updateShipmentTrackingHistory(sid) {
 
 /**
  *
- * @param {any[]} label Id of packing slip to assign
- * @param {string} shipmentId _id of Shipment to assign to packing slip
+ * @param {string | ObjectId} packingSlipId Id of packing slip to assign
+ * @param {string | ObjectId} shipmentId _id of Shipment to assign to packing slip
  */
-async function assignPackingSlipToShipment(label, shipmentId) {
+async function assignPackingSlipToShipment(packingSLipId, shipmentId) {
   await PackingSlip.updateOne(
-    { _id: label },
+    { _id: packingSlipId },
     { $set: { shipment: shipmentId } }
   );
 }
@@ -370,9 +432,9 @@ async function unassignPackingSlipFromShipment(label) {
 /**
  * Get shipment documents with manifest.items.item populated
  *
- * @param {(String | mongoose.Schema.Types.ObjectId)?} shipmentId
+ * @param {(String | mongoose.Schema.Types.ObjectId)?} label
  */
-async function getPopulatedShipmentData(shipmentId = undefined) {
+async function getPopulatedShipmentData(label = undefined) {
   try {
     const pipeline = [
       {
@@ -487,9 +549,9 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
       },
     ];
 
-    if (shipmentId) {
+    if (label) {
       pipeline.splice(0, 0, {
-        $match: { _id: ObjectId(shipmentId) },
+        $match: { _id: ObjectId(label) },
       });
     }
 
@@ -511,7 +573,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
 async function getAsPdf(req, res) {
   ExpressHandler(
     async () => {
-      const { manifest, customer, dateCreated, shipmentId, deliveryMethod } =
+      const { manifest, customer, dateCreated, label, deliveryMethod } =
         req.body;
       const { title } = customer;
 
@@ -604,7 +666,7 @@ async function getAsPdf(req, res) {
           signatureBlock,
         ],
         header: {
-          text: shipmentId,
+          text: label,
           alignment: "left",
           margin: [10, 20, 0, 0],
           fontSize: 10,
@@ -616,7 +678,7 @@ async function getAsPdf(req, res) {
         },
       };
 
-      const filename = shipmentId + ".pdf";
+      const filename = label + ".pdf";
       const data = { docDefinition, filename };
       return { data };
     },
@@ -821,6 +883,56 @@ function _pdf_makeManifestBlock(items, tableTitleArr, pageBreak) {
   if (pageBreak) ret.pageBreak = "after";
 
   return ret;
+}
+
+/**
+ * used to get poNumber from the shipment  _id value
+ * @param {String} sid -  shipment._id as a string
+ * @returns poNumber (String)
+ */
+ async function getPoNumberFromShipmentId(sid) {
+  try {
+    const agg = [
+      { $match: {
+        $expr: {
+          $eq: ['$_id', { $toObjectId: sid }]
+        }
+      } },
+      { $lookup: {
+        from: 'packingSlips',
+        let: { manifest: { $arrayElemAt: ['$manifest', 0] } },
+        pipeline: [
+          { $match: { 
+            $expr: { $eq: ['$$manifest', '$_id'] }
+          } },
+          { $lookup: {
+            from: 'workorders',
+            let: { orderNumber: '$orderNumber' },
+            pipeline: [
+              { $match: {
+                $expr: { $eq: ['$$orderNumber', '$OrderNumber'] }
+              } },
+              { $addFields: {
+                'poNumber': '$purchaseOrderNumber'
+              } },
+              { $project: {
+                'poNumber': 1, 
+                '_id': 0,
+              }}
+            ],
+            as: 'workOrder'
+          } },
+        ],
+        as: 'packingSlips'
+      }}
+    ];
+    const ret = await Shipment.aggregate(agg);
+    const { poNumber } = ret[0].packingSlips[0].workOrder[0];
+    return [ , poNumber ];
+  } 
+  catch (error) {
+    return [error];
+  }
 }
 
 function _pdf_GetLogoURI() {

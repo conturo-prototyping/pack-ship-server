@@ -41,7 +41,7 @@ router.post("/first", async (_req, res) => {
 
       const newShipment = new Shipment({
         customer,
-        shipmentId: newPackingSlip.label.replace("-PS", "-SH"),
+        label: newPackingSlip.label.replace("-PS", "-SH"),
         manifest: [newPackingSlip._id],
 
         customerHandoffName: "LEGACY DOCUMENT -- UNTRACKED",
@@ -76,9 +76,8 @@ router.post("/first", async (_req, res) => {
 
           const num = Number.parseInt(psId.indexOf("-PS") + 3);
 
-          newPackingSlip.label =
-            psId.substring(0, psId.indexOf("-PS")) + (num + 1);
-          newShipment.shipmentId = newPackingSlip.label.replace("-PS", "-SH");
+          newPackingSlip.label = psId.substring(0, psId.indexOf("-PS")) + (num + 1);
+          newShipment.label = newPackingSlip.label.replace("-PS", "-SH");
         }
       }
 
