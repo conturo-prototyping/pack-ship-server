@@ -397,9 +397,9 @@ async function createPackingSlip(req, res) {
       }
 
       const customerDoc = await Customer.findOne({ _id: customer });
-      const { numPackingSlips } = customerDoc;
+      const { numPackingSlips, tag } = customerDoc;
 
-      const label = `${orderNumber}-PS${numPackingSlips + 1}`;
+      const label = `PACK-${tag}-${numPackingSlips + 1}`;
 
       const packingSlip = new PackingSlip({
         customer,
@@ -515,7 +515,9 @@ async function deletePackingSlip(req, res) {
 async function mergePackingSlips(req, res) {
   ExpressHandler(
     async () => {
-      const { pids, orderNumber } = req.body;
+      return HTTPError('Not implemented.', 501);
+
+      const { pids, orderNumber, tag } = req.body;
 
       const numPackingSlips = await PackingSlip.countDocuments({
         orderNumber,
@@ -530,7 +532,7 @@ async function mergePackingSlips(req, res) {
         return HTTPError("Packing slips not found.", 400);
       }
 
-      const label = `${orderNumber}-PS${numPackingSlips - pids.length + 1}`;
+      const label = `PACK-${orderNumber}-${numPackingSlips - pids.length + 1}`;
       const itemsFlat = [].concat(...packingSlips.map((x) => x.items));
 
       // fix qties to not have a bunch of packing slips with repeat item(Ids) & qties all over the place

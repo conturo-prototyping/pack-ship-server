@@ -180,7 +180,7 @@ async function createOne(req, res) {
       const customerDoc = await Customer.findOne({ _id: customer });
       const { tag, numShipments } = customerDoc;
 
-      const label = `${tag}-SH${numShipments + 1}`;
+      const label = `SHIP-${tag}-${numShipments + 1}`;
 
       const shipment = new Shipment({
         customer,
