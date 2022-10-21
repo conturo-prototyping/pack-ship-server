@@ -240,7 +240,7 @@ async function GetPopulatedPackingSlips(
 function getAsPDF(req, res) {
   ExpressHandler(
     async () => {
-      const { orderNumber, label, dateCreated } = req.body;
+      const { orderNumber, packingSlipId, dateCreated } = req.body;
 
       const [packingSlipsRes, shopQOrderInfoRes] = [
         await GetPopulatedPackingSlips(
@@ -263,7 +263,7 @@ function getAsPDF(req, res) {
       if (shopQErr) return shopQErr;
 
       const data = _pdf_MakeDocDef(
-        packingSlips.find((x) => String(x._id) === label),
+        packingSlips.find((x) => String(x._id) === packingSlipId),
         shopQOrderInfo
       );
 
