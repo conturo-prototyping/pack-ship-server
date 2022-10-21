@@ -30,7 +30,6 @@ if( process.env.NODE_ENV === 'DEBUG' ) {
   console.debug('DEBUGGING ROUTES ARE ON !!!');
 
   app.use('/debug', require('./router.debug'));
-  app.use('/migrations', require('./migrate.delivery'));
 }
 
 // This handles authentication
@@ -41,7 +40,7 @@ app.all("*", function(req, res, next) {
 });
 
 app.use("/packingSlips",  require("./packingSlip/controller").router );
-app.use("/workOrders",    require("./workOrder/controller") );
+app.use("/workOrders",    require("./workOrder/controller").router );
 app.use("/shipments",     require("./shipment/controller") );
 app.use('/users',         require('./user/controller'));
 

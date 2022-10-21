@@ -7,9 +7,10 @@ const WorkOrder = require("../workOrder/model");
 const User = require("../user/model");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
-var ObjectId = require("mongodb").ObjectId;
+const ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 const currency = require('currency.js');
+const { SetAirTableFields, FIELD_NAMES } =  require('../service.airtable'); 
 
 module.exports = router;
 
@@ -172,6 +173,7 @@ async function createOne(req, res) {
       } = req.body;
 
       const customerDoc = await Customer.findOne({ _id: customer });
+      if ( !customerDoc ) return HTTPError('Customer not found.');
       const { tag, numShipments } = customerDoc;
 
       const shipmentId = `${tag}-SH${numShipments + 1}`;
@@ -195,15 +197,129 @@ async function createOne(req, res) {
 
       await shipment.save();
 
+      const orderNumbers = new Set();   //keep track of orderNumbers (I think there should only ever be one) TODO: check on this assumption
+      let customerId;   //there will be only one 
+      const itemsShipped = [];
+
       // update all packing slips in manifest w/ this shipment's id
-      const promises = manifest.map((x) =>
-        PackingSlip.updateOne({ _id: x }, { $set: { shipment: shipment._id } })
-      );
+      const promises = manifest.map( async (x) => {
+        const packingSlip = await PackingSlip.findOne({ _id: x });
+
+        orderNumbers.add(packingSlip.orderNumber)
+        if ( customerId === undefined ) customerId = packingSlip.customer.toString();
+
+        //build itemsShipped object
+        for ( const i of packingSlip.items ) {
+          itemsShipped.push( i.item.toString() );
+        }
+
+        packingSlip.shipment = shipment.id;
+        packingSlip.save();
+      } );
 
       customerDoc.numShipments = numShipments + 1;
       promises.push(customerDoc.save());
 
       await Promise.all(promises);
+      const orderNumbersArr = Array.from(orderNumbers);
+
+      // aggregation used to determine if items on the new packing slip are fully completed ...
+      // ... and need are ready for EPP or ready to be shipped. Data is then used to ...
+      // ... set AirTable fields as needed ('Ready 2 Ship' and 'Ready 4 EPP').
+      const agg = [
+        { $match: {
+          customer: new ObjectId(customerId),
+          isPastVersion: { $ne: true },
+        } },
+        { $unwind: '$manifest'},
+        { $lookup: {
+          from: 'packingSlips',
+          localField: 'manifest',
+          foreignField: '_id',
+          as: '_manifest'
+        } },
+        { $unwind: '$_manifest' },
+        { $match: {
+          $expr: {
+            $in: [ '$_manifest.orderNumber', orderNumbersArr]
+          }
+        } },
+        { $unwind: '$_manifest.items' },
+        { $match: {
+          $expr: { 
+            $in: [ { $toString: '$_manifest.items.item'} , itemsShipped ] 
+          }
+        } },
+        { $group: {
+          _id: '$_manifest.items.item',
+          orderNumber: { $first: '$_manifest.orderNumber' },
+          qtyShippedCustomer: { $sum: {
+            $cond: [
+              { $eq: ['$_manifest.destination', 'CUSTOMER'] },
+              '$_manifest.items.qty',
+              0
+            ]
+          } },
+          qtyShippedVendor: { $sum: {
+            $cond: [
+              { $eq: ['$_manifest.destination', 'VENDOR'] },
+              '$_manifest.items.qty',
+              0
+            ]
+          } }
+        } },
+        { $lookup: {
+          from: 'workorders',
+          let: { id: { $toString: '$_id' } },
+          pipeline: [
+            { $unwind: '$Items'},
+            { $match: {
+              $expr: {
+                $eq: [ '$$id', { $toString: '$Items._id' } ]
+              }
+            } },
+            { $project: {
+              'Items.Quantity': 1,
+              'Items.calcItemId': 1,
+            } },
+
+          ],
+          as: '_workOrder'
+        } },
+        { $unwind: '$_workOrder' },
+        { $addFields: {
+          totalQty: '$_workOrder.Items.Quantity',
+          calcItemId: '$_workOrder.Items.calcItemId'
+        } },
+        { $project: {
+          _workOrder: 0
+        } }
+      ];
+
+      const jobShippingData = await Shipment.aggregate(agg);
+
+      //loop through pipeline data and check if AT fields need set
+      for ( x of jobShippingData ) {
+        const fields = {};
+        const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } = x;
+
+        if ( qtyShippedCustomer >= totalQty ) {
+          //set fields key/value to be set in AT
+          fields[ FIELD_NAMES.READY_TO_SHIP ] = true;
+          fields[ FIELD_NAMES.SHIPPED ] = true;
+        }
+
+        //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
+        if ( qtyShippedVendor >= totalQty ) {
+          //set fields key/value to be set in AT
+          fields[ FIELD_NAMES.READY_FOR_EPP ] = true;
+        }
+
+        //set AirTable fields (if needed)
+        if ( Object.keys(fields).length > 0 ) {
+          SetAirTableFields( calcItemId, fields );
+        }
+      }
 
       return {
         data: {
@@ -568,6 +684,7 @@ async function getAsPdf(req, res) {
       const allShipmentsInfo = [];
 
       let idx = 0;
+      let lineItemNumber = 1;
       for ( const orderNumber of orderNumbers ) {
         const promises = [];
 
@@ -616,6 +733,8 @@ async function getAsPdf(req, res) {
           tableTitleArr.push('');
 
         manifestBlocks.push(_pdf_makeManifestBlock(items, tableTitleArr, pageBreakAfter));
+
+
         idx += 1;
       }
       
@@ -823,6 +942,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
 
   let lineNumber = 0;
   for (const i of items) {
+    ++lineNumber;
 
     // here, 'quantity' refers to the quantity ordered in the PO
     const { partNumber, partDescription, partRev, quantity, qtyShipped } = i;
@@ -836,7 +956,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
       lineText += "\n " + partDescription;
 
     const row = [
-      { text: lineNumber + 1, alignment: "center" },
+      { text: lineNumber, alignment: "center" },
       { text: lineText },
       { text: `${qtyOrdered}`, alignment: "right" },
       { text: `${qtyShipped}`, alignment: "right" },
