@@ -7,8 +7,9 @@ const WorkOrder = require("../workOrder/model");
 const User = require("../user/model");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
-var ObjectId = require("mongodb").ObjectId;
+const ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
+const currency = require('currency.js');
 const { SetAirTableFields, FIELD_NAMES } =  require('../service.airtable'); 
 
 module.exports = router;
@@ -341,9 +342,21 @@ async function getOne(req, res) {
       const [_, { allShipments }] = await getPopulatedShipmentData(sid);
       const shipment = allShipments[0];
 
+      let shipmentDollarValue = 0;
+      for ( m of shipment.manifest) {
+        for ( item of m.items) {
+          const { qty, finalUnitRate } = item;
+          shipmentDollarValue = currency(shipmentDollarValue)
+            .add( currency(finalUnitRate)
+            .multiply(qty) )
+            .format();
+        }
+      }
+
       return {
         data: {
           shipment,
+          shipmentDollarValue,
         },
       };
     },
@@ -535,6 +548,30 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                       $expr: { $eq: ["$Items._id", "$$packedItemIds"] },
                     },
                   },
+                  { $lookup: {
+                    from: 'genOrders-v2',
+                    let: {
+                      orderNumber: '$OrderNumber',
+                      calcItemId: '$Items.calcItemId'
+                    },
+                    pipeline: [
+                      { $match: {
+                        $expr: { $eq: ['$orderNumber', '$$orderNumber'] },
+                      } },
+                      { $unwind: '$content.order.items' },
+                      { $match: {
+                        $expr: { $eq: [ { $toString: '$content.order.items._id' }, '$$calcItemId' ] }
+                      } },
+                      { $addFields: {
+                        finalUnitRate: '$content.order.items.calculations.header.finalUnitRate'
+                      } },
+                      { $project: {
+                        finalUnitRate: 1
+                      } }
+
+                    ], 
+                    as: 'genOrder'
+                  } },
                   {
                     $group: {
                       _id: "$Items._id",
@@ -544,10 +581,16 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                           orderNumber: "$Items.OrderNumber",
                           partNumber: "$Items.PartNumber",
                           partDescription: "$Items.PartName",
+                          calcItemId: '$Items.calcItemId',
                           partRev: "$Items.Revision",
                           batch: "$Items.batchNumber",
                           quantity: "$Items.Quantity", // batchQty
                         },
+                      },
+                      finalUnitRate: { 
+                        $first: { 
+                          $arrayElemAt: ['$genOrder.finalUnitRate', 0] 
+                        } 
                       },
                       packingSlipId: { $first: "$$packingSlipOID" },
                       packedQty: { $first: "$$packedItemQtys" },
@@ -576,6 +619,7 @@ async function getPopulatedShipmentData(shipmentId = undefined) {
                     _id: { $arrayElemAt: ["$items.rowId", 0] },
                     item: { $arrayElemAt: ["$items.item", 0] },
                     qty: { $arrayElemAt: ["$items.packedQty", 0] },
+                    finalUnitRate: { $arrayElemAt: ["$items.finalUnitRate", 0] },
                   },
                 },
                 customer: { $first: "$customer" },
