@@ -56,12 +56,12 @@ async function getPlanningReleased(
 ) {
   ExpressHandler(
     async () => {
-      const { regexFilter } = req.body;
+      const { regexFilter } = req.query; // This has already been decoded by express
 
       // Ensure it is a valid regex filter
       if (regexFilter) {
         try {
-          new RegExp(regexFilter);
+          new RegExp(String(regexFilter));
         } catch (e) {
           return HTTPError(
             `${regexFilter} is not a valid regex expression`,
