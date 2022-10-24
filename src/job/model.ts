@@ -8,6 +8,9 @@ import { ICustomerPart } from '../customerPart/model';
 import { ILot } from '../lot/model';
 
 export interface IJob extends Document {
+  // The order number
+  orderNumber: string;
+
   // The customer part that this job is for
   partId: ICustomerPart['_id'];
 
@@ -41,6 +44,7 @@ export interface IJob extends Document {
 }
 
 export const JobSchema = new Schema<IJob>({
+  orderNumber: String,
   partId: Schema.Types.ObjectId,
 
   dueDate: String,

@@ -99,6 +99,12 @@ async function getPlanningReleased(
                       $options: 'i',
                     },
                   },
+                  {
+                    orderNumber: {
+                      $regex: regexFilter || '',
+                      $options: 'i',
+                    },
+                  },
                 ],
               },
             ],
