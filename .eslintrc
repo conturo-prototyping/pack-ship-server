@@ -16,7 +16,8 @@
     "prefer-const": ["error", {
       "destructuring": "all"
     }],
-    "linebreak-style": "off"
+    "linebreak-style": "off",
+    "brace-style": ["error", "1tbs", { "allowSingleLine": true }]
   },
   "env": {
     "es2021": true,
