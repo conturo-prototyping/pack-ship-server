@@ -8,9 +8,7 @@ require('../config'); // recommended way of loading root hooks
 
 const URL = '/jobs';
 
-// set up DB_URL - NOTE: this only works with a local db, if not set up use the /debug/reset route to generate data (this might not be needed)
 const DB_URL: string = process.env.MONGO_DB_URI!;
-// FYI for this there is a permission issue of trying to go to a new db, currently I don't have a local db set up
 
 const CLIENT = new MongoClient(DB_URL);
 
@@ -52,5 +50,52 @@ describe('# JOB', () => {
     expect(job.released).to.be.eq(false);
     expect(job.onHold).to.be.eq(true);
     expect(job.stdLotSize).to.be.eq(1);
+  });
+
+  it('Should find 1 released planning job.', async () => {
+    // create a planning released job
+    const doc = {
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: ['pp2', 'pp1'],
+      lots: ['lotId1', 'lotid2'],
+      released: true,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    // hit endpoint to get all jobs in collection
+    const res = await ChaiRequest('get', `${URL}/planningReleased`);
+    expect(res.body.jobs.length).to.be.eq(1);
+
+    // check data
+    const job = res.body.jobs[0];
+    expect(job.released).to.be.eq(true);
+    expect(job.canceled).to.be.eq(false);
+  });
+
+  it('Should find 0 released planning job.', async () => {
+    // create a planning released job
+    const doc = {
+      partId: 'partId',
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: ['pp2', 'pp1'],
+      lots: ['lotId1', 'lotid2'],
+      released: false,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(doc);
+
+    // hit endpoint to get all jobs in collection
+    const res = await ChaiRequest('get', `${URL}/planningReleased`);
+    expect(res.body.jobs.length).to.be.eq(0);
   });
 });
