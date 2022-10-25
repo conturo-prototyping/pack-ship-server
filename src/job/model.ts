@@ -8,6 +8,7 @@ import { COLLECTIONS } from '../global.collectionNames';
 import { IJob } from '../global.interfaces';
 
 export const JobSchema = new Schema<IJob>({
+  orderNumber: String,
   partId: Schema.Types.ObjectId,
 
   dueDate: String,

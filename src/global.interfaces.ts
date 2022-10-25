@@ -17,6 +17,8 @@ export interface ICustomerPart extends Document {
  * router is what each Lot should use in case they do not have an overriding router referenced.
  */
 export interface IJob extends Document {
+  // The order number as defined by the yet-to-be-developped "Order"
+  orderNumber: string;
 
   // The customer part that this job is for
   partId: ICustomerPart['_id'];
