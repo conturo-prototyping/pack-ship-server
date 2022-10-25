@@ -280,7 +280,7 @@ describe('# JOB', () => {
     await CLIENT.db().collection('jobs').drop();
   });
 
-  it('Should fail since the job is already cancled.', async () => {
+  it('Should fail since the job is already canceled.', async () => {
     // set up connection to db
     await CLIENT.connect().catch(console.error);
 
