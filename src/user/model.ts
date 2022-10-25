@@ -1,20 +1,6 @@
-// models/employees/User.js
-// document Schema for every user that logs in via Google OAuth2
-
-import { Document, model, Schema } from 'mongoose';
-
-export interface IUser extends Document {
-  google: {
-    id: String,
-    accessToken: String,
-    refreshToken: String,
-    email: String
-  };
-
-  UserName: String;
-  Groups: String;
-  IsActive: Boolean;
-}
+import { model, Schema } from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
+import { IUser } from '../global.interfaces';
 
 export const UserSchema = new Schema<IUser>({
   google: {
@@ -29,4 +15,4 @@ export const UserSchema = new Schema<IUser>({
   IsActive: Boolean,
 });
 
-export const UserModel = model<IUser>('user', UserSchema);
+export const UserModel = model<IUser>(COLLECTIONS.USER, UserSchema);

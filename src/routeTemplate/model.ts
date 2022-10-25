@@ -1,24 +1,17 @@
-import { Document, model, Schema } from 'mongoose';
-import { IRouteStep } from '../routeStep/model';
-
-export interface IRouteTemplate extends Document {
-  name: string;
-
-  steps: [{
-    id: IRouteStep['_id'],
-    details: string
-  }];
-}
+import { model, Schema } from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
+import { IRouteTemplate } from '../global.interfaces';
 
 export const RouteTemplateSchema = new Schema<IRouteTemplate>({
   name: String,
   steps: [{
     id: {
       type: Schema.Types.ObjectId,
-      ref: 'routeSteps',
+      ref: COLLECTIONS.ROUTE_TEMPLATE,
     },
     details: String,
   }],
 });
 
-export const RouteTemplateModel = model<IRouteTemplate>('routeTemplate', RouteTemplateSchema, 'routeTemplates');
+// eslint-disable-next-line max-len
+export const RouteTemplateModel = model<IRouteTemplate>(COLLECTIONS.ROUTE_TEMPLATE, RouteTemplateSchema);

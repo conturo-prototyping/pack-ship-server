@@ -3,14 +3,9 @@
  * This is fairly representative of what the final schema will look like.
  */
 
-import { Document, model, Schema } from 'mongoose';
-
-export interface ICustomerPart extends Document {
-  customerId: Schema.Types.ObjectId;
-  partNumber: String;
-  partDescription: String;
-  partRev: String;
-}
+import { model, Schema } from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
+import { ICustomerPart } from '../global.interfaces';
 
 export const CustomerPartSchema = new Schema<ICustomerPart>({
   customerId: {
@@ -23,4 +18,5 @@ export const CustomerPartSchema = new Schema<ICustomerPart>({
   partRev: String,
 });
 
-export const CustomerPartModel = model<ICustomerPart>('customerPart', CustomerPartSchema, 'customerParts');
+// eslint-disable-next-line max-len
+export const CustomerPartModel = model<ICustomerPart>(COLLECTIONS.CUSTOMER_PART, CustomerPartSchema);
