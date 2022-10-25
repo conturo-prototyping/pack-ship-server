@@ -2,18 +2,31 @@ import express from 'express';
 import { ExpressHandler, HTTPError } from '../utils';
 import { LotModel } from './model';
 import { JobModel } from '../job/model';
-import { getRevCode, getRevNumber, verifyLotId, verifyStepId } from './utils';
+import {
+  getRevCode,
+  getRevNumber,
+  verifyLotId,
+  verifyStepId,
+  verifyStepIdInLot,
+} from './utils';
 import { RouteStepModel } from '../routeStep/model';
+import { ObjectId } from 'mongodb';
 
 const LotRouter = express.Router();
 
 // Middleware to verify ids exists in the req body
 // as well as if the it pertains to a valid object
-LotRouter.post(['/scrap', '/step'], async (req, res, next) => {
+LotRouter.post(['/scrap'], async (req, res, next) => {
   verifyLotId(req, res, next, LotModel);
 });
-LotRouter.post(['/step'], async (req, res, next) => {
+LotRouter.patch(['/step'], async (req, res, next) => {
+  verifyLotId(req, res, next, LotModel);
+});
+LotRouter.patch(['/step'], async (req, res, next) => {
   verifyStepId(req, res, next, RouteStepModel);
+});
+LotRouter.patch(['/step'], async (req, res, next) => {
+  verifyStepIdInLot(req, res, next, LotModel);
 });
 
 LotRouter.post('/scrap', scrapLot);
@@ -53,13 +66,23 @@ async function patchStep(req: express.Request, res: express.Response) {
   ExpressHandler(
     async () => {
       const { lot } = res.locals;
-      const { stepDetails } = req.body;
-      console.log(lot);
+      const { stepDetails, stepId } = req.body;
       if (!stepDetails) {
         return HTTPError(`stepDetails is empty.`, 404);
       }
+      try {
+        const stepOId = new ObjectId(stepId);
+        await LotModel.updateOne(
+          { 'specialRouter.step._id': stepOId, _id: lot._id },
+          { $set: { 'specialRouter.$.stepDetails': stepDetails } },
+        );
+      } catch (e) {
+        return HTTPError(
+          `Error occurred trying to update stepDetails for lotId: ${lot._id} and router step: ${stepId}.`,
+          500,
+        );
+      }
 
-      //TODO
       return {};
     },
     res,

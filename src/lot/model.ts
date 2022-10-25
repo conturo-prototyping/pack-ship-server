@@ -5,6 +5,7 @@
 
 import { Document, model, Schema } from 'mongoose';
 import { IJob } from '../job/model';
+import { IRouterElement } from '../router/model';
 
 export interface ILot extends Document {
   jobId: IJob['_id'];
@@ -12,6 +13,8 @@ export interface ILot extends Document {
   quantity: Number;
 
   rev: String;
+
+  specialRouter: IRouterElement[];
 }
 
 export const LotSchema = new Schema<ILot>({
@@ -23,6 +26,14 @@ export const LotSchema = new Schema<ILot>({
   quantity: Number,
 
   rev: String,
+
+  specialRouter: [
+    {
+      step: Object, // deep copy of RouterStep
+      stepCode: Number,
+      stepDetails: String,
+    },
+  ],
 });
 
 export const LotModel = model<ILot>('lot', LotSchema);

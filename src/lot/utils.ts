@@ -88,3 +88,38 @@ export async function verifyStepId(
     }
   }
 }
+
+export async function verifyStepIdInLot(
+  req: express.Request,
+  res: express.Response,
+  next: NextFunction,
+  model: Model<ILot, {}, {}, {}, any>,
+) {
+  const { stepId, lotId } = req.body;
+  if (!stepId) {
+    // Make sure stepId is provided
+    res.status(400).send('Please provide a stepId');
+  } else if (!ObjectId.isValid(stepId)) {
+    // Verify if id is valid
+    res.status(404).send(`Router Step ${stepId} not found`);
+  } else {
+    // Find the step with stepId in a specialRouter in a lot with lotId
+    const stepOid = new ObjectId(stepId);
+    const lotpOid = new ObjectId(lotId);
+
+    const step = await model.find({
+      'specialRouter.step._id': stepOid,
+      _id: lotpOid,
+    });
+
+    // Check if the step exists
+    if (step.length === 0) {
+      res
+        .status(404)
+        .send(`Router Step ${stepId} not found in any lot specialRouters`);
+    } else {
+      res.locals.step = step;
+      next();
+    }
+  }
+}

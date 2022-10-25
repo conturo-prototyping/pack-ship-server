@@ -1,7 +1,10 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient, ObjectId } from 'mongodb';
+import { LotModel } from '../../src/lot/model';
 import { DropAllCollections } from '../../src/router.debug';
+import { RouterModel } from '../../src/router/model';
+import { RouteStepModel } from '../../src/routeStep/model';
 import { ChaiRequest } from '../config';
 
 require('../config'); // recommended way of loading root hooks
@@ -187,6 +190,155 @@ describe('# LOT', () => {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.equal(
         `Job ${jobId.toString()} has already been released. Can't scrap lot.`,
+      );
+    }
+  });
+  it('Should update stepDetails of specialRouter found via lotId and stepId', async () => {
+    const jobId = new ObjectId('111111111111111111111111');
+    const routerStep1Id = new ObjectId('222222222222222222222222');
+    const routerStep2Id = new ObjectId('333333333333333333333333');
+    const lotId = new ObjectId('444444444444444444444444');
+
+    // Create a routerStep
+    const routerStep1Doc = {
+      _id: routerStep1Id,
+      name: 'routerName',
+      category: 'routerCat',
+    };
+    await CLIENT.db()
+      .collection(RouteStepModel.collection.name)
+      .insertOne(routerStep1Doc);
+
+    const routerStep2Doc = {
+      _id: routerStep2Id,
+      name: 'routerName',
+      category: 'routerCat',
+    };
+    await CLIENT.db()
+      .collection(RouteStepModel.collection.name)
+      .insertOne(routerStep2Doc);
+
+    // Create lot
+    const lotDoc = {
+      _id: lotId,
+      jobId: jobId,
+      quantity: 1,
+      specialRouter: [
+        { step: routerStep1Doc, stepCode: 100, stepDetails: 'step 1 Details' },
+        { step: routerStep2Doc, stepCode: 200, stepDetails: 'step 2 Details' },
+      ],
+    };
+    await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+
+    // hit endpoint to patch step
+    const res = await ChaiRequest('patch', `${URL}/step`, {
+      lotId: lotId.toString(),
+      stepId: routerStep1Id.toString(),
+      stepDetails: 'step 1 details modified',
+    });
+
+    // check that step 1details are modified and step 2 is untouched
+    const actual = await CLIENT.db()
+      .collection(LotModel.collection.name)
+      .findOne({ _id: lotId });
+    expect(actual.specialRouter[0].stepDetails).to.be.eq(
+      'step 1 details modified',
+    );
+    expect(actual.specialRouter[1].stepDetails).to.be.eq('step 2 Details');
+  });
+
+  it('Ensure 400 is raised when no lotId provided', async () => {
+    try {
+      await ChaiRequest('patch', `${URL}/step`);
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Please provide a lotId');
+    }
+  });
+
+  it('Ensure 404 is raised when lotId provided but doesnt exist', async () => {
+    try {
+      await ChaiRequest('patch', `${URL}/step`, { lotId: 'fake_id' });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(`Lot fake_id not found`);
+    }
+  });
+
+  it('Ensure 400 is raised when no stepId is provided', async () => {
+    try {
+      const jobId = new ObjectId('111111111111111111111111');
+      const lotId = new ObjectId('444444444444444444444444');
+      // Create lot
+      const lotDoc = {
+        _id: lotId,
+        jobId: jobId,
+        quantity: 1,
+      };
+
+      await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+      await ChaiRequest('patch', `${URL}/step`, { lotId: lotId.toString() });
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Please provide a stepId');
+    }
+  });
+
+  it('Ensure 404 is raised when stepId is provided but doesnt exist', async () => {
+    try {
+      const jobId = new ObjectId('111111111111111111111111');
+      const lotId = new ObjectId('444444444444444444444444');
+      // Create lot
+      const lotDoc = {
+        _id: lotId,
+        jobId: jobId,
+        quantity: 1,
+      };
+
+      await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+      await ChaiRequest('patch', `${URL}/step`, {
+        lotId: lotId.toString(),
+        stepId: 'fake_id',
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal('Router Step fake_id not found');
+    }
+  });
+
+  it('Ensure 404 is raised when stepId and lotId both exist, but the stepId is not within the specialRouter', async () => {
+    try {
+      const jobId = new ObjectId('111111111111111111111111');
+      const routerStepId = new ObjectId('222222222222222222222222');
+      const lotId = new ObjectId('444444444444444444444444');
+
+      // Create lot
+      const lotDoc = {
+        _id: lotId,
+        jobId: jobId,
+        quantity: 1,
+        specialRouter: [],
+      };
+      await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+
+      // Create a routerStep
+      const routerStep1Doc = {
+        _id: routerStepId,
+        name: 'routerName',
+        category: 'routerCat',
+      };
+      await CLIENT.db()
+        .collection(RouteStepModel.collection.name)
+        .insertOne(routerStep1Doc);
+
+      await ChaiRequest('patch', `${URL}/step`, {
+        lotId: lotId.toString(),
+        stepId: routerStepId.toString(),
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        'Router Step 222222222222222222222222 not found in any lot specialRouters',
       );
     }
   });
