@@ -1,12 +1,14 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient } from 'mongodb';
+import { JobModel } from '../../src/job/model';
 import { DropAllCollections } from '../../src/router.debug';
 import { ChaiRequest } from '../config';
 
 require('../config'); // recommended way of loading root hooks
 
 const URL = '/jobs';
+const COLLECTION_NAME = JobModel.collection.name;
 
 // set up DB_URL - NOTE: this only works with a local db, if not set up use the /debug/reset route to generate data (this might not be needed)
 const DB_URL: string = process.env.MONGO_DB_URI!;
@@ -35,7 +37,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await CLIENT.db().collection( COLLECTION_NAME ).insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/`);
