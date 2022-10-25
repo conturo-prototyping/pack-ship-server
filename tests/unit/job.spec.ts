@@ -35,7 +35,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection( COLLECTION_NAME ).insertOne(doc);
+    await CLIENT.db().collection( 'jobs' ).insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/`);
