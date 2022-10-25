@@ -69,6 +69,7 @@ async function createRandomSetupData(customers) {
 
   // 2) Create random jobs from the parts
   const allJobs: IJob[] = [];
+  const tags = ['ABC', 'DEF', 'GHI'];
   for (const p of allParts) {
     for (let i = 0; i < randomInt(3); i++) {
       promises.push(
@@ -78,6 +79,7 @@ async function createRandomSetupData(customers) {
           const sliceEnd = randomInt(sliceStart, externals.length + 1);
 
           const newJob = new JobModel({
+            orderNumber: `${tags[randomInt(0, 3)]}100${randomInt(1, 10)}`,
             partId: p,
             released: [true, false][randomInt(0, 2)],
             canceled: [true, false][randomInt(0, 2)],

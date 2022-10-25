@@ -2,6 +2,7 @@ import express from 'express';
 import { ObjectId } from 'mongodb';
 import { JobModel } from './model';
 import { ExpressHandler, HTTPError } from '../utils';
+import { CustomerPartModel } from '../customerPart/model';
 
 const JobRouter = express.Router();
 JobRouter.get('/', getJobs);
@@ -54,16 +55,68 @@ async function getJobs(_req: express.Request, res: express.Response) {
 }
 
 async function getPlanningReleased(
-  _req: express.Request,
+  req: express.Request,
   res: express.Response,
 ) {
   ExpressHandler(
     async () => {
-      const jobs = await JobModel.find({
-        released: true,
-        canceled: false,
-      }).lean();
+      const { regexFilter } = req.query; // This has already been decoded by express
 
+      // Ensure it is a valid regex filter
+      if (regexFilter) {
+        try {
+          // NOTE(jarrilla): I actually have no clue what this warning means..
+          // Leaving it unresolved for now
+          new RegExp(String(regexFilter));
+        } catch (e) {
+          return HTTPError(
+            `${regexFilter} is not a valid regex expression`,
+            405,
+          );
+        }
+      }
+
+      // Find the jobs
+      const jobs = await JobModel.aggregate([
+        {
+          $lookup: {
+            from: CustomerPartModel.collection.collectionName,
+            localField: 'partId',
+            foreignField: '_id',
+            as: 'customerParts',
+          },
+        },
+        {
+          $match: {
+            $and: [
+              { released: true },
+              { canceled: false },
+              {
+                $or: [
+                  {
+                    'customerParts.partNumber': {
+                      $regex: regexFilter || '',
+                      $options: 'i',
+                    },
+                  },
+                  {
+                    'customerParts.partDescription': {
+                      $regex: regexFilter || '',
+                      $options: 'i',
+                    },
+                  },
+                  {
+                    orderNumber: {
+                      $regex: regexFilter || '',
+                      $options: 'i',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ]);
       const data = { jobs };
       return { data };
     },
@@ -137,19 +190,17 @@ async function setStdLotSize(req: express.Request, res: express.Response) {
     async () => {
       const { jobId, lotSize } = req.body;
 
-      console.error(jobId, lotSize);
-
       // If there is no Job ID, we can't do anything
       if (lotSize === undefined) {
-        return HTTPError(`Please provide a lotSize`, 400);
-      } else if (lotSize <= 0) {
-        return HTTPError(`lotSize must be > 0`, 400);
+        return HTTPError('Please provide a lotSize', 400);
+      } if (lotSize <= 0) {
+        return HTTPError('lotSize must be > 0', 400);
       }
 
       const job = await JobModel.findById(`${jobId}`);
 
       if (job?.released) {
-        return HTTPError(`Job cannot be released.`, 405);
+        return HTTPError('Job cannot be released.', 405);
       }
 
       await JobModel.updateOne(

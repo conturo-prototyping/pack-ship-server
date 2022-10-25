@@ -52,6 +52,7 @@ app.use('/packingSlips', require('./packingSlip/controller').router);
 app.use('/workOrders', require('./workOrder/controller'));
 app.use('/shipments', require('./shipment/controller'));
 app.use('/users', require('./user/controller'));
+
 app.use('/routeSteps', RouteStepRouter);
 app.use('/lots', LotRouter);
 app.use('/jobs', JobRouter);

@@ -53,20 +53,34 @@ describe('# JOB', () => {
   });
 
   it('Should find 1 released planning job.', async () => {
+    // Create a part and a job
+    const partId = new ObjectId('222222222222222222222222');
+    const partDoc = {
+      _id: partId,
+      customerId: '111111111111111111111111',
+      partNumber: 'PN-004',
+      partDescription: 'dummy',
+      partRev: 'A',
+    };
+    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+
     // create a planning released job
-    const doc = {
-      partId: 'partId',
+    const jobDoc = {
+      partId: partId,
       dueDate: '2022/10/14',
       batchQty: 1,
       material: 'moondust',
-      externalPostProcesses: ['pp2', 'pp1'],
-      lots: ['lotId1', 'lotid2'],
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
       released: true,
       onHold: true,
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await CLIENT.db().collection('jobs').insertOne(jobDoc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/planningReleased`);
@@ -127,7 +141,7 @@ describe('# JOB', () => {
       jobId,
     });
     const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
-    expect(actual.onHold).to.be.eq(true);
+    expect(actual!.onHold).to.be.eq(true);
   });
 
   it('Should fail with no jobId provided.', async () => {
@@ -259,8 +273,8 @@ describe('# JOB', () => {
     });
 
     const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
-    expect(actual.onHold, 'onhold should be false').to.be.eq(false);
-    expect(actual.released, 'released should be true').to.be.eq(true);
+    expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
+    expect(actual!.released, 'released should be true').to.be.eq(true);
 
     // drop collection to maintain stateless tests
     await CLIENT.db().collection('jobs').drop();
@@ -334,10 +348,56 @@ describe('# JOB', () => {
     const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
 
     // check data
-    expect(actual.stdLotSize).to.be.eq(12);
+    expect(actual!.stdLotSize).to.be.eq(12);
 
     // drop collection to maintain stateless tests
     await CLIENT.db().collection('jobs').drop();
+  });
+
+
+  it('Should find released job(s) matching orderNumber regex', async () => {
+    // Create a part and a job
+    const partId = new ObjectId('222222222222222222222222');
+    const partDoc = {
+      _id: partId,
+      customerId: '111111111111111111111111',
+      partNumber: 'PN-004',
+      partDescription: 'dummy',
+      partRev: 'A',
+    };
+    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+
+    // create a planning released job
+    const jobDoc = {
+      orderNumber: 'ABC1001',
+      partId: partId,
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: true,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+
+    // hit endpoint to get all jobs in collection
+    const res = await ChaiRequest(
+      'get',
+      `${URL}/planningReleased/?regexFilter=abc`,
+    );
+    expect(res.body.jobs.length).to.be.eq(1);
+
+    // check data
+    const job = res.body.jobs[0];
+    expect(job.released).to.be.eq(true);
+    expect(job.canceled).to.be.eq(false);
+    expect(job.orderNumber).to.be.eq('ABC1001');
   });
 
   it('lot size needs to be included.', async () => {
@@ -377,6 +437,51 @@ describe('# JOB', () => {
       // drop collection to maintain stateless tests
       await CLIENT.db().collection('jobs').drop();
     }
+  });
+
+  it('Should find released job(s) matching partDescription regex', async () => {
+    // Create a part and a job
+    const partId = new ObjectId('222222222222222222222222');
+    const partDoc = {
+      _id: partId,
+      customerId: '111111111111111111111111',
+      partNumber: 'PN-004',
+      partDescription: 'dummy',
+      partRev: 'A',
+    };
+    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+
+    // create a planning released job
+    const jobDoc = {
+      orderNumber: 'ABC1001',
+      partId: partId,
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: true,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+
+    // hit endpoint to get all jobs in collection
+    const res = await ChaiRequest(
+      'get',
+      `${URL}/planningReleased/?regexFilter=umm`,
+    );
+    expect(res.body.jobs.length).to.be.eq(1);
+
+    // check data
+    const job = res.body.jobs[0];
+    expect(job.released).to.be.eq(true);
+    expect(job.canceled).to.be.eq(false);
+    expect(job.customerParts[0].partDescription).to.be.eq('dummy');
   });
 
   it('lot size cannot be edited for released job.', async () => {
@@ -454,5 +559,50 @@ describe('# JOB', () => {
       // drop collection to maintain stateless tests
       await CLIENT.db().collection('jobs').drop();
     }
+  });
+
+  it('Should find released job(s) matching partNumber regex', async () => {
+    // Create a part and a job
+    const partId = new ObjectId('222222222222222222222222');
+    const partDoc = {
+      _id: partId,
+      customerId: '111111111111111111111111',
+      partNumber: 'PN-004',
+      partDescription: 'dummy',
+      partRev: 'A',
+    };
+    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+
+    // create a planning released job
+    const jobDoc = {
+      orderNumber: 'ABC1001',
+      partId: partId,
+      dueDate: '2022/10/14',
+      batchQty: 1,
+      material: 'moondust',
+      externalPostProcesses: [
+        '111111111111111111111111',
+        '222222222222222222222222',
+      ],
+      lots: ['111111111111111111111111', '222222222222222222222222'],
+      released: true,
+      onHold: true,
+      canceled: false,
+      stdLotSize: 1,
+    };
+    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+
+    // hit endpoint to get all jobs in collection
+    const res = await ChaiRequest(
+      'get',
+      `${URL}/planningReleased/?regexFilter=-0`,
+    );
+    expect(res.body.jobs.length).to.be.eq(1);
+
+    // check data
+    const job = res.body.jobs[0];
+    expect(job.released).to.be.eq(true);
+    expect(job.canceled).to.be.eq(false);
+    expect(job.customerParts[0].partNumber).to.be.eq('PN-004');
   });
 });
