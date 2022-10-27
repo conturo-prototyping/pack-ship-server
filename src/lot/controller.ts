@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import express from 'express';
 import { ExpressHandler, HTTPError } from '../utils';
 import { LotModel } from './model';
@@ -9,28 +10,30 @@ import {
   verifyStepId,
   verifyStepIdInLot,
 } from './utils';
-import { RouteStepModel } from '../routeStep/model';
-import { ObjectId } from 'mongodb';
 
 const LotRouter = express.Router();
 
 // Middleware to verify ids exists in the req body
 // as well as if the it pertains to a valid object
 LotRouter.post(['/scrap'], async (req, res, next) => {
-  verifyLotId(req, res, next, LotModel);
+  verifyLotId(req, res, next);
 });
 LotRouter.patch(['/step'], async (req, res, next) => {
-  verifyLotId(req, res, next, LotModel);
+  verifyLotId(req, res, next);
 });
 LotRouter.patch(['/step'], async (req, res, next) => {
-  verifyStepId(req, res, next, RouteStepModel);
+  verifyStepId(req, res, next);
 });
 LotRouter.patch(['/step'], async (req, res, next) => {
-  verifyStepIdInLot(req, res, next, LotModel);
+  verifyStepIdInLot(req, res, next);
+});
+LotRouter.get(['/:lotId/router'], async (req, res, next) => {
+  verifyLotId(req, res, next, 'param');
 });
 
 LotRouter.post('/scrap', scrapLot);
 LotRouter.patch('/step', patchStep);
+LotRouter.get('/:lotId/router', getLotRouter);
 
 async function scrapLot(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -53,8 +56,8 @@ async function scrapLot(_req: express.Request, res: express.Response) {
 
       const currentRev: string = lot.rev;
       const revN = getRevNumber(currentRev);
-      lot.rev = getRevCode(revN + 1);
-      lot.save();
+      const rev = getRevCode(revN + 1);
+      await LotModel.updateOne({ _id: lot._id }, { $set: { rev } });
       return {};
     },
     res,
@@ -68,7 +71,7 @@ async function patchStep(req: express.Request, res: express.Response) {
       const { lot } = res.locals;
       const { stepDetails, stepId } = req.body;
       if (!stepDetails) {
-        return HTTPError(`stepDetails is empty.`, 404);
+        return HTTPError('stepDetails is empty.', 404);
       }
       try {
         const stepOId = new ObjectId(stepId);
@@ -86,7 +89,28 @@ async function patchStep(req: express.Request, res: express.Response) {
       return {};
     },
     res,
-    'scrap lot',
+    'patch lot',
+  );
+}
+
+async function getLotRouter(_req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { lot } = res.locals;
+
+      try {
+        const { specialRouter } = lot;
+        const data = { router: { path: specialRouter } };
+        return { data };
+      } catch (e) {
+        return HTTPError(
+          `Error occurred trying to get lot's router for lot ${lot._id}.`,
+          500,
+        );
+      }
+    },
+    res,
+    'get lot router',
   );
 }
 

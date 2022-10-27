@@ -247,7 +247,7 @@ describe('# LOT', () => {
     expect(actual.specialRouter[1].stepDetails).to.be.eq('step 2 Details');
   });
 
-  it('Ensure 400 is raised when no lotId provided', async () => {
+  it('Ensure 400 is raised when no lotId provided when patching lot router step', async () => {
     try {
       await ChaiRequest('patch', `${URL}/step`);
     } catch (err) {
@@ -256,7 +256,7 @@ describe('# LOT', () => {
     }
   });
 
-  it('Ensure 404 is raised when lotId provided but doesnt exist', async () => {
+  it('Ensure 404 is raised when lotId provided when patching lot router step', async () => {
     try {
       await ChaiRequest('patch', `${URL}/step`, { lotId: 'fake_id' });
     } catch (err) {
@@ -265,7 +265,7 @@ describe('# LOT', () => {
     }
   });
 
-  it('Ensure 400 is raised when no stepId is provided', async () => {
+  it('Ensure 400 is raised when no stepId is provided when patching lot router step', async () => {
     try {
       const jobId = new ObjectId('111111111111111111111111');
       const lotId = new ObjectId('444444444444444444444444');
@@ -284,7 +284,7 @@ describe('# LOT', () => {
     }
   });
 
-  it('Ensure 404 is raised when stepId is provided but doesnt exist', async () => {
+  it('Ensure 404 is raised when stepId is provided but doesnt exist when patching lot router step', async () => {
     try {
       const jobId = new ObjectId('111111111111111111111111');
       const lotId = new ObjectId('444444444444444444444444');
@@ -306,7 +306,7 @@ describe('# LOT', () => {
     }
   });
 
-  it('Ensure 404 is raised when stepId and lotId both exist, but the stepId is not within the specialRouter', async () => {
+  it('Ensure 404 is raised when stepId and lotId both exist, but the stepId is not within the specialRouter when patching lot router step', async () => {
     try {
       const jobId = new ObjectId('111111111111111111111111');
       const routerStepId = new ObjectId('222222222222222222222222');
@@ -341,5 +341,68 @@ describe('# LOT', () => {
         'Router Step 222222222222222222222222 not found in any lot specialRouters',
       );
     }
+  });
+
+  it('Ensure 404 is raised when lotId is provided but doesnt exist, when getting a router for lotId', async () => {
+    try {
+      const lolId = 'fake_id';
+      await ChaiRequest('get', `${URL}/${lolId}/router`);
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(`Lot fake_id not found`);
+    }
+  });
+
+  it('When lotId is provided and does exist, get the full router', async () => {
+    const jobId = new ObjectId('111111111111111111111111');
+    const routerStep1Id = new ObjectId('222222222222222222222222');
+    const routerStep2Id = new ObjectId('333333333333333333333333');
+    const lotId = new ObjectId('444444444444444444444444');
+
+    // Create a routerStep
+    const routerStep1Doc = {
+      _id: routerStep1Id,
+      name: 'routerName',
+      category: 'routerCat',
+    };
+    await CLIENT.db()
+      .collection(RouteStepModel.collection.name)
+      .insertOne(routerStep1Doc);
+
+    const routerStep2Doc = {
+      _id: routerStep2Id,
+      name: 'routerName',
+      category: 'routerCat',
+    };
+    await CLIENT.db()
+      .collection(RouteStepModel.collection.name)
+      .insertOne(routerStep2Doc);
+
+    // Create lot
+    const path = [
+      {
+        step: { name: 'routerName', category: 'routerCat' },
+        stepCode: 100,
+        stepDetails: 'step 1 Details',
+      },
+      {
+        step: {
+          name: 'routerName',
+          category: 'routerCat',
+        },
+        stepCode: 200,
+        stepDetails: 'step 2 Details',
+      },
+    ];
+    const lotDoc = {
+      _id: lotId,
+      jobId: jobId,
+      quantity: 1,
+      specialRouter: path,
+    };
+    await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+
+    const res = await ChaiRequest('get', `${URL}/${lotId.toString()}/router`);
+    expect(res.body.router.path).to.eql(path);
   });
 });
