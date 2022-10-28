@@ -10,13 +10,43 @@ router.get("/", getAll);
 router.put("/", createOne);
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
+router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
+router.patch("/:deliveryId", editOne);
 
 module.exports = {
   router,
   CreateNew,
 };
+
+/**
+ * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
+ * THEN delete the matching model doc
+ */
+function undoReceive(req, res) {
+  ExpressHandler(
+    async () => {
+      return HTTPError('not implemented', 501);
+    },
+    res,
+    'deleting delivery receipt'
+  )
+}
+
+/**
+ * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
+ * THEN commit changes
+ */
+function editOne(req, res) {
+  ExpressHandler(
+    async () => {
+      return HTTPError('not implemented', 501);
+    },
+    res,
+    'editing delivery'
+  );
+}
 
 /**
  * Manually create a new incoming delivery.
