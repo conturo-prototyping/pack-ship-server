@@ -28,9 +28,16 @@ LotRouter.patch(['/step'], async (req, res, next) => {
 LotRouter.patch(['/step'], async (req, res, next) => {
   verifyStepIdInLot(req, res, next, LotModel);
 });
+LotRouter.put(['/step'], async (req, res, next) => {
+  verifyLotId(req, res, next, LotModel);
+});
+LotRouter.put(['/step'], async (req, res, next) => {
+  verifyStepId(req, res, next, RouteStepModel);
+});
 
 LotRouter.post('/scrap', scrapLot);
 LotRouter.patch('/step', patchStep);
+LotRouter.put('/step', addRouteStep);
 
 async function scrapLot(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -62,6 +69,40 @@ async function scrapLot(_req: express.Request, res: express.Response) {
   );
 }
 
+function addRouteStep(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { lotId, stepId, insertAfterIndex } = req.body;
+
+      const lot = await LotModel.findOne({ _id: lotId }).lean();
+
+      if (!lot) return HTTPError('Lot not found (lot ID provided)', 404);
+
+      const routeStep = await RouteStepModel.findOne({ _id: stepId }).lean();
+
+      if (!routeStep)
+        return HTTPError('Step not found (step ID provided)', 404);
+
+      lot.specialRouter.splice(
+        insertAfterIndex !== undefined && insertAfterIndex >= 0
+          ? insertAfterIndex + 1
+          : 0,
+        0,
+        { step: { ...routeStep }, stepCode: 100, stepDetails: '' },
+      );
+
+      await LotModel.updateOne(
+        { _id: lotId },
+        { $set: { specialRouter: lot.specialRouter } },
+      );
+
+      return {};
+    },
+    res,
+    'putting route step',
+  );
+}
+
 async function patchStep(req: express.Request, res: express.Response) {
   ExpressHandler(
     async () => {
@@ -82,11 +123,10 @@ async function patchStep(req: express.Request, res: express.Response) {
           500,
         );
       }
-
       return {};
     },
     res,
-    'scrap lot',
+    'putting route step',
   );
 }
 
