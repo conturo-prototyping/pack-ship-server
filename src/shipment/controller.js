@@ -397,7 +397,7 @@ async function deleteOne(req, res) {
 
       await Promise.all([p_delete, p_updatePackingSlips]);
 
-      await IncomingDelivery.findOneAndDelete({
+      await IncomingDelivery.deleteMany({
         sourceShipmentId: sid,
       });
     },
