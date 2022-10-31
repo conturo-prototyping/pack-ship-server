@@ -4,7 +4,6 @@ const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const ObjectId = require("mongodb").ObjectId;
 const IncomingDelivery = require("./model");
 const IncomingDeliveryHistory = require("./model.history");
-const User = require("../user/model");
 const WorkOrder = require("../workOrder/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
@@ -13,16 +12,11 @@ router.get("/", getAll);
 router.put("/", createOne);
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
-// Make sure the editMadeBy is valid
-router.post("/undoReceive", async (req, res, next) => {
-  const { editMadeBy } = req.body;
-  await checkId(res, next, User, editMadeBy);
-});
+
 // Make sure the deliveryId is valid
-router.post("/undoReceive", async (req, res, next) => {
-  const { deliveryId } = req.body;
-  await checkId(res, next, IncomingDelivery, deliveryId);
-});
+router.post("/undoReceive", (req, res, next) =>
+  checkId(res, next, IncomingDelivery, req.body.deliveryId)
+);
 
 router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
@@ -42,18 +36,22 @@ function undoReceive(req, res) {
   ExpressHandler(
     async () => {
       const { _id, ...incomingDel } = res.locals.data;
-      const { deliveryId, editMadeBy } = req.body;
+      const { deliveryId } = req.body;
+      const editMadeBy = req.user._id;
+
       try {
         const incDelHist = new IncomingDeliveryHistory({
           editMadeBy,
           ...incomingDel,
         });
+
         await Promise.all([
           incDelHist.save(),
           IncomingDelivery.deleteOne({ _id: ObjectId(deliveryId) }),
         ]);
       } catch (error) {
         LogError(error);
+        
         return HTTPError(
           `Unexpected error calling undoReceive with ${deliveryId}.`
         );
