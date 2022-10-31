@@ -6,12 +6,11 @@ const { Schema, model } = require("mongoose");
 const { ObjectId } = Schema.Types;
 
 const schema = new Schema({
-
   // Pointer to whoever made edits that created the CURRENT
   // (i.e. the document that triggered creation of this history doc)
   editMadeBy: {
     type: ObjectId,
-    ref: 'user'
+    ref: "user",
   },
 
   // AUTOMATICALLY ENTERED
@@ -19,13 +18,13 @@ const schema = new Schema({
 
   // The fields below are exact copies of the same fields in the "model" file.
   label: String,
-  createdBy: { type: ObjectId, ref: 'user' },
-  internalPurchaseOrderNumber: String, 
-  sourceShipmentId: { type: ObjectId, ref: 'shipment' },
+  createdBy: { type: ObjectId, ref: "user" },
+  internalPurchaseOrderNumber: String,
+  sourceShipmentId: { type: ObjectId, ref: "shipment" },
   receivedQuantities: [{ item: ObjectId, qty: Number }],
   isDueBackOn: String,
   receivedOn: Date,
-  receivedBy: { type: ObjectId, ref: 'user' }
+  receivedBy: { type: ObjectId, ref: "user" },
 });
 
 const Model = model("incomingDeliveryHistory", schema);

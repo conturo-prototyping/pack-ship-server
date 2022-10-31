@@ -1,7 +1,10 @@
 const { Router } = require("express");
 const router = Router();
 const { LogError, ExpressHandler, HTTPError } = require("../utils");
-const IncomingDelivery = require("./model"); //causing an error
+const ObjectId = require("mongodb").ObjectId;
+const IncomingDelivery = require("./model");
+const IncomingDeliveryHistory = require("./model.history");
+const User = require("../user/model");
 const WorkOrder = require("../workOrder/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
@@ -10,6 +13,17 @@ router.get("/", getAll);
 router.put("/", createOne);
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
+// Make sure the editMadeBy is valid
+router.post("/undoReceive", async (req, res, next) => {
+  const { editMadeBy } = req.body;
+  await checkId(res, next, User, editMadeBy);
+});
+// Make sure the deliveryId is valid
+router.post("/undoReceive", async (req, res, next) => {
+  const { deliveryId } = req.body;
+  await checkId(res, next, IncomingDelivery, deliveryId);
+});
+
 router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
@@ -27,11 +41,27 @@ module.exports = {
 function undoReceive(req, res) {
   ExpressHandler(
     async () => {
-      return HTTPError('not implemented', 501);
+      const { _id, ...incomingDel } = res.locals.data;
+      const { deliveryId, editMadeBy } = req.body;
+      try {
+        const incDelHist = new IncomingDeliveryHistory({
+          editMadeBy,
+          ...incomingDel,
+        });
+        await Promise.all([
+          incDelHist.save(),
+          IncomingDelivery.deleteOne({ _id: ObjectId(deliveryId) }),
+        ]);
+      } catch (error) {
+        LogError(error);
+        return HTTPError(
+          `Unexpected error calling undoReceive with ${deliveryId}.`
+        );
+      }
     },
     res,
-    'deleting delivery receipt'
-  )
+    "undo receive"
+  );
 }
 
 /**
@@ -41,10 +71,10 @@ function undoReceive(req, res) {
 function editOne(req, res) {
   ExpressHandler(
     async () => {
-      return HTTPError('not implemented', 501);
+      return HTTPError("not implemented", 501);
     },
     res,
-    'editing delivery'
+    "editing delivery"
   );
 }
 
@@ -88,9 +118,8 @@ async function CreateNew(
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
 
-    return [ , { incomingDelivery: newIncomingDelivery }];
-  } 
-  catch (error) {
+    return [, { incomingDelivery: newIncomingDelivery }];
+  } catch (error) {
     LogError(error);
     return [HTTPError("Unexpected error creating incoming delivery.")];
   }
@@ -378,4 +407,29 @@ function getAllReceived(req, res) {
     res,
     "getting all received incoming deliveries"
   );
+}
+async function checkId(res, next, model, id) {
+  if (!id) {
+    // Make sure id is provided
+    res
+      .status(400)
+      .send(`Please provide an id for ${model.collection.collectionName}`);
+  } else if (!ObjectId.isValid(id)) {
+    // Verify if id is valid
+    res
+      .status(404)
+      .send(`${id} for ${model.collection.collectionName} not valid`);
+  } else {
+    // Find the id and if it doesnt exist, raise an error
+    const data = await model.findById(id).lean();
+    // Check if the data exists
+    if (!data) {
+      res
+        .status(404)
+        .send(`${id} for ${model.collection.collectionName} not found`);
+    } else {
+      res.locals.data = data;
+      next();
+    }
+  }
 }
