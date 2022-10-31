@@ -82,7 +82,7 @@ async function searchShipments(req, res) {
       const sortFunc = (a, b) => {
         let testVal;
         if (sortBy === "CUSTOMER") {
-          testVal = a.customer.tag.localeCompare(b.customer.tag);
+          testVal = a.label.localeCompare(b.label);
         } else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
 
         if (testVal * sortOrder < 1) return -1;
