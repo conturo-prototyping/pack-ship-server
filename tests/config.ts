@@ -32,10 +32,7 @@ before(async () => {
 
 // TEAR DOWN
 // Clear out all TEST DB collections
-after(async () => {
-  await DropAllCollections();
-  console.log('here');
-});
+after(async () => await DropAllCollections());
 
 // Use this db client as needed in spec files
 export const TEST_DB_CLIENT = new MongoClient(process.env.MONGO_DB_URI!);
