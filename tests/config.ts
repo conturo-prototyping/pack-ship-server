@@ -2,6 +2,7 @@ import { Express } from 'express';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import { DropAllCollections } from '../src/router.debug';
+import { MongoClient } from 'mongodb';
 
 require('dotenv').config();
 
@@ -29,7 +30,13 @@ before(async () => {
 
 // TEAR DOWN
 // Clear out all TEST DB collections
-after(async () => DropAllCollections());
+after(async () => {
+  await DropAllCollections();
+  console.log('here');
+});
+
+// Use this db client as needed in spec files
+export const TEST_DB_CLIENT = new MongoClient(process.env.MONGO_DB_URI!);
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------

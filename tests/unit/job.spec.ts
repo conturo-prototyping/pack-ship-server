@@ -3,20 +3,15 @@ import { describe, it } from 'mocha';
 import { JobModel } from '../../src/job/model';
 import { MongoClient, ObjectId } from 'mongodb';
 import { DropAllCollections } from '../../src/router.debug';
-import { ChaiRequest } from '../config';
+import { ChaiRequest, TEST_DB_CLIENT } from '../config';
 
 require('../config'); // recommended way of loading root hooks
 
 const URL = '/jobs';
-const COLLECTION_NAME = JobModel.collection.name;
-
-const DB_URL: string = process.env.MONGO_DB_URI!;
-
-const CLIENT = new MongoClient(DB_URL);
 
 describe('# JOB', () => {
   before(async function () {
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
   });
   afterEach(async function () {
     await DropAllCollections();
@@ -35,7 +30,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection( 'jobs' ).insertOne(doc);
+    await TEST_DB_CLIENT.db().collection( 'jobs' ).insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/`);
@@ -64,7 +59,7 @@ describe('# JOB', () => {
       partDescription: 'dummy',
       partRev: 'A',
     };
-    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+    await TEST_DB_CLIENT.db().collection('customerParts').insertOne(partDoc);
 
     // create a planning released job
     const jobDoc = {
@@ -82,7 +77,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(jobDoc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/planningReleased`);
@@ -108,7 +103,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/planningReleased`);
@@ -136,13 +131,13 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     // hit endpoint to get the job and check if onHold is true
     const res = await ChaiRequest('post', `${URL}/hold`, {
       jobId,
     });
-    const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db().collection('jobs').findOne({ _id: id });
     expect(actual!.onHold).to.be.eq(true);
   });
 
@@ -202,7 +197,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     try {
       await ChaiRequest('post', `${URL}/hold`, {
@@ -230,7 +225,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     try {
       await ChaiRequest('post', `${URL}/hold`, {
@@ -241,13 +236,13 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Job ${jobId} is already on hold`);
     } finally {
       // drop collection to maintain stateless tests
-      await CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection('jobs').drop();
     }
   });
 
   it('Should release job from on hold.', async () => {
     // set up connection to db
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
 
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
@@ -267,24 +262,24 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     // hit endpoint to get the job and check if onHold is true
     const res = await ChaiRequest('post', `${URL}/release`, {
       jobId,
     });
 
-    const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db().collection('jobs').findOne({ _id: id });
     expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
     expect(actual!.released, 'released should be true').to.be.eq(true);
 
     // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
+    await TEST_DB_CLIENT.db().collection('jobs').drop();
   });
 
   it('Should fail since the job is already canceled.', async () => {
     // set up connection to db
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
 
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
@@ -301,7 +296,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     try {
       await ChaiRequest('post', `${URL}/cancel`, {
@@ -312,7 +307,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Job ${jobId} has already been canceled`);
     } finally {
       // drop collection to maintain stateless tests
-      await CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection('jobs').drop();
     }
   });
 
@@ -327,7 +322,7 @@ describe('# JOB', () => {
       partDescription: 'dummy',
       partRev: 'A',
     };
-    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+    await TEST_DB_CLIENT.db().collection('customerParts').insertOne(partDoc);
 
     // create a planning released job
     const jobDoc = {
@@ -346,7 +341,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(jobDoc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest(
@@ -372,7 +367,7 @@ describe('# JOB', () => {
       partDescription: 'dummy',
       partRev: 'A',
     };
-    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+    await TEST_DB_CLIENT.db().collection('customerParts').insertOne(partDoc);
 
     // create a planning released job
     const jobDoc = {
@@ -391,7 +386,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(jobDoc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest(
@@ -417,7 +412,7 @@ describe('# JOB', () => {
       partDescription: 'dummy',
       partRev: 'A',
     };
-    await CLIENT.db().collection('customerParts').insertOne(partDoc);
+    await TEST_DB_CLIENT.db().collection('customerParts').insertOne(partDoc);
 
     // create a planning released job
     const jobDoc = {
@@ -436,7 +431,7 @@ describe('# JOB', () => {
       canceled: false,
       stdLotSize: 1,
     };
-    await CLIENT.db().collection('jobs').insertOne(jobDoc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(jobDoc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest(
@@ -456,7 +451,7 @@ describe('# JOB', () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     // set up connection to db
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
 
     // create job using mongodb driver
     const doc = {
@@ -475,7 +470,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 0,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     // hit endpoint to get update lot size
     await ChaiRequest('post', `${URL}/lotSize`, {
@@ -483,20 +478,20 @@ describe('# JOB', () => {
       lotSize: 12,
     });
 
-    const actual = await CLIENT.db().collection('jobs').findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db().collection('jobs').findOne({ _id: id });
 
     // check data
     expect(actual!.stdLotSize).to.be.eq(12);
 
     // drop collection to maintain stateless tests
-    await CLIENT.db().collection('jobs').drop();
+    await TEST_DB_CLIENT.db().collection('jobs').drop();
   });
 
   it('lot size needs to be included.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     // set up connection to db
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
 
     // create job using mongodb driver
     const doc = {
@@ -515,7 +510,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 0,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     try {
       // hit endpoint to get update lot size
@@ -527,7 +522,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Please provide a lotSize`);
     } finally {
       // drop collection to maintain stateless tests
-      await CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection('jobs').drop();
     }
   });
 
@@ -535,7 +530,7 @@ describe('# JOB', () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     // set up connection to db
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
 
     // create job using mongodb driver
     const doc = {
@@ -551,7 +546,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 0,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     try {
       // hit endpoint to get update lot size
@@ -564,7 +559,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Job cannot be released.`);
     } finally {
       // drop collection to maintain stateless tests
-      await CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection('jobs').drop();
     }
   });
 
@@ -572,7 +567,7 @@ describe('# JOB', () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     // set up connection to db
-    await CLIENT.connect().catch(console.error);
+    await TEST_DB_CLIENT.connect().catch(console.error);
 
     // create job using mongodb driver
     const doc = {
@@ -591,7 +586,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 0,
     };
-    await CLIENT.db().collection('jobs').insertOne(doc);
+    await TEST_DB_CLIENT.db().collection('jobs').insertOne(doc);
 
     try {
       // hit endpoint to get update lot size
@@ -604,7 +599,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`lotSize must be > 0`);
     } finally {
       // drop collection to maintain stateless tests
-      await CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection('jobs').drop();
     }
   });
 });
