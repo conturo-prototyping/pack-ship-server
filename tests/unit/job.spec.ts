@@ -9,9 +9,8 @@ require('../config'); // recommended way of loading root hooks
 const URL = '/jobs';
 
 describe('# JOB', () => {
-  afterEach(async function () {
-    await DropAllCollections();
-  });
+  beforeEach(async () => await DropAllCollections());
+
   it('Should find 1 inserted job.', async () => {
     // create job using mongodb driver
     const doc = {
