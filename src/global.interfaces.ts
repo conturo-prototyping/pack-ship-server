@@ -35,6 +35,12 @@ export interface IJob extends Document {
   // array of post processes to apply to job
   externalPostProcesses: string[];
 
+  // is this job released (i.e. are its lots visible in queues)
+  released: boolean;
+
+  // is this job on hold? (i.e. can't clock in to any of its lots)
+  onHold: boolean;
+
   // is this job canceled (i.e. no longer visible)
   canceled: boolean;
 

@@ -26,6 +26,8 @@ export const JobSchema = new Schema<IJob>({
     ref: COLLECTIONS.ROUTER,
   },
 
+  released: Boolean,
+  onHold: Boolean,
   canceled: Boolean,
 
   stdLotSize: Number,
