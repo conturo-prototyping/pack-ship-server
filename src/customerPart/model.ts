@@ -4,7 +4,7 @@
  */
 
 import { model, Schema } from 'mongoose';
-import { COLLECTIONS } from '../global.collectionNames';
+// import { COLLECTIONS } from '../global.collectionNames';
 import { ICustomerPart } from '../global.interfaces';
 
 export const CustomerPartSchema = new Schema<ICustomerPart>({
@@ -19,4 +19,4 @@ export const CustomerPartSchema = new Schema<ICustomerPart>({
 });
 
 // eslint-disable-next-line max-len
-export const CustomerPartModel = model<ICustomerPart>(COLLECTIONS.CUSTOMER_PART, CustomerPartSchema);
+export const CustomerPartModel = model<ICustomerPart>('customerPart', CustomerPartSchema, 'customerParts');
