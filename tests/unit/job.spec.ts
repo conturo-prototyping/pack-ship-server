@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { JobModel } from '../../src/job/model';
 import { MongoClient, ObjectId } from 'mongodb';
 import { DropAllCollections } from '../../src/router.debug';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
@@ -10,9 +9,6 @@ require('../config'); // recommended way of loading root hooks
 const URL = '/jobs';
 
 describe('# JOB', () => {
-  before(async function () {
-    await TEST_DB_CLIENT.connect().catch(console.error);
-  });
   afterEach(async function () {
     await DropAllCollections();
   });

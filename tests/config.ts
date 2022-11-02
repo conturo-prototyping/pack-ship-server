@@ -26,6 +26,8 @@ before(async () => {
   passportStub.login({ UserName: 'Frank the Tank' });
 
   APP = app;
+
+  await TEST_DB_CLIENT.connect().catch(console.error);
 });
 
 // TEAR DOWN
