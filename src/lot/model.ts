@@ -13,10 +13,10 @@ export const LotSchema = new Schema<ILot>({
     ref: COLLECTIONS.JOB,
   },
 
+  onHold: Boolean,
+  canceled: Boolean,
   quantity: Number,
-
   rev: String,
-
   specialRouter: {
     type: Schema.Types.ObjectId,
     ref: COLLECTIONS.ROUTER,

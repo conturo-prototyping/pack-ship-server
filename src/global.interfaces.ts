@@ -81,8 +81,14 @@ export interface ILot extends Document {
   // Reference to parent Job
   jobId: IJob['_id'];
 
+  // is this lot on hold? (overrides job.released)
+  onHold: boolean;
+
+  // is this lot canceled? (overrides job.released)
+  canceled: boolean;
+
   // quantity to be produced for this lot
-  quantity: Number;
+  quantity: number;
 
   // Revision of this lot (in case of entire quantity scrap)
   rev: String;
