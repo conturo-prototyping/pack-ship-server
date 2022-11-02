@@ -321,6 +321,7 @@ describe('# JOB', () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
     
+    // @ts-ignore
     await insertOneJob({ id, released: false, stdLotSize: 0 });
 
     try {
