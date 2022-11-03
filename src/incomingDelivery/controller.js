@@ -322,31 +322,35 @@ function setReceived(req, res) {
 
       // Compare to receivedQuantities. If the  qty is not fullfilled,
       // make an exact copy
-      result.forEach(async (ogShipment) => {
-        ogShipment.fromManifest.forEach(async (manifest) => {
-          const remaining = manifest.items.find((item) => {
-            const match = receivedQuantities.find((r) =>
-              r.item.toString().includes(item.item)
-            );
-            return match && Number(match.qty) < item.qty;
-          });
+      await Promise.all(
+        result.map(async (ogShipment) => {
+          await Promise.all(
+            ogShipment.fromManifest.map(async (manifest) => {
+              const remaining = manifest.items.find((item) => {
+                const match = receivedQuantities.find((r) =>
+                  r.item.toString().includes(item.item)
+                );
+                return match && Number(match.qty) < item.qty;
+              });
 
-          // We automatically create a new incomingDelivery with the exact same content as the original
-          // except _id, receivedOn, receivedBy, reqceivedQuantities, when the qty is not fullfilled
-          // the new incoming delivery.
-          if (remaining) {
-            const {
-              _id,
-              receivedOn,
-              receivedBy,
-              receivedQuantities,
-              ...remaining
-            } = incomingDelivery._doc;
-            const remainingIncDelivery = new IncomingDelivery(remaining);
-            await remainingIncDelivery.save();
-          }
-        });
-      });
+              // We automatically create a new incomingDelivery with the exact same content as the original
+              // except _id, receivedOn, receivedBy, reqceivedQuantities, when the qty is not fullfilled
+              // the new incoming delivery.
+              if (remaining) {
+                const {
+                  _id,
+                  receivedOn,
+                  receivedBy,
+                  receivedQuantities,
+                  ...remaining
+                } = incomingDelivery._doc;
+                const remainingIncDelivery = new IncomingDelivery(remaining);
+                await remainingIncDelivery.save();
+              }
+            })
+          );
+        })
+      );
 
       const data = { message: "success" };
       return { data };
