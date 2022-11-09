@@ -113,6 +113,7 @@ async function dropAllCollections() {
   const PackingSlip = require("./packingSlip/model");
   const Customer = require("./customer/model");
   const ShopQueue = require('./shopQ/shopQueue.model');
+  const IncomingDelivery = require('./incomingDelivery/model');
 
   const _dropCollection = async (model) => {
     try {
@@ -135,6 +136,7 @@ async function dropAllCollections() {
     await _dropCollection(Shipment),
     await _dropCollection(Customer),
     await _dropCollection(ShopQueue),
+    await _dropCollection(IncomingDelivery),
   ];
 
   if (ok.some((x) => !x)) return [new Error("Error dropping collections")];
