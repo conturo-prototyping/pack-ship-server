@@ -21,6 +21,10 @@ router.post("/undoReceive", (req, res, next) =>
 router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
+
+router.patch("/:deliveryId", (req, res, next) =>
+  checkId(res, next, IncomingDelivery, req.params.deliveryId)
+);
 router.patch("/:deliveryId", editOne);
 
 module.exports = {
@@ -51,7 +55,7 @@ function undoReceive(req, res) {
         ]);
       } catch (error) {
         LogError(error);
-        
+
         return HTTPError(
           `Unexpected error calling undoReceive with ${deliveryId}.`
         );
@@ -69,10 +73,32 @@ function undoReceive(req, res) {
 function editOne(req, res) {
   ExpressHandler(
     async () => {
-      return HTTPError("not implemented", 501);
+      const { _id, ...incomingDel } = res.locals.data;
+      const edited = req.body;
+      const editMadeBy = req.user._id;
+
+      try {
+        const incDelHist = new IncomingDeliveryHistory({
+          editMadeBy,
+          ...incomingDel,
+        });
+
+        const updated = {
+          ...incomingDel,
+          ...edited,
+        };
+        await Promise.all([
+          incDelHist.save(),
+          IncomingDelivery.updateOne({ _id: _id }, { $set: updated }),
+        ]);
+      } catch (error) {
+        LogError(error);
+
+        return HTTPError(`Unexpected error calling editOne with ${_id}.`);
+      }
     },
     res,
-    "editing delivery"
+    "editing deliveru"
   );
 }
 
