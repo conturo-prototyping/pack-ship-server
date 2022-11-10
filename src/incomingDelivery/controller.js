@@ -324,9 +324,10 @@ function getOne(req, res) {
   ExpressHandler(
     async () => {
       const { deliveryId } = req.params;
-      const incomingDelivery = await IncomingDelivery.findOne({
-        _id: deliveryId,
-      })
+      const incomingDelivery = await IncomingDelivery
+        .findOne({
+          _id: deliveryId,
+        })
         .populate({
           path: "sourceShipmentId",
           populate: {
@@ -368,7 +369,7 @@ function getOne(req, res) {
 
         // only send some data
         const { PartNumber, PartName, Revision, Quantity, batchNumber } = _item;
-        mItem.item = { PartNumber, PartName, Revision, Quantity, batchNumber };
+        mItem.item = { PartNumber, PartName, Revision, Quantity, batchNumber, _id: _item._id };
       }
 
       const data = { incomingDelivery };
