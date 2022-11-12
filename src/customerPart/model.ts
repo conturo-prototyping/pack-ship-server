@@ -1,13 +1,20 @@
 /**
- * Temporary schema to get rolling in development.
- * This is fairly representative of what the final schema will look like.
+ * CustomerPart is the basic building block for all quote line-items.
+ * Line items will each have a CustomerPart and a PartCostAnalysis
  */
 
-import { model, Schema } from 'mongoose';
-// import { COLLECTIONS } from '../global.collectionNames';
-import { ICustomerPart } from '../global.interfaces';
+import {
+  Document, model, Schema, Types,
+} from 'mongoose';
 
-export const CustomerPartSchema = new Schema<ICustomerPart>({
+export interface ICustomerPart extends Document {
+  customerId: Types.ObjectId;
+  partNumber: String;
+  partDescription: String;
+  partRev: String;
+}
+
+export const CustomerPartSchema = new Schema({
   customerId: {
     type: Schema.Types.ObjectId,
     ref: 'customers',

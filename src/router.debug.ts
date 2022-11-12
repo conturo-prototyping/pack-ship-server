@@ -80,8 +80,7 @@ async function randomizeRouters(_req: Request, res: Response) {
     }
 
     return res.sendStatus(200);
-  }
-  catch (e) {
+  } catch (e) {
     return res.status(500).send(e);
   }
 }

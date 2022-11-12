@@ -1,6 +1,23 @@
-import { model, Schema } from 'mongoose';
+/**
+ * RouteTemplates are a simple way to re-create routers from pre-built templates.
+ * Unlike actual routers, RouteTempltes encode live references to RouteSteps.
+ * When building a router from a template, we make copies of referenced RouteSteps,
+ * just as we would if building it from scratch.
+ */
+
+import {
+  model, Schema, Document, Types,
+} from 'mongoose';
 import { COLLECTIONS } from '../global.collectionNames';
-import { IRouteTemplate } from '../global.interfaces';
+
+export interface IRouteTemplate extends Document {
+  name: string;
+
+  steps: [{
+    id: Types.ObjectId;
+    details: string
+  }];
+}
 
 export const RouteTemplateSchema = new Schema<IRouteTemplate>({
   name: String,
