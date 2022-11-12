@@ -5,6 +5,8 @@ import { ExpressHandler, HTTPError } from '../utils';
 import { CustomerPartModel } from '../customerPart/model';
 
 const JobRouter = express.Router();
+export default JobRouter;
+
 JobRouter.get('/', getJobs);
 JobRouter.get('/planningReleased', getPlanningReleased);
 
@@ -204,5 +206,3 @@ async function setStdLotSize(req: express.Request, res: express.Response) {
     'job std lot',
   );
 }
-
-export default JobRouter;
