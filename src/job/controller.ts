@@ -62,20 +62,6 @@ async function getPlanningReleased(
     async () => {
       const { regexFilter } = req.query; // This has already been decoded by express
 
-      // Ensure it is a valid regex filter
-      if (regexFilter) {
-        try {
-          // NOTE(jarrilla): I actually have no clue what this warning means..
-          // Leaving it unresolved for now
-          new RegExp(String(regexFilter));
-        } catch (e) {
-          return HTTPError(
-            `${regexFilter} is not a valid regex expression`,
-            405,
-          );
-        }
-      }
-
       // Find the jobs
       const jobs = await JobModel.aggregate([
         {
