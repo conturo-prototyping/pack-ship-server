@@ -1,15 +1,14 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { MongoClient, ObjectId } from 'mongodb';
-import { DropAllCollections } from '../../src/router.debug';
+import { ObjectId } from 'mongodb';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
 
 require('../config'); // recommended way of loading root hooks
 
 const URL = '/jobs';
+const COLLECTION_NAME = 'jobs';
 
 describe('# JOB', () => {
-  beforeEach(async () => await DropAllCollections());
 
   it('Should find 1 inserted job.', async () => {
     // create job using mongodb driver
@@ -25,7 +24,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await TEST_DB_CLIENT.db().collection( 'jobs' ).insertOne(doc);
+    await TEST_DB_CLIENT.db().collection( COLLECTION_NAME ).insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/`);
@@ -77,7 +76,7 @@ describe('# JOB', () => {
     await ChaiRequest('post', `${URL}/hold`, {
       jobId,
     });
-    const actual = await TEST_DB_CLIENT.db().collection('jobs').findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
     expect(actual!.onHold).to.be.eq(true);
   });
 
@@ -154,7 +153,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Job ${jobId} is already on hold`);
     } finally {
       // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
 
@@ -170,12 +169,12 @@ describe('# JOB', () => {
       jobId,
     });
 
-    const actual = await TEST_DB_CLIENT.db().collection('jobs').findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
     expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
     expect(actual!.released, 'released should be true').to.be.eq(true);
 
     // drop collection to maintain stateless tests
-    await TEST_DB_CLIENT.db().collection('jobs').drop();
+    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
   });
 
   it('Should fail since the job is already canceled.', async () => {
@@ -194,7 +193,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Job ${jobId} has already been canceled`);
     } finally {
       // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
 
@@ -265,13 +264,13 @@ describe('# JOB', () => {
       lotSize: 12,
     });
 
-    const actual = await TEST_DB_CLIENT.db().collection('jobs').findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
 
     // check data
     expect(actual!.stdLotSize).to.be.eq(12);
 
     // drop collection to maintain stateless tests
-    await TEST_DB_CLIENT.db().collection('jobs').drop();
+    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
   });
 
   it('lot size needs to be included.', async () => {
@@ -291,7 +290,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Please provide a lotSize`);
     } finally {
       // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
 
@@ -313,7 +312,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`Job cannot be released.`);
     } finally {
       // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
 
@@ -335,7 +334,7 @@ describe('# JOB', () => {
       expect(err.text).to.be.eq(`lotSize must be > 0`);
     } finally {
       // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection('jobs').drop();
+      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
 });
@@ -385,5 +384,5 @@ async function insertOneJob({
   // @ts-ignore
   if (id) jobDoc._id = id;
 
-  await TEST_DB_CLIENT.db().collection('jobs').insertOne(jobDoc);
+  await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).insertOne(jobDoc);
 }
