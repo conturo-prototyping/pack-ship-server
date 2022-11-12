@@ -2,13 +2,12 @@
 /* eslint-disable no-console */
 import express, { Request, Response } from 'express';
 import { randomInt } from 'crypto';
-import { CustomerPartModel } from './customerPart/model';
-import { JobModel } from './job/model';
+import { CustomerPartModel, ICustomerPart } from './customerPart/model';
+import { IJob, JobModel } from './job/model';
 import { LotModel } from './lot/model';
 import { RouteStepModel } from './routeStep/model';
 import { RouteTemplateModel } from './routeTemplate/model';
-import { RouterModel } from './router/model';
-import { ICustomerPart, IJob, IRouter } from './global.interfaces';
+import { IRouter, RouterModel } from './router/model';
 
 const Customer = require('./customer/model');
 
