@@ -6,7 +6,7 @@
     "project": "./tsconfig.json"
   },
   "plugins": ["@typescript-eslint"],
-  "project": "pack-ship/server/tsconfig.json",
+  // "project": "pack-ship/server/tsconfig.json",
   "extends": ["airbnb-base", "airbnb-typescript/base"],
   // "include": ["src/**/*.js", "src/**/*.ts"],
   "rules": {
