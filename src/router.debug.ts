@@ -70,11 +70,11 @@ async function randomizeRouters(_req: Request, res: Response) {
 
     // randomly pick jobs / lots & assign routers
     for (const j of existingJobs.filter(() => Math.random() > 0.5)) {
-      j.router = createdRouters[randomInt(0, createdRouters.length)];
+      j.router = (createdRouters[randomInt(0, createdRouters.length)])._id;
       await j.save();
     }
     for (const l of existingLots.filter(() => Math.random() > 0.5)) {
-      l.specialRouter = createdRouters[randomInt(0, createdRouters.length)];
+      l.specialRouter = (createdRouters[randomInt(0, createdRouters.length)])._id;
       await l.save();
     }
 
