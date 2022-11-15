@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { ObjectId } from 'mongodb';
+import { RouterModel } from '../../src/router/model';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
 
 require('../config'); // recommended way of loading root hooks
@@ -9,7 +10,6 @@ const URL = '/jobs';
 const COLLECTION_NAME = 'jobs';
 
 describe('# JOB', () => {
-
   it('Should find 1 inserted job.', async () => {
     // create job using mongodb driver
     const doc = {
@@ -24,7 +24,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await TEST_DB_CLIENT.db().collection( COLLECTION_NAME ).insertOne(doc);
+    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/`);
@@ -43,7 +43,7 @@ describe('# JOB', () => {
     expect(job.stdLotSize).to.be.eq(1);
   });
 
-  it('Should find 1 released planning job.', async () => {    
+  it('Should find 1 released planning job.', async () => {
     await insertOnePart();
     await insertOneJob({});
 
@@ -76,7 +76,9 @@ describe('# JOB', () => {
     await ChaiRequest('post', `${URL}/hold`, {
       jobId,
     });
-    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
     expect(actual!.onHold).to.be.eq(true);
   });
 
@@ -140,7 +142,7 @@ describe('# JOB', () => {
   it('Should fail since the job is onHold already.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, onHold: true });
 
@@ -159,19 +161,38 @@ describe('# JOB', () => {
 
   it('Should release job from on hold.', async () => {
     const jobId = '111111111111111111111111';
-    const id = new ObjectId(jobId);
+    const jobIdObj = new ObjectId(jobId);
+    const routerId = '333333333333333333333333';
+    const routerIdObj = new ObjectId(routerId);
 
-    // @ts-ignore
-    await insertOneJob({ id, onHold: true, released: false });
+    await insertOneRoute(routerIdObj);
+    await insertOneJob({
+      // @ts-ignore
+      id: jobIdObj,
+      onHold: true,
+      released: false,
+      // @ts-ignore
+      router: routerIdObj,
+    });
 
     // hit endpoint to get the job and check if onHold is true
-    const res = await ChaiRequest('post', `${URL}/release`, {
+    await ChaiRequest('post', `${URL}/release`, {
       jobId,
     });
 
-    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
-    expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
-    expect(actual!.released, 'released should be true').to.be.eq(true);
+    const actualJob = await TEST_DB_CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: jobIdObj });
+    expect(actualJob!.onHold, 'onhold should be false').to.be.eq(false);
+    expect(actualJob!.released, 'released should be true').to.be.eq(true);
+
+    // Make sure route path stepCodes are present and incremented
+    const actualRoute = await TEST_DB_CLIENT.db()
+      .collection(RouterModel.collection.name)
+      .findOne({ _id: routerIdObj });
+
+    expect(actualRoute!.path[0].stepCode, 'first is 100').to.be.eq(100);
+    expect(actualRoute!.path[1].stepCode, 'second is 200').to.be.eq(200);
 
     // drop collection to maintain stateless tests
     await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
@@ -196,7 +217,6 @@ describe('# JOB', () => {
       await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
-
 
   it('Should find released job(s) matching orderNumber regex', async () => {
     await insertOneJob({});
@@ -232,7 +252,7 @@ describe('# JOB', () => {
     expect(job.canceled).to.be.eq(false);
     expect(job.customerParts[0].partDescription).to.be.eq('dummy');
   });
-  
+
   it('Should find released job(s) matching partNumber regex', async () => {
     await insertOnePart();
     await insertOneJob({});
@@ -264,7 +284,9 @@ describe('# JOB', () => {
       lotSize: 12,
     });
 
-    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
 
     // check data
     expect(actual!.stdLotSize).to.be.eq(12);
@@ -276,7 +298,7 @@ describe('# JOB', () => {
   it('lot size needs to be included.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, released: false, stdLotSize: 0 });
 
@@ -297,7 +319,7 @@ describe('# JOB', () => {
   it('lot size cannot be edited for released job.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, stdLotSize: 0 });
 
@@ -319,7 +341,7 @@ describe('# JOB', () => {
   it('lot size must be greater than 0.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, released: false, stdLotSize: 0 });
 
@@ -354,6 +376,16 @@ async function insertOnePart() {
   await TEST_DB_CLIENT.db().collection('customerParts').insertOne(partDoc);
 }
 
+async function insertOneRoute(id) {
+  const routeDoc = {
+    _id: id,
+    path: [{ step: 'step1' }, { step: 'step2' }],
+  };
+  await TEST_DB_CLIENT.db()
+    .collection(RouterModel.collection.name)
+    .insertOne(routeDoc);
+}
+
 /**
  * Create a test job document with given criteria
  */
@@ -363,6 +395,7 @@ async function insertOneJob({
   onHold = false,
   canceled = false,
   stdLotSize = 1,
+  router = undefined,
 }) {
   const jobDoc = {
     partId: DUMMY_PART_ID,
@@ -379,6 +412,7 @@ async function insertOneJob({
     onHold,
     canceled,
     stdLotSize,
+    router,
   };
 
   // @ts-ignore
