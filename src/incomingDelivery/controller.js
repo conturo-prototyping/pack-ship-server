@@ -352,9 +352,15 @@ function getOne(req, res) {
       const { deliveryId } = req.params;
       if (!deliveryId) return HTTPError("DeliveryId is required.", 400);
 
-      const incomingDelivery = await IncomingDelivery
-        .findOne({
-          _id: deliveryId,
+      const incomingDelivery = await IncomingDelivery.findOne({
+        _id: deliveryId,
+      })
+        .populate({
+          path: "sourceShipmentId",
+          populate: {
+            path: "manifest",
+            model: "packingSlip",
+          },
         })
         .lean()
         .exec();
@@ -383,7 +389,7 @@ function getOne(req, res) {
         const itemId = String(el.item);
         const itemMatch = workOrder.Items.find( x => String(x._id) === itemId );
 
-        if (!_item) return HTTPError(`Item not found on workOrder ${orderNumber}.`);
+        if (!itemMatch) return HTTPError(`Item not found on workOrder ${orderNumber}.`);
 
         const { PartNumber, PartName, Revision, Quantity, batchNumber } = itemMatch;
         el.item = { PartNumber, PartName, Revision, Quantity, batchNumber, _id: itemId };
