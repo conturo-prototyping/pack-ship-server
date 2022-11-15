@@ -324,6 +324,8 @@ function getOne(req, res) {
   ExpressHandler(
     async () => {
       const { deliveryId } = req.params;
+      if (!deliveryId) return HTTPError("DeliveryId is required.", 400);
+
       const incomingDelivery = await IncomingDelivery.findOne({
         _id: deliveryId,
       })
@@ -337,15 +339,11 @@ function getOne(req, res) {
         .lean()
         .exec();
 
-      if (!incomingDelivery) return HTTPError("delivery not found");
+      if (!incomingDelivery) return HTTPError("Incoming delivery not found.", 404);
 
       const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
 
       // mutate data as needed
-      const newManifest = incomingDelivery.sourceShipmentId.manifest
-        .map((ps) => ps.items)
-        .flat();
-      incomingDelivery.sourceShipmentId.manifest = newManifest;
       if (!incomingDelivery.createdBy) incomingDelivery.createdBy = "AUTO";
       incomingDelivery.source = "VENDOR";
 
@@ -355,20 +353,20 @@ function getOne(req, res) {
         .select("Items")
         .exec();
 
-      if (!workOrder) return HTTPError("workOrder not found");
+      if (!workOrder) return HTTPError("Work Order not found.", 404);
       if (workOrder.Items.length === 0)
-        return HTTPError("no workOrder items found on workOrder");
+        return HTTPError("No Work Order Items found on Work Order.", 404);
 
-      // update manifest[].item to item info (can reduce what info is set to reduce the amount of data being sent)
-      for (const mItem of incomingDelivery.sourceShipmentId.manifest) {
-        const itemId = mItem.item.toString();
-        const _item = workOrder.Items.find((x) => x._id.toString() === itemId);
-        if (!_item)
-          return HTTPError(`item not found on workOrder ${orderNumber}`);
+      // set incomingDelivery.receivedQuantities[].item to item info
+      // (can reduce what info is set to reduce the amount of data being sent)
+      for (const el of incomingDelivery.receivedQuantities) {
+        const itemId = String(el.item);
+        const itemMatch = workOrder.Items.find( x => String(x._id) === itemId );
 
-        // only send some data
-        const { PartNumber, PartName, Revision, Quantity, batchNumber } = _item;
-        mItem.item = { PartNumber, PartName, Revision, Quantity, batchNumber };
+        if (!itemMatch) return HTTPError(`Item not found on workOrder ${orderNumber}.`);
+
+        const { PartNumber, PartName, Revision, Quantity, batchNumber } = itemMatch;
+        el.item = { PartNumber, PartName, Revision, Quantity, batchNumber, _id: itemId };
       }
 
       const data = { incomingDelivery };
