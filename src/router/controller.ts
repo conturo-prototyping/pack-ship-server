@@ -1,7 +1,7 @@
 import express from 'express';
 import { ExpressHandler, HTTPError } from '../utils';
 import { RouterModel } from './model';
-import { RouterTemplate } from '../routeTemplate/model';
+import { RouteTemplateModel } from '../routeTemplate/model';
 
 const router = express.Router();
 export default router;
@@ -30,15 +30,22 @@ function importRouter(req: express.Request, res: express.Response) {
         return HTTPError('Router not found', 404);
       }
 
-      if (routerObj?.released) {
-        return HTTPError('Router is already released', 405);
-      }
+      // if (routerObj?.released) {
+      //   return HTTPError('Router is already released', 405);
+      // }
 
-      const routerTemplate = await RouterTemplate.findById(routerTemplateId);
+      const routerTemplate = await RouteTemplateModel.findById(
+        routerTemplateId,
+      );
 
       if (!routerTemplate) {
         return HTTPError('Router Template not found', 404);
       }
+
+      await RouterModel.updateOne(
+        { _id: routerObj._id },
+        { $set: { path: [...routerObj.path] } },
+      );
 
       return {};
     },
