@@ -3,11 +3,10 @@
   "parserOptions": {
     "ecmaVersion": 12,
     "sourceType": "module",
-    "project": "./tsconfig.json"
+    "project": "./tsconfig.json",
   },
   "plugins": ["@typescript-eslint"],
   "extends": ["airbnb-base", "airbnb-typescript/base"],
-  // "include": ["src/**/*.js", "src/**/*.ts"],
   "rules": {
     "@typescript-eslint/no-use-before-define": "off",
     "no-underscore-dangle": "off",
@@ -16,7 +15,8 @@
     "prefer-const": ["error", {
       "destructuring": "all"
     }],
-    "linebreak-style": "off"
+    "linebreak-style": "off",
+    "brace-style": ["error", "1tbs", { "allowSingleLine": true }]
   },
   "env": {
     "es2021": true,

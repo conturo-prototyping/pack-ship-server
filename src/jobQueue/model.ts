@@ -1,14 +1,15 @@
 /**
- * jobQueue.model.ts
  * Job Queues are work queues that deal with an entire job as opposed to processing each lot
  *  individually.
  *
  * This is particularly helpful for stages such as "Planning" or "Shipping", where it is
- *  more useful to process the entire job once all lots are present, rather than lot per lot.
+ *  more useful to process the entire job once all lots are present, rather than lot by lot.
  */
 
-import { Document, model, Schema } from 'mongoose';
-import { JobModel, IJob } from '../job/model';
+import {
+  model, Schema, Document, Types,
+} from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
 
 export interface IJobQueue extends Document {
   // The name of this queue; e.g. "Planning"
@@ -18,7 +19,7 @@ export interface IJobQueue extends Document {
   description: string;
 
   // Jobs currently in this queue
-  jobsInQueue: IJob['_id'][];
+  jobsInQueue: Types.ObjectId[];
 }
 
 export const JobQueueSchema = new Schema<IJobQueue>({
@@ -26,8 +27,8 @@ export const JobQueueSchema = new Schema<IJobQueue>({
   description: String,
   jobsInQueue: [{
     type: Schema.Types.ObjectId,
-    ref: JobModel.collection.name,
+    ref: COLLECTIONS.JOB,
   }],
 });
 
-export const JobQueueModel = model<IJobQueue>('jobQueue', JobQueueSchema, 'jobQueues');
+export const JobQueueModel = model<IJobQueue>(COLLECTIONS.JOB_QUEUE, JobQueueSchema);

@@ -2,6 +2,7 @@ import { Express } from 'express';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import { DropAllCollections } from '../src/router.debug';
+import { MongoClient } from 'mongodb';
 
 require('dotenv').config();
 
@@ -25,11 +26,22 @@ before(async () => {
   passportStub.login({ UserName: 'Frank the Tank' });
 
   APP = app;
+
+  await TEST_DB_CLIENT.connect().catch(console.error);
 });
 
 // TEAR DOWN
 // Clear out all TEST DB collections
-after(async () => DropAllCollections());
+after(async () => {
+  await TEST_DB_CLIENT.db().dropDatabase();
+  await TEST_DB_CLIENT.close();
+});
+
+// Local tearn down
+beforeEach(async () => await DropAllCollections());
+
+// Use this db client as needed in spec files
+export const TEST_DB_CLIENT = new MongoClient(process.env.MONGO_DB_URI!);
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------

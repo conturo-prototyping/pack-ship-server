@@ -1,39 +1,44 @@
 /**
- * Temporary schema to get rolling in development.
- * This is fairly representative of what the final schema will look like.
+ * Lots essentially define a bunch of "parts" that move around a site together.
  */
 
-import { Document, model, Schema } from 'mongoose';
-import { IJob } from '../job/model';
-import { IRouterElement } from '../router/model';
+import { model, Schema, Document, Types } from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
 
 export interface ILot extends Document {
-  jobId: IJob['_id'];
+  // Reference to parent Job
+  jobId: Types.ObjectId;
 
-  quantity: Number;
+  // is this lot on hold? (overrides job.released)
+  onHold: boolean;
 
+  // is this lot canceled? (overrides job.released)
+  canceled: boolean;
+
+  // quantity to be produced for this lot
+  quantity: number;
+
+  // Revision of this lot (in case of entire quantity scrap)
   rev: String;
 
-  specialRouter: IRouterElement[];
+  specialRouter?: Types.ObjectId;
 }
 
 export const LotSchema = new Schema<ILot>({
   jobId: {
     type: Schema.Types.ObjectId,
-    ref: 'jobs',
+    ref: COLLECTIONS.JOB,
   },
 
+  onHold: Boolean,
+  canceled: Boolean,
   quantity: Number,
-
   rev: String,
 
-  specialRouter: [
-    {
-      step: Object, // deep copy of RouterStep
-      stepCode: Number,
-      stepDetails: String,
-    },
-  ],
+  specialRouter: {
+    type: Schema.Types.ObjectId,
+    ref: COLLECTIONS.ROUTER,
+  },
 });
 
-export const LotModel = model<ILot>('lot', LotSchema);
+export const LotModel = model<ILot>(COLLECTIONS.LOT, LotSchema);
