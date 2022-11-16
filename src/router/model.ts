@@ -1,17 +1,16 @@
 /**
- * router.model.ts
- *
  * Routers define the path a job and its lots (or a specific lot) will take once
  *  a bid has been won.
  */
 
-import { Document, model, Schema } from 'mongoose';
+import { model, Schema, Document } from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
 import { IRouteStep } from '../routeStep/model';
 
 export interface IRouterElement {
   step: IRouteStep;
-  stepCode: number;
-  stepDetails: string;
+  stepCode?: number;
+  stepDetails?: string;
 }
 
 export interface IRouter extends Document {
@@ -26,4 +25,4 @@ export const RouterSchema = new Schema<IRouter>({
   }],
 });
 
-export const RouterModel = model<IRouter>('router', RouterSchema);
+export const RouterModel = model<IRouter>(COLLECTIONS.ROUTER, RouterSchema);

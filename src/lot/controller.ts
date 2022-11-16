@@ -1,3 +1,4 @@
 import { Router } from 'express';
 
-export const LotRouter = Router();
+const LotRouter = Router();
+export default LotRouter;

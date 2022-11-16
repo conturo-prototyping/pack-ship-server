@@ -2,6 +2,7 @@ import { Express } from 'express';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import { DropAllCollections } from '../src/router.debug';
+import { MongoClient } from 'mongodb';
 
 require('dotenv').config();
 
@@ -25,11 +26,22 @@ before(async () => {
   passportStub.login({ UserName: 'Frank the Tank' });
 
   APP = app;
+
+  await TEST_DB_CLIENT.connect().catch(console.error);
 });
 
 // TEAR DOWN
 // Clear out all TEST DB collections
-after(async () => DropAllCollections());
+after(async () => {
+  await TEST_DB_CLIENT.db().dropDatabase();
+  await TEST_DB_CLIENT.close();
+});
+
+// Local tearn down
+beforeEach(async () => await DropAllCollections());
+
+// Use this db client as needed in spec files
+export const TEST_DB_CLIENT = new MongoClient(process.env.MONGO_DB_URI!);
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
@@ -43,12 +55,10 @@ export async function ChaiRequest(
   payload: Object = {},
   throwError: Boolean = true,
 ) {
-  const res = await chai
-    .request(APP)[method](url)
-    .send(payload);
+  const res = await chai.request(APP)[method](url).send(payload);
 
   if (throwError && res.status !== 200 && res.status !== 201) {
-    throw res.data;
+    throw res.error;
   }
 
   return res;
@@ -67,10 +77,10 @@ export function SetTeardowns(...teardownCallbacks: Function[]) {
 }
 
 /**
-* Useful function to do a hard reset between test suites.
-* If there are special teardowns that need to happen (e.g. change update critical collections)
-*  make sure to use SetTeardowns() first.
-*/
+ * Useful function to do a hard reset between test suites.
+ * If there are special teardowns that need to happen (e.g. change update critical collections)
+ *  make sure to use SetTeardowns() first.
+ */
 export async function LocalReset() {
   await DropAllCollections();
   await Promise.all(TEARDOWN_CALLBACKS.map((x) => x()));

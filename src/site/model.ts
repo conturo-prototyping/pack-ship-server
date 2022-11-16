@@ -1,15 +1,14 @@
 /**
- * site.model.ts
  * Sites are the main hierarchical units of ShopQ.
  * Each site has its own staff, work queues (job & lot), timezone, location, and name.
  *
  * A centralized sales module feeds work to each site.
  */
 
-import { Document, model, Schema } from 'mongoose';
-import { IUser, UserModel } from '../user/model';
-import { ILotQueue } from '../lotQueue/model';
-import { IJobQueue } from '../jobQueue/model';
+import {
+  model, Schema, Document, Types,
+} from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
 
 export interface ISite extends Document {
   // The name of the site; e.g. HQ
@@ -22,13 +21,13 @@ export interface ISite extends Document {
   timezone: string;
 
   // Array of staff members employed at the site.
-  staff: IUser['_id'][];
+  staff: Types.ObjectId;
 
   // Array of Job Queues.
-  jobQueues: IJobQueue['_id'][];
+  jobQueues: Types.ObjectId[];
 
   // Array of Lot Queues.
-  lotQueues: ILotQueue['_id'][];
+  lotQueues: Types.ObjectId[];
 }
 
 export const SiteSchema = new Schema<ISite>({
@@ -37,8 +36,8 @@ export const SiteSchema = new Schema<ISite>({
   timezone: String,
   staff: [{
     type: Schema.Types.ObjectId,
-    ref: UserModel.collection.name,
+    ref: COLLECTIONS.USER,
   }],
 });
 
-export const SiteModel = model<ISite>('site', SiteSchema);
+export const SiteModel = model<ISite>(COLLECTIONS.SITE, SiteSchema);
