@@ -2,7 +2,9 @@
  * Lots essentially define a bunch of "parts" that move around a site together.
  */
 
-import { model, Schema, Document, Types } from 'mongoose';
+import {
+  model, Schema, Document, Types,
+} from 'mongoose';
 import { COLLECTIONS } from '../global.collectionNames';
 
 export interface ILot extends Document {

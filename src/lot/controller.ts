@@ -78,7 +78,7 @@ async function addRouteStep(req: express.Request, res: express.Response) {
       const { insertAfterIndex } = req.body;
       if (insertAfterIndex === undefined || insertAfterIndex < 0) {
         res.status(405).send('insertInvalidIndex missing or < 0');
-        return;
+        return {};
       }
 
       // Check if router exists
@@ -102,29 +102,29 @@ async function addRouteStep(req: express.Request, res: express.Response) {
       let newStepCode = 0;
       if (job.released) {
         if (specialRouter.path.length === 0) {
+          // insert at the beginning is path is empty
           newStepCode = STEP_CODE_INCREMENT;
         } else if (
-          0 <= insertAfterIndex &&
-          insertAfterIndex < specialRouter.path.length - 1
+          insertAfterIndex >= 0
+          && insertAfterIndex < specialRouter.path.length - 1
         ) {
           // We are inserting inbetween
           newStepCode = Math.floor(
-            ((specialRouter.path[insertAfterIndex]?.stepCode ?? 0) +
-              (specialRouter.path[insertAfterIndex + 1]?.stepCode ?? 0)) /
-              2,
+            ((specialRouter.path[insertAfterIndex]?.stepCode ?? 0)
+              + (specialRouter.path[insertAfterIndex + 1]?.stepCode ?? 0))
+              / 2,
           );
         } else if (specialRouter.path.length - 1 === insertAfterIndex) {
           // We are inserting at the end
-          newStepCode =
-            (specialRouter.path[insertAfterIndex]?.stepCode ?? 0) +
-            STEP_CODE_INCREMENT;
+          newStepCode = (specialRouter.path[insertAfterIndex]?.stepCode ?? 0)
+            + STEP_CODE_INCREMENT;
         } else if (specialRouter.path.length <= insertAfterIndex) {
           res
             .status(405)
             .send(
               `insertInvalidIndex invalid for a lot router with path length of ${specialRouter.path.length}`,
             );
-          return;
+          return {};
         }
       }
 
@@ -154,7 +154,7 @@ async function patchStep(req: express.Request, res: express.Response) {
       const { lot, specialRouter } = res.locals;
       const { stepDetails, stepId } = req.body;
       if (!stepDetails) {
-        return HTTPError(`stepDetails is empty.`, 404);
+        return HTTPError('stepDetails is empty.', 404);
       }
       try {
         // Update the step via stepid within the path

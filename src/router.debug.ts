@@ -33,14 +33,16 @@ async function randomizeRouters(_req: Request, res: Response) {
     const existingJobs = await JobModel.find();
     const existingLots = await LotModel.find();
 
-    if (!existingJobs.length)
+    if (!existingJobs.length) {
       return res
         .status(404)
         .send('No jobs found -- use /reset to create random job data');
-    if (!existingLots.length)
+    }
+    if (!existingLots.length) {
       return res
         .status(404)
         .send('No lots found -- use /reset to create lot data.');
+    }
 
     // Create the basic route steps
     const defaultRouteSteps = [
