@@ -208,6 +208,7 @@ export async function DropAllCollections() {
     await dropCollection(LotModel),
     await dropCollection(RouteStepModel),
     await dropCollection(RouteTemplateModel),
+    await dropCollection(RouterModel),
   ];
 
   if (ok.some((x) => !x)) return [new Error('Error dropping collections')];

@@ -48,14 +48,16 @@ function importRouter(req: express.Request, res: express.Response) {
 
       const newSteps: any[] = [];
 
-      routerTemplate.steps.forEach(async (e) => {
-        const routeStep = await RouteStepModel.findById(e.id).lean().exec();
+      await Promise.all(
+        routerTemplate.steps.map(async (e) => {
+          const routeStep = await RouteStepModel.findById(e.id).lean().exec();
 
-        newSteps.push({
-          step: { name: routeStep?.name, category: routeStep?.category },
-          stepDetails: e.details,
-        });
-      });
+          newSteps.push({
+            step: { name: routeStep?.name, category: routeStep?.category },
+            stepDetails: e.details,
+          });
+        }),
+      );
 
       await RouterModel.updateOne(
         { _id: routerObj._id },
@@ -65,6 +67,6 @@ function importRouter(req: express.Request, res: express.Response) {
       return {};
     },
     res,
-    'deleting route step',
+    'importing router',
   );
 }
