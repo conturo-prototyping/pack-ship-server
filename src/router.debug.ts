@@ -33,8 +33,14 @@ async function randomizeRouters(_req: Request, res: Response) {
     const existingJobs = await JobModel.find();
     const existingLots = await LotModel.find();
 
-    if (!existingJobs.length) return res.status(404).send('No jobs found -- use /reset to create random job data');
-    if (!existingLots.length) return res.status(404).send('No lots found -- use /reset to create lot data.');
+    if (!existingJobs.length)
+      return res
+        .status(404)
+        .send('No jobs found -- use /reset to create random job data');
+    if (!existingLots.length)
+      return res
+        .status(404)
+        .send('No lots found -- use /reset to create lot data.');
 
     // Create the basic route steps
     const defaultRouteSteps = [
@@ -54,7 +60,9 @@ async function randomizeRouters(_req: Request, res: Response) {
       const path: any[] = [];
       for (let j = 0; j < randomInt(5); j++) {
         const newStep = {
-          step: { ...defaultRouteSteps[randomInt(0, defaultRouteSteps.length)] },
+          step: {
+            ...defaultRouteSteps[randomInt(0, defaultRouteSteps.length)],
+          },
         };
 
         path.push(newStep);
@@ -70,11 +78,11 @@ async function randomizeRouters(_req: Request, res: Response) {
 
     // randomly pick jobs / lots & assign routers
     for (const j of existingJobs.filter(() => Math.random() > 0.5)) {
-      j.router = (createdRouters[randomInt(0, createdRouters.length)])._id;
+      j.router = createdRouters[randomInt(0, createdRouters.length)]._id;
       await j.save();
     }
     for (const l of existingLots.filter(() => Math.random() > 0.5)) {
-      l.specialRouter = (createdRouters[randomInt(0, createdRouters.length)])._id;
+      l.specialRouter = createdRouters[randomInt(0, createdRouters.length)]._id;
       await l.save();
     }
 
@@ -208,6 +216,7 @@ export async function DropAllCollections() {
     await dropCollection(LotModel),
     await dropCollection(RouteStepModel),
     await dropCollection(RouteTemplateModel),
+    await dropCollection(RouterModel),
   ];
 
   if (ok.some((x) => !x)) return [new Error('Error dropping collections')];

@@ -1,6 +1,7 @@
 import express, { NextFunction } from 'express';
 import { ObjectId } from 'mongodb';
 import { Model } from 'mongoose';
+import { IRouter } from '../router/model';
 import { IRouteStep } from '../routeStep/model';
 import { ILot } from './model';
 
@@ -93,7 +94,7 @@ export async function verifyStepIdInLot(
   req: express.Request,
   res: express.Response,
   next: NextFunction,
-  model: Model<ILot, {}, {}, {}, any>,
+  model: Model<IRouter, {}, {}, {}, any>,
 ) {
   const { stepId, lotId } = req.body;
   if (!stepId) {
@@ -104,21 +105,27 @@ export async function verifyStepIdInLot(
     res.status(404).send(`Router Step ${stepId} not found`);
   } else {
     // Find the step with stepId in a specialRouter in a lot with lotId
-    const stepOid = new ObjectId(stepId);
-    const lotpOid = new ObjectId(lotId);
+    const specialRouterOId = res.locals.lot?.specialRouter;
+    if (!specialRouterOId) {
+      res.status(404).send(`specialRouter doesnt exist for lotId: ${lotId}.`);
+    }
 
-    const step = await model.find({
-      'specialRouter.step._id': stepOid,
-      _id: lotpOid,
+    const stepOid = new ObjectId(stepId);
+
+    // Ensure the router has the specified step id
+    const specialRouter = await model.findOne({
+      'path.step._id': stepOid,
+      _id: specialRouterOId._id,
     });
 
-    // Check if the step exists
-    if (step.length === 0) {
+    if (!specialRouter) {
       res
         .status(404)
-        .send(`Router Step ${stepId} not found in any lot specialRouters`);
+        .send(
+          `Router Step ${stepId} not found in any lot specialRouters with lot id ${lotId}`,
+        );
     } else {
-      res.locals.step = step;
+      res.locals.specialRouter = specialRouter;
       next();
     }
   }

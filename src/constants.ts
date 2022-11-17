@@ -1,0 +1,2 @@
+const STEP_CODE_INCREMENT = 100;
+export default STEP_CODE_INCREMENT;
