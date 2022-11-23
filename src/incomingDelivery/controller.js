@@ -5,6 +5,7 @@ const ObjectId = require("mongodb").ObjectId;
 const IncomingDelivery = require("./model");
 const IncomingDeliveryHistory = require("./model.history");
 const PackingSlip = require("../packingSlip/model");
+const Shipments = require("../shipment/model");
 const WorkOrder = require("../workOrder/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
@@ -304,7 +305,7 @@ function setReceived(req, res) {
       await incomingDelivery.save();
 
       // Joing to packingSlips collection to find qty per item
-      const result = await Shipment.aggregate([
+      const ogShipment = await Shipment.aggregate([
         {
           $lookup: {
             from: PackingSlip.collection.collectionName,
@@ -323,32 +324,37 @@ function setReceived(req, res) {
       // Compare to receivedQuantities. If the  qty is not fullfilled,
       // make an exact copy
       await Promise.all(
-        result.map(async (ogShipment) => {
-          await Promise.all(
-            ogShipment.fromManifest.map(async (manifest) => {
-              const remaining = manifest.items.find((item) => {
-                const match = receivedQuantities.find((r) =>
-                  r.item.toString().includes(item.item)
-                );
-                return match && Number(match.qty) < item.qty;
-              });
+        ogShipment[0].fromManifest.map(async (manifest) => {
+          const remaining = manifest.items.find((item) => {
+            const match = receivedQuantities.find((r) =>
+              r.item.toString().includes(item.item)
+            );
+            return match && Number(match.qty) < item.qty;
+          });
 
-              // We automatically create a new incomingDelivery with the exact same content as the original
-              // except _id, receivedOn, receivedBy, reqceivedQuantities, when the qty is not fullfilled
-              // the new incoming delivery.
-              if (remaining) {
-                const {
-                  _id,
-                  receivedOn,
-                  receivedBy,
-                  receivedQuantities,
-                  ...remaining
-                } = incomingDelivery._doc;
-                const remainingIncDelivery = new IncomingDelivery(remaining);
-                await remainingIncDelivery.save();
-              }
-            })
-          );
+          const shipmentCt = await IncomingDelivery.countDocuments({
+            sourceShipmentId: incomingDelivery.sourceShipmentId,
+          });
+
+          const newLabel = `${incomingDelivery.label}${shipmentCt + 1}`;
+
+          // We automatically create a new incomingDelivery with the exact same content as the original
+          // except _id, receivedOn, receivedBy, and reqceivedQuantities, when the qty is not fullfilled by
+          // the new incoming delivery.
+          if (remaining) {
+            const {
+              _id,
+              receivedOn,
+              receivedBy,
+              receivedQuantities,
+              ...remaining
+            } = incomingDelivery._doc;
+            const remainingIncDelivery = new IncomingDelivery({
+              ...remaining,
+              label: newLabel,
+            });
+            remainingIncDelivery.save();
+          }
         })
       );
 
