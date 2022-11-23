@@ -4,6 +4,8 @@ const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const ObjectId = require("mongodb").ObjectId;
 const IncomingDelivery = require("./model");
 const IncomingDeliveryHistory = require("./model.history");
+const PackingSlip = require("../packingSlip/model");
+const Shipments = require("../shipment/model");
 const WorkOrder = require("../workOrder/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
@@ -292,16 +294,70 @@ function setReceived(req, res) {
     async () => {
       const { _id, receivedQuantities } = req.body;
       const userId = req.user._id;
-
       const incomingDelivery = await IncomingDelivery.findOne({ _id });
+
       if (incomingDelivery.receivedOn)
         return HTTPError("delivery already received");
 
       incomingDelivery.receivedOn = new Date();
       incomingDelivery.receivedBy = userId;
       incomingDelivery.receivedQuantities = receivedQuantities;
-
       await incomingDelivery.save();
+
+      // Joing to packingSlips collection to find qty per item
+      const ogShipment = await Shipment.aggregate([
+        {
+          $lookup: {
+            from: PackingSlip.collection.collectionName,
+            localField: "manifest",
+            foreignField: "_id",
+            as: "fromManifest",
+          },
+        },
+        {
+          $match: {
+            _id: incomingDelivery.sourceShipmentId,
+          },
+        },
+      ]);
+
+      // Compare to receivedQuantities. If the  qty is not fullfilled,
+      // make an exact copy
+      await Promise.all(
+        ogShipment[0].fromManifest.map(async (manifest) => {
+          const remaining = manifest.items.find((item) => {
+            const match = receivedQuantities.find((r) =>
+              r.item.toString().includes(item.item)
+            );
+            return match && Number(match.qty) < item.qty;
+          });
+
+          const shipmentCt = await IncomingDelivery.countDocuments({
+            sourceShipmentId: incomingDelivery.sourceShipmentId,
+          });
+
+          const newLabel = `${incomingDelivery.label}${shipmentCt + 1}`;
+
+          // We automatically create a new incomingDelivery with the exact same content as the original
+          // except _id, receivedOn, receivedBy, and reqceivedQuantities, when the qty is not fullfilled by
+          // the new incoming delivery.
+          if (remaining) {
+            const {
+              _id,
+              receivedOn,
+              receivedBy,
+              receivedQuantities,
+              ...remaining
+            } = incomingDelivery._doc;
+            const remainingIncDelivery = new IncomingDelivery({
+              ...remaining,
+              label: newLabel,
+            });
+            remainingIncDelivery.save();
+          }
+        })
+      );
+
       const data = { message: "success" };
       return { data };
     },
