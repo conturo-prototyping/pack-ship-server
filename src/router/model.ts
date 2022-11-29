@@ -11,6 +11,7 @@ export interface IRouterElement {
   step: IRouteStep;
   stepCode?: number;
   stepDetails?: string;
+  isRemoved?: boolean;
 }
 
 export interface IRouter extends Document {
@@ -18,11 +19,14 @@ export interface IRouter extends Document {
 }
 
 export const RouterSchema = new Schema<IRouter>({
-  path: [{
-    step: Object,
-    stepCode: Number,
-    stepDetails: String,
-  }],
+  path: [
+    {
+      step: Object,
+      stepCode: Number,
+      stepDetails: String,
+      isRemoved: Boolean,
+    },
+  ],
 });
 
 export const RouterModel = model<IRouter>(COLLECTIONS.ROUTER, RouterSchema);

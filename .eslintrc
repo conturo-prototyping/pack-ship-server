@@ -16,6 +16,7 @@
       "destructuring": "all"
     }],
     "linebreak-style": "off",
+    "operator-linebreak": 0,
     "brace-style": ["error", "1tbs", { "allowSingleLine": true }]
   },
   "env": {

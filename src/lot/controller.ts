@@ -36,10 +36,20 @@ LotRouter.put(['/step'], async (req, res, next) => {
 LotRouter.put(['/step'], async (req, res, next) => {
   verifyStepId(req, res, next, RouteStepModel);
 });
+LotRouter.delete(['/step'], async (req, res, next) => {
+  verifyLotId(req, res, next, LotModel);
+});
+LotRouter.delete(['/step'], async (req, res, next) => {
+  verifyStepId(req, res, next, RouteStepModel);
+});
+LotRouter.delete(['/step'], async (req, res, next) => {
+  verifyStepIdInLot(req, res, next, RouterModel);
+});
 
 LotRouter.post('/scrap', scrapLot);
 LotRouter.patch('/step', patchStep);
 LotRouter.put('/step', addRouteStep);
+LotRouter.delete('/step', deleteRouteStep);
 
 async function scrapLot(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -105,19 +115,20 @@ async function addRouteStep(req: express.Request, res: express.Response) {
           // insert at the beginning is path is empty
           newStepCode = STEP_CODE_INCREMENT;
         } else if (
-          insertAfterIndex >= 0
-          && insertAfterIndex < specialRouter.path.length - 1
+          insertAfterIndex >= 0 &&
+          insertAfterIndex < specialRouter.path.length - 1
         ) {
           // We are inserting inbetween
           newStepCode = Math.floor(
-            ((specialRouter.path[insertAfterIndex]?.stepCode ?? 0)
-              + (specialRouter.path[insertAfterIndex + 1]?.stepCode ?? 0))
-              / 2,
+            ((specialRouter.path[insertAfterIndex]?.stepCode ?? 0) +
+              (specialRouter.path[insertAfterIndex + 1]?.stepCode ?? 0)) /
+              2,
           );
         } else if (specialRouter.path.length - 1 === insertAfterIndex) {
           // We are inserting at the end
-          newStepCode = (specialRouter.path[insertAfterIndex]?.stepCode ?? 0)
-            + STEP_CODE_INCREMENT;
+          newStepCode =
+            (specialRouter.path[insertAfterIndex]?.stepCode ?? 0) +
+            STEP_CODE_INCREMENT;
         } else if (specialRouter.path.length <= insertAfterIndex) {
           res
             .status(405)
@@ -145,6 +156,64 @@ async function addRouteStep(req: express.Request, res: express.Response) {
     },
     res,
     'putting route step',
+  );
+}
+
+async function deleteRouteStep(_: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { lot, step } = res.locals;
+
+      // Check if router exists
+      const specialRouter = await RouterModel.findOne({
+        _id: lot.specialRouter,
+      });
+      if (!specialRouter) {
+        return HTTPError(
+          `specialRouter ${lot.specialRouter} does not exist.`,
+          404,
+        );
+      }
+
+      // Check if job exists
+      const job = await JobModel.findById(lot.jobId);
+      if (!job) {
+        return HTTPError(`Job ${lot.jobId} does not exist.`, 404);
+      }
+
+      // if job is relased then do not remove the step corresponding to
+      // stepID. Just mark it as isRemoved. Otherwise if the job is
+      // unreleased, remove the step so that the length of the router
+      // is orig length - 1
+
+      const stepOId = new ObjectId(step._id);
+      if (job.released) {
+        try {
+          // Update the step via stepid within the path
+          await RouterModel.updateOne(
+            { 'path.step._id': stepOId, _id: specialRouter._id },
+            { $set: { 'path.$.isRemoved': true } },
+          );
+
+          res.status(200).send('Success marking stepId as isRemoved');
+        } catch (e) {
+          return HTTPError(
+            `Error occurred trying to mark router step isRemoved for lotId: ${lot._id} and router step: ${step._id}.`,
+            500,
+          );
+        }
+      } else {
+        await RouterModel.updateOne(
+          { _id: specialRouter._id },
+          { $pull: { path: { 'step._id': step._id } } },
+        );
+        res.status(200).send('Success removing stepId from router');
+      }
+
+      return {};
+    },
+    res,
+    'deleting route step',
   );
 }
 
