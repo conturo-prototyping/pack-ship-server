@@ -864,7 +864,7 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
   let secondColumnSignoff;
   if ( ['DROPOFF', 'PICKUP'].includes(deliveryMethod) ) {
     deliveryTypeString = 'Received by:';
-    secondColumnSignoff = "X __________________________";
+    secondColumnSignoff = "Print ______________________";
   }
   else {
     deliveryTypeString = '';
@@ -896,6 +896,19 @@ function _pdf_makePackingBlock(customerTitle, shippingContact) {
       },
     ],
   ];
+
+  if ( ['DROPOFF', 'PICKUP'].includes(deliveryMethod) ) {
+    (_table.table.body).push([
+      {
+        text: '',
+        border: [false, false, false, false]
+      },
+      {
+        text: "Sign _______________________",
+        border: [false, false, false, false]
+      }
+    ]);
+  }
 
   return _table;
 }
