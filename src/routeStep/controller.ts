@@ -8,6 +8,7 @@ export default router;
 router.put('/', putRouteStep);
 router.get('/', allRouteSteps);
 router.delete('/', deleteRouteStep);
+router.patch('/', patchRouteStep);
 
 /**
  * Insert a RouteStep with the given category and name.
@@ -28,6 +29,46 @@ function putRouteStep(req: express.Request, res: express.Response) {
     },
     res,
     'putting route step',
+  );
+}
+
+/**
+ * Update a RouteStep with the given category and name.
+ */
+function patchRouteStep(req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { routeStepId, category, name } = req.body;
+
+      if (!routeStepId)
+        return HTTPError('Route Step ID must be specified.', 400);
+
+      const routeStep = await RouteStepModel.findById(routeStepId);
+
+      if (!routeStep) return HTTPError('Step does not exist.', 404);
+
+      let updateDict = {};
+
+      if (category) {
+        updateDict = { ...updateDict, category };
+      }
+
+      if (name) {
+        updateDict = { ...updateDict, name };
+      }
+
+      await RouteStepModel.updateOne(
+        { _id: routeStepId },
+        {
+          $set: updateDict,
+        },
+      );
+
+      const data = { message: 'success' };
+      return { data };
+    },
+    res,
+    'patching route step',
   );
 }
 
@@ -57,9 +98,12 @@ function deleteRouteStep(req: express.Request, res: express.Response) {
   ExpressHandler(
     async () => {
       const { routeStepId } = req.body;
-      if (!routeStepId) return HTTPError('Route Step ID must be specified.', 400);
+      if (!routeStepId)
+        return HTTPError('Route Step ID must be specified.', 400);
 
-      const deletedRouteStep = await RouteStepModel.findByIdAndDelete(routeStepId);
+      const deletedRouteStep = await RouteStepModel.findByIdAndDelete(
+        routeStepId,
+      );
       if (!deletedRouteStep) return HTTPError('No Route Step found.', 404);
 
       const data = { deletedRouteStep };

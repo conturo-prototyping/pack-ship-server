@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { RouteStepModel } from '../../src/routeStep/model';
 import { ChaiRequest, LocalReset } from '../config';
 
@@ -18,10 +18,10 @@ const CLIENT = new MongoClient(DB_URL);
 
 describe('# ROUTE STEPS', () => {
   // connect to db before all
-  before(async () => CLIENT.connect().catch(console.error));
+  before(async () => await CLIENT.connect().catch(console.error));
   
   // teardown after each test
-  afterEach(async () => LocalReset());
+  afterEach(async () => await LocalReset());
 
   it('GET /routeStep should find single document.', async () => {
     // create routeStep using mongodb driver
@@ -54,4 +54,111 @@ describe('# ROUTE STEPS', () => {
 
     expect(sniff.length).to.be.eq(0);
   })
+
+  it('PATCH /routeStep should update category correctly.', async () => {
+    const stepId = '111111111111111111111111';
+    const id = new ObjectId(stepId);
+
+    const doc = {
+      _id: id,
+      name: 'for testing',
+      category: 'testing...',
+    };
+    await CLIENT.db().collection(COLLECTION_NAME).insertOne(doc);
+
+    await ChaiRequest('patch', ENDPOINT_ROOT_URL, {
+      routeStepId: stepId,
+      category: 'newcat',
+    });
+    const newDoc = await CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
+
+    expect(newDoc.category).to.be.eq('newcat');
+    expect(newDoc.name).to.be.eq('for testing');
+  });
+
+  it('PATCH /routeStep should update name correctly.', async () => {
+    const stepId = '111111111111111111111111';
+    const id = new ObjectId(stepId);
+
+    const doc = {
+      _id: id,
+      name: 'for testing',
+      category: 'testing...',
+    };
+    await CLIENT.db().collection(COLLECTION_NAME).insertOne(doc);
+
+    await ChaiRequest('patch', ENDPOINT_ROOT_URL, {
+      routeStepId: stepId,
+      name: 'newname',
+    });
+    const newDoc = await CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
+
+    expect(newDoc.category).to.be.eq('testing...');
+    expect(newDoc.name).to.be.eq('newname');
+  });
+
+  it('PATCH /routeStep should update name and category correctly.', async () => {
+    const stepId = '111111111111111111111111';
+    const id = new ObjectId(stepId);
+
+    const doc = {
+      _id: id,
+      name: 'for testing',
+      category: 'testing...',
+    };
+    await CLIENT.db().collection(COLLECTION_NAME).insertOne(doc);
+
+    await ChaiRequest('patch', ENDPOINT_ROOT_URL, {
+      routeStepId: stepId,
+      category: 'newcat',
+      name: 'newname',
+    });
+    const newDoc = await CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
+
+    expect(newDoc.category).to.be.eq('newcat');
+    expect(newDoc.name).to.be.eq('newname');
+  });
+
+  it('PATCH /routeStep should error with no routeStepId.', async () => {
+    const stepId = '111111111111111111111111';
+    const id = new ObjectId(stepId);
+
+    const doc = {
+      _id: id,
+      name: 'for testing',
+      category: 'testing...',
+    };
+    await CLIENT.db().collection(COLLECTION_NAME).insertOne(doc);
+
+    try {
+      await ChaiRequest('patch', ENDPOINT_ROOT_URL, {
+        category: 'newcat',
+        name: 'newname',
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Route Step ID must be specified.');
+    }
+  });
+
+  it('PATCH /routeStep should error with no RouteStep to update.', async () => {
+    const stepId = '111111111111111111111111';
+
+    try {
+      await ChaiRequest('patch', ENDPOINT_ROOT_URL, {
+        routeStepId: stepId,
+        category: 'newcat',
+        name: 'newname',
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal('Step does not exist.');
+    }
+  });
 });
