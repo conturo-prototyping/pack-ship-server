@@ -20,7 +20,7 @@ const schema = new Schema({
         type: ObjectId,
         ref: "packingSlips",
       },
-      itemId: ObjectId,
+      itemId: ObjectId, // ref to nested field WorkOrder.Items[]._id
       qtyRequested: Number,
     },
   ],
