@@ -1,3 +1,8 @@
+/* workorderPO.model
+ * Model for Work Order POs that will be automatically created when
+ * VENDOR shipments get created that are DUE BACK
+ */
+
 const { Schema, model } = require("mongoose");
 const { ObjectId } = Schema.Types;
 
