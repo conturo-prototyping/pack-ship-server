@@ -2,14 +2,13 @@
 // An incoming delivery will be created manually by a user or automatically
 // In the case of automatic creation, the document will be tied to a VENDOR shipment.
 // The Internal Purchase Order Number is meant to be the field that connects this delivery to the contents
-// 
+//
 // In the future, we may consider adding a "contents" or "manifest" field additional to internal PO
 
 const { Schema, model } = require("mongoose");
 const { ObjectId } = Schema.Types;
 
 const schema = new Schema({
-  
   // This should be <Source Shipment Label>-R<Optional Number>
   // For example, if source shipment label is "AUR-SH103"
   // This label should be "AUR-SH103-R"
@@ -19,26 +18,22 @@ const schema = new Schema({
   // the person that created this delivery
   createdBy: {
     type: ObjectId,
-    ref: 'user'
+    ref: "user",
   },
 
-  internalPurchaseOrderNumber: String,
+  sourcePoType: String,
 
-  // If a vendor shipment is due back, it will automatically create an incoming delivery
-  // This field connects the two
-  // Not set, if manually created
-  sourceShipmentId: {
+  sourcePOId: {
     type: ObjectId,
-    ref: 'shipment'
+    refPath: "sourcePOType",
   },
 
-  // Used to track any potential loss
-  // best case:   just a copy of packing slip
-  // worst case:  copy of packing slip with all qty = 0 
-  receivedQuantities: [{
-    item: ObjectId,
-    qty: Number
-  }],
+  linesReceived: [
+    {
+      poLineId: ObjectId,
+      qtyReceived: Number,
+    },
+  ],
 
   // mm/dd/yyyy formatted Date of date due
   // This should always exist
@@ -48,8 +43,8 @@ const schema = new Schema({
   receivedOn: Date,
   receivedBy: {
     type: ObjectId,
-    ref: 'user'
-  }
+    ref: "user",
+  },
 });
 
 const Model = model("incomingDelivery", schema, "incomingDeliveries");
