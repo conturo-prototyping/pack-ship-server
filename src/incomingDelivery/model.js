@@ -31,6 +31,7 @@ const schema = new Schema({
   linesReceived: [
     {
       poLineId: ObjectId,
+      qtyReceived: Number,
     },
   ],
 
