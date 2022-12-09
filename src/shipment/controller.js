@@ -9,6 +9,7 @@ const { CreateNew } = require("../incomingDelivery/controller");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
+const { CreateNewWorkOrderPO } = require("../workOrderPO/controller");
 const ObjectId = require("mongodb").ObjectId;
 
 module.exports = router;
@@ -201,16 +202,43 @@ async function createOne(req, res) {
 
       await shipment.save();
 
+      const lines = await Promise.all(
+        shipment.manifest.map(async (e) => {
+          const packingSlip = await PackingSlip.findById(e).lean().exec();
+          return packingSlip.items.map((m) => {
+            return {
+              packingSlipId: packingSlip._id,
+              itemId: m._id,
+              qtyRequested: m.qty,
+            };
+          });
+        })
+      );
+
       if (isDueBack) {
-        const [returnErr] = await CreateNew(
+        // const workedOrderReturnErr = true;
+        const [workedOrderReturnErr, workOrderPO] = await CreateNewWorkOrderPO(
           undefined,
           req.user._id,
-          isDueBackOn,
-          shipment._id
+          lines.flat()
         );
-        if (returnErr) {
+
+        if (!workedOrderReturnErr) {
+          const [returnErr] = await CreateNew(
+            undefined,
+            req.user._id,
+            isDueBackOn,
+            shipment._id,
+            workOrderPO.workOrderPO._id
+          );
+
+          if (returnErr) {
+            await shipment.delete();
+            return returnErr;
+          }
+        } else {
           await shipment.delete();
-          return returnErr;
+          return workedOrderReturnErr;
         }
       }
 
