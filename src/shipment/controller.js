@@ -216,7 +216,6 @@ async function createOne(req, res) {
       );
 
       if (isDueBack) {
-        // const workedOrderReturnErr = true;
         const [workedOrderReturnErr, workOrderPO] = await CreateNewWorkOrderPO(
           undefined,
           req.user._id,
