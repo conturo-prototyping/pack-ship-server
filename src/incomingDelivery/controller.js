@@ -28,6 +28,11 @@ router.patch("/:deliveryId", (req, res, next) =>
 );
 router.patch("/:deliveryId", editOne);
 
+const POTypes = {
+  WorkOrder: "WorkOrderPO",
+  Consumable: "ConsumablePO",
+};
+
 module.exports = {
   router,
   CreateNew,
@@ -116,7 +121,8 @@ async function CreateNew(
   internalPurchaseOrderNumber,
   creatingUserId,
   isDueBackOn,
-  sourceShipmentId = undefined
+  sourceShipmentId = undefined,
+  workOrderPOId = undefined
 ) {
   try {
     if (!sourceShipmentId) return [HTTPError("Shipment ID not sent.", 400)];
@@ -138,6 +144,8 @@ async function CreateNew(
       isDueBackOn,
       sourceShipmentId,
       label,
+      sourcePOId: workOrderPOId,
+      sourcePoType: POTypes.WorkOrder,
     };
 
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
@@ -324,48 +332,44 @@ function setReceived(req, res) {
       //  against quantities that are due.
       // If qty is not fulfilled, make a copy with a new label to be received again
       let isReturnFulfilled = true;
-      const allDeliveries = await IncomingDelivery
-        .find({ sourceShipmentId: incomingDelivery.sourceShipmentId })
-        .lean();
+      const allDeliveries = await IncomingDelivery.find({
+        sourceShipmentId: incomingDelivery.sourceShipmentId,
+      }).lean();
 
-      const labelMatch = (incomingDelivery.label).match(/SHIP-(.+)-([0-9]+)-R([0-9]+)?/);
+      const labelMatch = incomingDelivery.label.match(
+        /SHIP-(.+)-([0-9]+)-R([0-9]+)?/
+      );
 
       const customerTag = labelMatch[1];
       const shipmentNumber = labelMatch[2];
 
-      let newLabel = `SHIP-${customerTag}-${shipmentNumber}-R${allDeliveries.length+1}`;
-      
+      let newLabel = `SHIP-${customerTag}-${shipmentNumber}-R${
+        allDeliveries.length + 1
+      }`;
+
       // reduce all incomingDeliveries.receivedQuantities into uniques
-      const allReceivedQuantities = allDeliveries.reduce(
-        (acc, curr) => {
-          (curr.receivedQuantities).forEach(x => {
-            if ( x.item in acc === false ) acc[x.item] = 0;
-            acc[x.item] += x.qty;
-          });
-          
-          return acc;
-        },
-        {}
-      );
+      const allReceivedQuantities = allDeliveries.reduce((acc, curr) => {
+        curr.receivedQuantities.forEach((x) => {
+          if (x.item in acc === false) acc[x.item] = 0;
+          acc[x.item] += x.qty;
+        });
+
+        return acc;
+      }, {});
 
       // check source shipment manifests against all received quantities
-      (ogShipment[0].fromManifest).forEach(x => {
-        (x.items).forEach(y => {
+      ogShipment[0].fromManifest.forEach((x) => {
+        x.items.forEach((y) => {
           const receivedItemQty = allReceivedQuantities[y.item];
-          if ( receivedItemQty < y.qty ) isReturnFulfilled = false;
+          if (receivedItemQty < y.qty) isReturnFulfilled = false;
         });
       });
 
       // return isn't fulfilled, make another "incomingDelivery" entry
       // that we're expecting in the future
-      if ( !isReturnFulfilled ) {
-        const {
-          _id,
-          receivedOn,
-          receivedBy,
-          receivedQuantities,
-          ...rest
-        } = incomingDelivery._doc;
+      if (!isReturnFulfilled) {
+        const { _id, receivedOn, receivedBy, receivedQuantities, ...rest } =
+          incomingDelivery._doc;
 
         const remainingIncDelivery = new IncomingDelivery({
           ...rest,
@@ -438,7 +442,8 @@ function getOne(req, res) {
         .lean()
         .exec();
 
-      if (!incomingDelivery) return HTTPError("Incoming delivery not found.", 404);
+      if (!incomingDelivery)
+        return HTTPError("Incoming delivery not found.", 404);
 
       const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
 
@@ -460,12 +465,21 @@ function getOne(req, res) {
       // (can reduce what info is set to reduce the amount of data being sent)
       for (const el of incomingDelivery.receivedQuantities) {
         const itemId = String(el.item);
-        const itemMatch = workOrder.Items.find( x => String(x._id) === itemId );
+        const itemMatch = workOrder.Items.find((x) => String(x._id) === itemId);
 
-        if (!itemMatch) return HTTPError(`Item not found on workOrder ${orderNumber}.`);
+        if (!itemMatch)
+          return HTTPError(`Item not found on workOrder ${orderNumber}.`);
 
-        const { PartNumber, PartName, Revision, Quantity, batchNumber } = itemMatch;
-        el.item = { PartNumber, PartName, Revision, Quantity, batchNumber, _id: itemId };
+        const { PartNumber, PartName, Revision, Quantity, batchNumber } =
+          itemMatch;
+        el.item = {
+          PartNumber,
+          PartName,
+          Revision,
+          Quantity,
+          batchNumber,
+          _id: itemId,
+        };
       }
 
       const data = { incomingDelivery };
