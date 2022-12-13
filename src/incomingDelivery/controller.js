@@ -28,6 +28,11 @@ router.patch("/:deliveryId", (req, res, next) =>
 );
 router.patch("/:deliveryId", editOne);
 
+const POTypes = {
+  WorkOrder: "WorkOrderPO",
+  Consumable: "ConsumablePO",
+};
+
 module.exports = {
   router,
   CreateNew,
@@ -140,6 +145,7 @@ async function CreateNew(
       sourceShipmentId,
       label,
       sourcePOId: workOrderPOId,
+      sourcePoType: POTypes.WorkOrder,
     };
 
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
