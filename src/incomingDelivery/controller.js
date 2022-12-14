@@ -191,9 +191,72 @@ function createOne(req, res) {
 /**
  * Get the queue of incoming deliveries that have not yet been received.
  */
+
+//TODO GET queue
+
 function getQueue(req, res) {
   ExpressHandler(
     async () => {
+      const incomingQueue = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: "WorkOrderPO",
+            receivedOn: { $exists: false },
+          },
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "WorkOrderPOs",
+            foreignField: "_id",
+            as: "populatedPO",
+          },
+        },
+      ]).exec();
+
+      for (let i = 0; i < incomingQueue.length; i++) {
+        console.log("WO", incomingQueue[i]);
+        const lines = incomingQueue[i]["populatedPO"][0]["lines"];
+        for (let j = 0; j < lines.length; j++) {
+          const line = lines[j];
+          console.log(line["itemId"]);
+          const [packingSlip, workorderItem] = await Promise.all([
+            PackingSlip.findById(line["packingSlipId"]),
+            WorkOrder.aggregate([
+              { $match: { "Items._id": line["itemId"] } },
+              {
+                $project: {
+                  Items: {
+                    $filter: {
+                      input: "$Items",
+                      as: "item",
+                      cond: { $eq: ["$$item._id", line["itemId"]] },
+                    },
+                  },
+                },
+              },
+            ]),
+          ]);
+          incomingQueue[i]["populatedPO"][0]["lines"][j]["packingSlip"] =
+            packingSlip;
+          incomingQueue[i]["populatedPO"][0]["lines"][j]["item"] =
+            workorderItem[0];
+          console.log("WO2", JSON.stringify(incomingQueue[i], null, 4));
+        }
+      }
+      // console.log(workOrderQueue);
+      // const populatedLines = await Promise.all(
+      //   workOrderQueue.map(async (e) => {
+      //     console.log("AAAA", e);
+      //     return await Promise.all(
+      //       e["populatedPO"][0]["lines"].map(async (line) => {
+      //         console.log("BBBBBB", line);
+      //         return PackingSlip.findById(line["packingSlipId"]);
+      //       })
+      //     );
+      //   })
+      // );
+      // console.info(JSON.stringify(workOrderQueue, null, 4));
       const query = {
         receivedOn: {
           $exists: false,
@@ -232,6 +295,7 @@ function getQueue(req, res) {
               })
                 .lean()
                 .select("Items")
+
                 .exec();
 
               for (const woItem of workOrder.Items) {
@@ -419,6 +483,7 @@ async function getSourceShipmentLabel(id) {
 /**
  * Get one incomingDelivery by its _id field.
  * Get incomingDelivery, mutate manifest data to only have packing slip items, ...
+ *
  * ... auto generate createdBy (if needed) and source field (for now it will be ...
  * ... "VENDOR"), get workOrder infomation, set manifest.item infomation to ...
  * ... workOrder item information (only applicable fields for FE use)
@@ -455,6 +520,7 @@ function getOne(req, res) {
       const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
         .lean()
         .select("Items")
+
         .exec();
 
       if (!workOrder) return HTTPError("Work Order not found.", 404);
@@ -496,20 +562,41 @@ function getOne(req, res) {
 function getAllReceived(req, res) {
   ExpressHandler(
     async () => {
-      const query = { receivedOn: { $exists: true } };
-      const _receivedDeliveries = await IncomingDelivery.find(query)
-        .lean()
-        .select("label source receivedOn sourceShipmentId")
-        .populate("sourceShipmentId")
-        .exec();
+      const receivedWorkOrders = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: "WorkOrderPO",
+            receivedOn: { $exists: true },
+          },
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "WorkOrderPOs",
+            foreignField: "_id",
+            as: "sourcePOId",
+          },
+        },
+      ]).exec();
 
-      const receivedDeliveries = _receivedDeliveries
-        .filter((x) => x.sourceShipmentId?.isPastVersion !== true)
-        .map((d) => {
-          delete d.sourceShipmentId;
-          return d;
-        });
+      const receiveConsumables = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: "ConsumablePO",
+            receivedOn: { $exists: true },
+          },
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "ConsumablePOs",
+            foreignField: "_id",
+            as: "sourcePOId",
+          },
+        },
+      ]).exec();
 
+      const receivedDeliveries = [...receiveConsumables, ...receivedWorkOrders];
       const data = { receivedDeliveries };
       return { data };
     },
