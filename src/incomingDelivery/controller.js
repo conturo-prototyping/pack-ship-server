@@ -197,10 +197,10 @@ function createOne(req, res) {
 function getQueue(req, res) {
   ExpressHandler(
     async () => {
-      const incomingQueue = await IncomingDelivery.aggregate([
+      const workOrderPOQueue = await IncomingDelivery.aggregate([
         {
           $match: {
-            sourcePoType: "WorkOrderPO",
+            sourcePoType: POTypes.WorkOrder,
             receivedOn: { $exists: false },
           },
         },
@@ -209,17 +209,17 @@ function getQueue(req, res) {
             localField: "sourcePOId",
             from: "WorkOrderPOs",
             foreignField: "_id",
-            as: "populatedPO",
+            as: "po",
           },
         },
       ]).exec();
 
-      for (let i = 0; i < incomingQueue.length; i++) {
-        console.log("WO", incomingQueue[i]);
-        const lines = incomingQueue[i]["populatedPO"][0]["lines"];
+      for (let i = 0; i < workOrderPOQueue.length; i++) {
+        const lines = workOrderPOQueue[i]["po"][0]["lines"];
+
         for (let j = 0; j < lines.length; j++) {
           const line = lines[j];
-          console.log(line["itemId"]);
+
           const [packingSlip, workorderItem] = await Promise.all([
             PackingSlip.findById(line["packingSlipId"]),
             WorkOrder.aggregate([
@@ -237,118 +237,33 @@ function getQueue(req, res) {
               },
             ]),
           ]);
-          incomingQueue[i]["populatedPO"][0]["lines"][j]["packingSlip"] =
-            packingSlip;
-          incomingQueue[i]["populatedPO"][0]["lines"][j]["item"] =
-            workorderItem[0];
-          console.log("WO2", JSON.stringify(incomingQueue[i], null, 4));
+          workOrderPOQueue[i]["po"][0]["lines"][j]["packingSlip"] = packingSlip;
+
+          const { Items } = workorderItem[0];
+          workOrderPOQueue[i]["po"][0]["lines"][j]["item"] = Items[0];
         }
       }
-      // console.log(workOrderQueue);
-      // const populatedLines = await Promise.all(
-      //   workOrderQueue.map(async (e) => {
-      //     console.log("AAAA", e);
-      //     return await Promise.all(
-      //       e["populatedPO"][0]["lines"].map(async (line) => {
-      //         console.log("BBBBBB", line);
-      //         return PackingSlip.findById(line["packingSlipId"]);
-      //       })
-      //     );
-      //   })
-      // );
-      // console.info(JSON.stringify(workOrderQueue, null, 4));
-      const query = {
-        receivedOn: {
-          $exists: false,
-        },
-        isPastVersion: { $ne: true },
-      };
-      const _deliveries = await IncomingDelivery.find(query)
-        .lean()
-        .populate({
-          path: "sourceShipmentId",
-          populate: {
-            path: "manifest",
-            model: "packingSlip",
+
+      const consumablePOQueue = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: POTypes.Consumable,
+            receivedOn: { $exists: false },
           },
-        })
-        .exec();
-
-      const ordersSet = new Set(); //use to track all workOrders that need to be fetched
-      const itemsObjs = {};
-      const promises = [];
-
-      //map _deliveries into almost final format
-      const deliveries = _deliveries.map((x) => {
-        const { _id, label, sourceShipmentId } = x;
-
-        const manifestArr = [];
-        for (m of sourceShipmentId.manifest) {
-          manifestArr.push(...m.items);
-
-          //check if ordersSet has order number already, add if not
-          if (ordersSet.has(m.orderNumber) === false) {
-            ordersSet.add(m.orderNumber);
-            const _populateItems = async (orderNumber) => {
-              const workOrder = await WorkOrder.findOne({
-                OrderNumber: orderNumber,
-              })
-                .lean()
-                .select("Items")
-
-                .exec();
-
-              for (const woItem of workOrder.Items) {
-                const {
-                  _id,
-                  OrderNumber,
-                  PartNumber,
-                  PartName,
-                  Revision,
-                  batchNumber,
-                } = woItem;
-                const _woItem = {
-                  _id,
-                  orderNumber: OrderNumber,
-                  partNumber: PartNumber,
-                  partDescription: PartName,
-                  partRev: Revision,
-                  batch: batchNumber,
-                };
-                itemsObjs[woItem._id] = _woItem;
-              }
-            };
-            promises.push(_populateItems(m.orderNumber));
-          }
-        }
-
-        const _obj = {
-          _id,
-          label,
-          manifest: manifestArr,
-          source: m.destination,
-        };
-
-        return _obj;
-      });
-
-      await Promise.all(promises);
-
-      //loop through deliveries and create mutated ret array
-      const ret = deliveries.map((d) => {
-        const _manifest = d.manifest.map(({ _id, item, qty }) => {
-          return {
-            _id,
-            item: itemsObjs[item],
-            qty,
-          };
-        });
-        d.manifest = _manifest;
-        return d;
-      });
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "ConsumablePOs",
+            foreignField: "_id",
+            as: "po",
+          },
+        },
+      ]).exec();
 
       const data = {
-        incomingDeliveries: ret,
+        workOrderPOQueue,
+        consumablePOQueue,
       };
       return { data };
     },
