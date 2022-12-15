@@ -192,8 +192,6 @@ function createOne(req, res) {
  * Get the queue of incoming deliveries that have not yet been received.
  */
 
-//TODO GET queue
-
 function getQueue(req, res) {
   ExpressHandler(
     async () => {
