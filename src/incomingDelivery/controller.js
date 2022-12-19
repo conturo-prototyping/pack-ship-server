@@ -104,7 +104,7 @@ function undoReceipt(req, res) {
       }
     },
     res,
-    "undoing delivery"
+    "undoing delivery receipt"
   );
 }
 
