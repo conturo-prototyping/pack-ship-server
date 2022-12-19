@@ -228,7 +228,6 @@ function createOne(req, res) {
         sourceShipmentId
       );
       if (err) return err;
-      res.locals.data = data;
       return { data };
     },
     res,
