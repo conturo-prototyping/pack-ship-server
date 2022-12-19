@@ -19,8 +19,11 @@ const schema = new Schema({
   // The fields below are exact copies of the same fields in the "model" file.
   label: String,
   createdBy: { type: ObjectId, ref: "user" },
-  internalPurchaseOrderNumber: String,
-  sourceShipmentId: { type: ObjectId, ref: "shipment" },
+  sourcePoType: String,
+  sourcePOId: {
+    type: ObjectId,
+    refPath: "sourcePOType",
+  },
   linesReceived: [
     {
       poLineId: ObjectId,
