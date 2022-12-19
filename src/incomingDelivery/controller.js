@@ -215,7 +215,7 @@ function getAll(req, res) {}
  * Create a single incoming delivery.
  * Use this only for manual entries.
  */
-function createOne(req, res, next) {
+function createOne(req, res) {
   ExpressHandler(
     async () => {
       const { internalPurchaseOrderNumber, isDueBackOn, sourceShipmentId } =
@@ -229,7 +229,6 @@ function createOne(req, res, next) {
       );
       if (err) return err;
       res.locals.data = data;
-      // next();
       return { data };
     },
     res,
