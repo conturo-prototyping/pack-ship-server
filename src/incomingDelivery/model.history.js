@@ -24,12 +24,13 @@ const schema = new Schema({
     type: ObjectId,
     refPath: "sourcePOType",
   },
-  linesReceived: [
-    {
-      poLineId: ObjectId,
-      qtyReceived: Number,
-    },
-  ],
+  linesReceived: [String],
+  //  [
+  //   {
+  //     poLineId: ObjectId,
+  //     qtyReceived: Number,
+  //   },
+  // ],
   isDueBackOn: String,
   receivedOn: Date,
   receivedBy: { type: ObjectId, ref: "user" },
