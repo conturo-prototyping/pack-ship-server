@@ -21,7 +21,12 @@ const schema = new Schema({
   createdBy: { type: ObjectId, ref: "user" },
   internalPurchaseOrderNumber: String,
   sourceShipmentId: { type: ObjectId, ref: "shipment" },
-  receivedQuantities: [{ item: ObjectId, qty: Number }],
+  linesReceived: [
+    {
+      poLineId: ObjectId,
+      qtyReceived: Number,
+    },
+  ],
   isDueBackOn: String,
   receivedOn: Date,
   receivedBy: { type: ObjectId, ref: "user" },

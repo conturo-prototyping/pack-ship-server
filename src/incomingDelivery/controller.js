@@ -28,6 +28,11 @@ router.patch("/:deliveryId", (req, res, next) =>
 );
 router.patch("/:deliveryId", editOne);
 
+router.patch("/:deliveryId/undoReceipt", (req, res, next) =>
+  checkId(res, next, IncomingDelivery, req.params.deliveryId)
+);
+router.patch("/:deliveryId/undoReceipt", undoReceipt);
+
 const POTypes = {
   WorkOrder: "WorkOrderPO",
   Consumable: "ConsumablePO",
@@ -69,6 +74,37 @@ function undoReceive(req, res) {
     },
     res,
     "undo receive"
+  );
+}
+
+function undoReceipt(req, res) {
+  ExpressHandler(
+    async () => {
+      const { _id, ...incomingDel } = res.locals.data;
+      const editMadeBy = req.user._id;
+
+      try {
+        const incDelHist = new IncomingDeliveryHistory({
+          editMadeBy,
+          ...incomingDel,
+        });
+
+        const updated = {
+          ...incomingDel,
+          linesReceived: [],
+        };
+        await Promise.all([
+          incDelHist.save(),
+          IncomingDelivery.updateOne({ _id: _id }, { $set: updated }),
+        ]);
+      } catch (error) {
+        LogError(error);
+
+        return HTTPError(`Unexpected error undoing receipt with ${_id}.`);
+      }
+    },
+    res,
+    "undoing delivery"
   );
 }
 
