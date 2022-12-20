@@ -310,6 +310,13 @@ function setReceived(req, res) {
       if (incomingDelivery.receivedOn)
         return HTTPError("Delivery already received.", 400);
 
+      const incDelHist = new IncomingDeliveryHistory({
+        editMadeBy: userId,
+        ...incomingDelivery,
+      });
+
+      await incDelHist.save();
+
       incomingDelivery.receivedOn = new Date();
       incomingDelivery.receivedBy = userId;
       incomingDelivery.linesReceived = linesReceived;
