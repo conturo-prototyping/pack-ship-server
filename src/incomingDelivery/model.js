@@ -39,6 +39,17 @@ const schema = new Schema({
   // This should always exist
   isDueBackOn: String,
 
+  canceled: Boolean,
+
+  canceledOn: Date,
+
+  canceledReason: String,
+
+  canceledBy: {
+    type: ObjectId,
+    ref: "user",
+  },
+
   // Who received this delivery and when
   receivedOn: Date,
   receivedBy: {

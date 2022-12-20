@@ -23,6 +23,8 @@ router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
 
+router.put("/cancel", setCanceled);
+
 router.patch("/:deliveryId", (req, res, next) =>
   checkId(res, next, IncomingDelivery, req.params.deliveryId)
 );
@@ -517,6 +519,48 @@ function getAllReceived(req, res) {
     "getting all received incoming deliveries"
   );
 }
+
+function setCanceled(req, res) {
+  ExpressHandler(
+    async () => {
+      const { _id, reason } = req.body;
+
+      if (!reason) return HTTPError(`Reason is required.`, 400);
+
+      const incomingDelivery = await IncomingDelivery.findById(_id);
+
+      if (!incomingDelivery)
+        return HTTPError(`Incoming Delivery doesn't exist.`);
+
+      if (incomingDelivery.canceled)
+        return HTTPError(`Incoming Delivery already canceled.`, 400);
+
+      if (!incomingDelivery.receivedBy)
+        return HTTPError(
+          `Incoming Delivery isn't available to be canceled.`,
+          400
+        );
+
+      await IncomingDelivery.updateOne(
+        { _id: _id },
+        {
+          $set: {
+            canceled: true,
+            canceledReason: reason,
+            canceledOn: Date.now(),
+            canceledBy: req.user._id,
+          },
+        }
+      );
+
+      const data = { message: "success" };
+      return { data };
+    },
+    res,
+    "creating an incoming delivery"
+  );
+}
+
 async function checkId(res, next, model, id) {
   if (!id) {
     // Make sure id is provided
