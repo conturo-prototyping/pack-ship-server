@@ -16,19 +16,32 @@ router.put("/", createOne);
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
 
-// Make sure the deliveryId is valid
-router.post("/undoReceive", (req, res, next) =>
-  checkId(res, next, IncomingDelivery, req.body.deliveryId)
+router.post(
+  "/:deliveryId/undoReceive",
+  (req, res, next) =>
+    checkId(res, next, IncomingDelivery, req.params.deliveryId),
+  undoReceive,
+  recordHistory
 );
 
-router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
 
-router.patch("/:deliveryId", (req, res, next) =>
-  checkId(res, next, IncomingDelivery, req.params.deliveryId)
+router.patch(
+  "/:deliveryId",
+  (req, res, next) =>
+    checkId(res, next, IncomingDelivery, req.params.deliveryId),
+  editOne,
+  recordHistory
 );
-router.patch("/:deliveryId", editOne);
+
+router.patch(
+  "/:deliveryId/undoReceipt",
+  (req, res, next) =>
+    checkId(res, next, IncomingDelivery, req.params.deliveryId),
+  undoReceipt,
+  recordHistory
+);
 
 const POTypes = {
   WorkOrder: "WorkOrderPO",
@@ -44,29 +57,18 @@ module.exports = {
  * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
  * THEN delete the matching model doc
  */
-function undoReceive(req, res) {
+function undoReceive(req, res, next) {
   ExpressHandler(
     async () => {
-      const { _id, ...incomingDel } = res.locals.data;
-      const { deliveryId } = req.body;
-      const editMadeBy = req.user._id;
+      const { _id } = res.locals.data;
 
       try {
-        const incDelHist = new IncomingDeliveryHistory({
-          editMadeBy,
-          ...incomingDel,
-        });
-
-        await Promise.all([
-          incDelHist.save(),
-          IncomingDelivery.deleteOne({ _id: ObjectId(deliveryId) }),
-        ]);
+        await IncomingDelivery.deleteOne({ _id: ObjectId(_id) });
+        next();
       } catch (error) {
         LogError(error);
 
-        return HTTPError(
-          `Unexpected error calling undoReceive with ${deliveryId}.`
-        );
+        return HTTPError(`Unexpected error calling undoReceive with ${_id}.`);
       }
     },
     res,
@@ -75,14 +77,39 @@ function undoReceive(req, res) {
 }
 
 /**
- * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
- * THEN commit changes
+ * Clear the linesReceived of the current incomingDelivery
  */
-function editOne(req, res) {
+function undoReceipt(req, res, next) {
   ExpressHandler(
     async () => {
       const { _id, ...incomingDel } = res.locals.data;
-      const edited = req.body;
+
+      try {
+        await IncomingDelivery.updateOne(
+          { _id: _id },
+          {
+            $set: {
+              ...incomingDel,
+              linesReceived: [],
+            },
+          }
+        );
+        next();
+      } catch (error) {
+        LogError(error);
+
+        return HTTPError(`Unexpected error undoing receipt with ${_id}.`);
+      }
+    },
+    res,
+    "undoing delivery receipt"
+  );
+}
+
+function recordHistory(req, res) {
+  ExpressHandler(
+    async () => {
+      const { _id, ...incomingDel } = res.locals.data;
       const editMadeBy = req.user._id;
 
       try {
@@ -91,14 +118,35 @@ function editOne(req, res) {
           ...incomingDel,
         });
 
+        await incDelHist.save();
+      } catch (error) {
+        LogError(error);
+
+        return HTTPError(`Unexpected error recording history for ${_id}.`);
+      }
+    },
+    res,
+    "recording delivery history"
+  );
+}
+
+/**
+ * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
+ * THEN commit changes
+ */
+function editOne(req, res, next) {
+  ExpressHandler(
+    async () => {
+      const { _id, ...incomingDel } = res.locals.data;
+      const edited = req.body;
+
+      try {
         const updated = {
           ...incomingDel,
           ...edited,
         };
-        await Promise.all([
-          incDelHist.save(),
-          IncomingDelivery.updateOne({ _id: _id }, { $set: updated }),
-        ]);
+        await IncomingDelivery.updateOne({ _id: _id }, { $set: updated });
+        next();
       } catch (error) {
         LogError(error);
 
@@ -182,7 +230,6 @@ function createOne(req, res) {
         sourceShipmentId
       );
       if (err) return err;
-
       return { data };
     },
     res,
