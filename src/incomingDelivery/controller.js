@@ -6,6 +6,8 @@ const IncomingDelivery = require("./model");
 const IncomingDeliveryHistory = require("./model.history");
 const PackingSlip = require("../packingSlip/model");
 const WorkOrder = require("../workOrder/model");
+const WorkOrderPO = require("../workOrderPO/model");
+const ConsumablePO = require("../consumablePO/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
 
@@ -276,41 +278,35 @@ function getQueue(req, res) {
 function setReceived(req, res) {
   ExpressHandler(
     async () => {
-      const { _id, receivedQuantities } = req.body;
+      const { _id, sourcePOType, sourcePOId, linesReceived } = req.body;
       const userId = req.user._id;
-      const incomingDelivery = await IncomingDelivery.findOne({ _id });
+      const incomingDelivery = await IncomingDelivery.findOne({
+        _id,
+      });
 
       if (incomingDelivery.receivedOn)
         return HTTPError("Delivery already received.", 400);
 
       incomingDelivery.receivedOn = new Date();
       incomingDelivery.receivedBy = userId;
-      incomingDelivery.receivedQuantities = receivedQuantities;
+      incomingDelivery.linesReceived = linesReceived;
       await incomingDelivery.save();
 
       // Joing to packingSlips collection to find qty per item
-      const ogShipment = await Shipment.aggregate([
-        {
-          $lookup: {
-            from: PackingSlip.collection.collectionName,
-            localField: "manifest",
-            foreignField: "_id",
-            as: "fromManifest",
-          },
-        },
-        {
-          $match: {
-            _id: incomingDelivery.sourceShipmentId,
-          },
-        },
-      ]);
+      let ogPO = undefined;
+
+      if (sourcePOType === POTypes.WorkOrder) {
+        ogPO = await WorkOrderPO.findById(sourcePOId);
+      } else if (sourcePOType === POTypes.Consumable) {
+        ogPO = await ConsumablePO.findById(sourcePOId);
+      }
 
       // Check quantities we are receiving now + past received quantities
       //  against quantities that are due.
       // If qty is not fulfilled, make a copy with a new label to be received again
       let isReturnFulfilled = true;
       const allDeliveries = await IncomingDelivery.find({
-        sourceShipmentId: incomingDelivery.sourceShipmentId,
+        sourcePOId: incomingDelivery.sourcePOId,
       }).lean();
 
       const labelMatch = incomingDelivery.label.match(
@@ -326,26 +322,26 @@ function setReceived(req, res) {
 
       // reduce all incomingDeliveries.receivedQuantities into uniques
       const allReceivedQuantities = allDeliveries.reduce((acc, curr) => {
-        curr.receivedQuantities.forEach((x) => {
-          if (x.item in acc === false) acc[x.item] = 0;
-          acc[x.item] += x.qty;
+        curr.linesReceived.forEach((x) => {
+          if (x.poLineId in acc === false) acc[x.poLineId] = 0;
+          acc[x.poLineId] += x.qtyReceived;
         });
 
         return acc;
       }, {});
 
       // check source shipment manifests against all received quantities
-      ogShipment[0].fromManifest.forEach((x) => {
-        x.items.forEach((y) => {
-          const receivedItemQty = allReceivedQuantities[y.item];
-          if (receivedItemQty < y.qty) isReturnFulfilled = false;
-        });
+      ogPO.lines.forEach((x) => {
+        const receivedItemQty = allReceivedQuantities[x._id];
+        if (receivedItemQty < x.qtyRequested) {
+          isReturnFulfilled = false;
+        }
       });
 
       // return isn't fulfilled, make another "incomingDelivery" entry
       // that we're expecting in the future
       if (!isReturnFulfilled) {
-        const { _id, receivedOn, receivedBy, receivedQuantities, ...rest } =
+        const { _id, receivedOn, receivedBy, linesReceived, ...rest } =
           incomingDelivery._doc;
 
         const remainingIncDelivery = new IncomingDelivery({

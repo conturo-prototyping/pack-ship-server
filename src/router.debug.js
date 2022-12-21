@@ -24,12 +24,27 @@ async function resetData(_req, res) {
   const Customer = require("./customer/model");
   const WorkOrder = require("./workOrder/model");
   const ShopQueue = require('./shopQ/shopQueue.model');
+  const ConsumablePO = require('./consumablePO/model');
+
   const { randomInt } = require("crypto");
 
   console.debug("Resetting collections...");
 
   const [dropErr] = await dropAllCollections();
   if (dropErr) res.status(500).send(dropErr.message);
+
+  // create dummy consumable POs
+  for (let i=0; i < 10; i++) {
+    const type = ['MATERIAL', 'TOOLING', 'GAGES', 'OTHER'][ randomInt(0, 4) ];
+
+    const newConsPO = new ConsumablePO({
+      PONumber: String(i+1),
+      type,
+      lines: [{ item: type+(i+1), qtyRequested: randomInt(50) }],
+    });
+
+    await newConsPO.save();
+  }
 
   const tags = ["ABC", "DEF", "GHI"];
 
@@ -114,6 +129,7 @@ async function dropAllCollections() {
   const Customer = require("./customer/model");
   const ShopQueue = require('./shopQ/shopQueue.model');
   const IncomingDelivery = require('./incomingDelivery/model');
+  const ConsumablePO = require('./consumablePO/model');
 
   const _dropCollection = async (model) => {
     try {
@@ -137,6 +153,7 @@ async function dropAllCollections() {
     await _dropCollection(Customer),
     await _dropCollection(ShopQueue),
     await _dropCollection(IncomingDelivery),
+    await _dropCollection(ConsumablePO),
   ];
 
   if (ok.some((x) => !x)) return [new Error("Error dropping collections")];
