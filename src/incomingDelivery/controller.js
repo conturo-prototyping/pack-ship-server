@@ -24,7 +24,7 @@ router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
 
 router.put("/cancel", (req, res, next) =>
-  checkId(res, next, IncomingDelivery, req.params._id)
+  checkId(res, next, IncomingDelivery, req.body._id)
 );
 router.put("/cancel", setCanceled);
 
@@ -529,14 +529,15 @@ function getAllReceived(req, res) {
 function setCanceled(req, res) {
   ExpressHandler(
     async () => {
+      const { ...incomingDelivery } = res.locals.data;
       const { _id, reason } = req.body;
 
       if (!reason) return HTTPError(`Reason is required.`, 400);
 
-      const incomingDelivery = await IncomingDelivery.findById(_id);
+      // const incomingDelivery = await IncomingDelivery.findById(_id);
 
-      if (!incomingDelivery)
-        return HTTPError(`Incoming Delivery doesn't exist.`);
+      // if (!incomingDelivery)
+      //   return HTTPError(`Incoming Delivery doesn't exist.`);
 
       if (incomingDelivery.canceled)
         return HTTPError(`Incoming Delivery already canceled.`, 400);
