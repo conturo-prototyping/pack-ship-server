@@ -23,6 +23,9 @@ router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
 
+router.put("/cancel", (req, res, next) =>
+  checkId(res, next, IncomingDelivery, req.params._id)
+);
 router.put("/cancel", setCanceled);
 
 router.patch("/:deliveryId", (req, res, next) =>
@@ -520,6 +523,9 @@ function getAllReceived(req, res) {
   );
 }
 
+/**
+ * Used to cancel an incomingDelivery
+ */
 function setCanceled(req, res) {
   ExpressHandler(
     async () => {
@@ -535,7 +541,7 @@ function setCanceled(req, res) {
       if (incomingDelivery.canceled)
         return HTTPError(`Incoming Delivery already canceled.`, 400);
 
-      if (!incomingDelivery.receivedBy)
+      if (incomingDelivery.receivedBy)
         return HTTPError(
           `Incoming Delivery isn't available to be canceled.`,
           400
