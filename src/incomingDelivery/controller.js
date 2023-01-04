@@ -16,19 +16,32 @@ router.put("/", createOne);
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
 
-// Make sure the deliveryId is valid
-router.post("/undoReceive", (req, res, next) =>
-  checkId(res, next, IncomingDelivery, req.body.deliveryId)
+router.post(
+  "/:deliveryId/undoReceive",
+  (req, res, next) =>
+    checkId(res, next, IncomingDelivery, req.params.deliveryId),
+  undoReceive,
+  recordHistory
 );
 
-router.post("/undoReceive", undoReceive);
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
 
-router.patch("/:deliveryId", (req, res, next) =>
-  checkId(res, next, IncomingDelivery, req.params.deliveryId)
+router.patch(
+  "/:deliveryId",
+  (req, res, next) =>
+    checkId(res, next, IncomingDelivery, req.params.deliveryId),
+  editOne,
+  recordHistory
 );
-router.patch("/:deliveryId", editOne);
+
+router.patch(
+  "/:deliveryId/undoReceipt",
+  (req, res, next) =>
+    checkId(res, next, IncomingDelivery, req.params.deliveryId),
+  undoReceipt,
+  recordHistory
+);
 
 const POTypes = {
   WorkOrder: "WorkOrderPO",
@@ -44,29 +57,18 @@ module.exports = {
  * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
  * THEN delete the matching model doc
  */
-function undoReceive(req, res) {
+function undoReceive(req, res, next) {
   ExpressHandler(
     async () => {
-      const { _id, ...incomingDel } = res.locals.data;
-      const { deliveryId } = req.body;
-      const editMadeBy = req.user._id;
+      const { _id } = res.locals.data;
 
       try {
-        const incDelHist = new IncomingDeliveryHistory({
-          editMadeBy,
-          ...incomingDel,
-        });
-
-        await Promise.all([
-          incDelHist.save(),
-          IncomingDelivery.deleteOne({ _id: ObjectId(deliveryId) }),
-        ]);
+        await IncomingDelivery.deleteOne({ _id: ObjectId(_id) });
+        next();
       } catch (error) {
         LogError(error);
 
-        return HTTPError(
-          `Unexpected error calling undoReceive with ${deliveryId}.`
-        );
+        return HTTPError(`Unexpected error calling undoReceive with ${_id}.`);
       }
     },
     res,
@@ -75,14 +77,39 @@ function undoReceive(req, res) {
 }
 
 /**
- * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
- * THEN commit changes
+ * Clear the linesReceived of the current incomingDelivery
  */
-function editOne(req, res) {
+function undoReceipt(req, res, next) {
   ExpressHandler(
     async () => {
       const { _id, ...incomingDel } = res.locals.data;
-      const edited = req.body;
+
+      try {
+        await IncomingDelivery.updateOne(
+          { _id: _id },
+          {
+            $set: {
+              ...incomingDel,
+              linesReceived: [],
+            },
+          }
+        );
+        next();
+      } catch (error) {
+        LogError(error);
+
+        return HTTPError(`Unexpected error undoing receipt with ${_id}.`);
+      }
+    },
+    res,
+    "undoing delivery receipt"
+  );
+}
+
+function recordHistory(req, res) {
+  ExpressHandler(
+    async () => {
+      const { _id, ...incomingDel } = res.locals.data;
       const editMadeBy = req.user._id;
 
       try {
@@ -91,14 +118,35 @@ function editOne(req, res) {
           ...incomingDel,
         });
 
+        await incDelHist.save();
+      } catch (error) {
+        LogError(error);
+
+        return HTTPError(`Unexpected error recording history for ${_id}.`);
+      }
+    },
+    res,
+    "recording delivery history"
+  );
+}
+
+/**
+ * Create a new incomingDelivery.model.history document with the contents of the CURRENT incomingDelivery.model
+ * THEN commit changes
+ */
+function editOne(req, res, next) {
+  ExpressHandler(
+    async () => {
+      const { _id, ...incomingDel } = res.locals.data;
+      const edited = req.body;
+
+      try {
         const updated = {
           ...incomingDel,
           ...edited,
         };
-        await Promise.all([
-          incDelHist.save(),
-          IncomingDelivery.updateOne({ _id: _id }, { $set: updated }),
-        ]);
+        await IncomingDelivery.updateOne({ _id: _id }, { $set: updated });
+        next();
       } catch (error) {
         LogError(error);
 
@@ -182,7 +230,6 @@ function createOne(req, res) {
         sourceShipmentId
       );
       if (err) return err;
-
       return { data };
     },
     res,
@@ -193,100 +240,77 @@ function createOne(req, res) {
 /**
  * Get the queue of incoming deliveries that have not yet been received.
  */
+
 function getQueue(req, res) {
   ExpressHandler(
     async () => {
-      const query = {
-        receivedOn: {
-          $exists: false,
-        },
-        isPastVersion: { $ne: true },
-      };
-      const _deliveries = await IncomingDelivery.find(query)
-        .lean()
-        .populate({
-          path: "sourceShipmentId",
-          populate: {
-            path: "manifest",
-            model: "packingSlip",
+      const workOrderPOQueue = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: POTypes.WorkOrder,
+            receivedOn: { $exists: false },
           },
-        })
-        .exec();
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "WorkOrderPOs",
+            foreignField: "_id",
+            as: "po",
+          },
+        },
+      ]).exec();
 
-      const ordersSet = new Set(); //use to track all workOrders that need to be fetched
-      const itemsObjs = {};
-      const promises = [];
+      for (let i = 0; i < workOrderPOQueue.length; i++) {
+        const lines = workOrderPOQueue[i]["po"][0]["lines"];
 
-      //map _deliveries into almost final format
-      const deliveries = _deliveries.map((x) => {
-        const { _id, label, sourceShipmentId } = x;
+        for (let j = 0; j < lines.length; j++) {
+          const line = lines[j];
 
-        const manifestArr = [];
-        for (m of sourceShipmentId.manifest) {
-          manifestArr.push(...m.items);
+          const [packingSlip, workorderItem] = await Promise.all([
+            PackingSlip.findById(line["packingSlipId"]),
+            WorkOrder.aggregate([
+              { $match: { "Items._id": line["itemId"] } },
+              {
+                $project: {
+                  Items: {
+                    $filter: {
+                      input: "$Items",
+                      as: "item",
+                      cond: { $eq: ["$$item._id", line["itemId"]] },
+                    },
+                  },
+                },
+              },
+            ]),
+          ]);
+          workOrderPOQueue[i]["po"][0]["lines"][j]["packingSlip"] = packingSlip;
 
-          //check if ordersSet has order number already, add if not
-          if (ordersSet.has(m.orderNumber) === false) {
-            ordersSet.add(m.orderNumber);
-            const _populateItems = async (orderNumber) => {
-              const workOrder = await WorkOrder.findOne({
-                OrderNumber: orderNumber,
-              })
-                .lean()
-                .select("Items")
-                .exec();
-
-              for (const woItem of workOrder.Items) {
-                const {
-                  _id,
-                  OrderNumber,
-                  PartNumber,
-                  PartName,
-                  Revision,
-                  batchNumber,
-                } = woItem;
-                const _woItem = {
-                  _id,
-                  orderNumber: OrderNumber,
-                  partNumber: PartNumber,
-                  partDescription: PartName,
-                  partRev: Revision,
-                  batch: batchNumber,
-                };
-                itemsObjs[woItem._id] = _woItem;
-              }
-            };
-            promises.push(_populateItems(m.orderNumber));
-          }
+          const { Items } = workorderItem[0];
+          workOrderPOQueue[i]["po"][0]["lines"][j]["item"] = Items[0];
         }
+      }
 
-        const _obj = {
-          _id,
-          label,
-          manifest: manifestArr,
-          source: m.destination,
-        };
-
-        return _obj;
-      });
-
-      await Promise.all(promises);
-
-      //loop through deliveries and create mutated ret array
-      const ret = deliveries.map((d) => {
-        const _manifest = d.manifest.map(({ _id, item, qty }) => {
-          return {
-            _id,
-            item: itemsObjs[item],
-            qty,
-          };
-        });
-        d.manifest = _manifest;
-        return d;
-      });
+      const consumablePOQueue = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: POTypes.Consumable,
+            receivedOn: { $exists: false },
+          },
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "ConsumablePOs",
+            foreignField: "_id",
+            as: "po",
+          },
+        },
+      ]).exec();
 
       const data = {
-        incomingDeliveries: ret,
+        workOrderPOQueue,
+        consumablePOQueue,
       };
       return { data };
     },
@@ -415,6 +439,7 @@ async function getSourceShipmentLabel(id) {
 /**
  * Get one incomingDelivery by its _id field.
  * Get incomingDelivery, mutate manifest data to only have packing slip items, ...
+ *
  * ... auto generate createdBy (if needed) and source field (for now it will be ...
  * ... "VENDOR"), get workOrder infomation, set manifest.item infomation to ...
  * ... workOrder item information (only applicable fields for FE use)
@@ -451,6 +476,7 @@ function getOne(req, res) {
       const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
         .lean()
         .select("Items")
+
         .exec();
 
       if (!workOrder) return HTTPError("Work Order not found.", 404);
@@ -492,20 +518,41 @@ function getOne(req, res) {
 function getAllReceived(req, res) {
   ExpressHandler(
     async () => {
-      const query = { receivedOn: { $exists: true } };
-      const _receivedDeliveries = await IncomingDelivery.find(query)
-        .lean()
-        .select("label source receivedOn sourceShipmentId")
-        .populate("sourceShipmentId")
-        .exec();
+      const receivedWorkOrders = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: "WorkOrderPO",
+            receivedOn: { $exists: true },
+          },
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "WorkOrderPOs",
+            foreignField: "_id",
+            as: "sourcePOId",
+          },
+        },
+      ]).exec();
 
-      const receivedDeliveries = _receivedDeliveries
-        .filter((x) => x.sourceShipmentId?.isPastVersion !== true)
-        .map((d) => {
-          delete d.sourceShipmentId;
-          return d;
-        });
+      const receiveConsumables = await IncomingDelivery.aggregate([
+        {
+          $match: {
+            sourcePoType: "ConsumablePO",
+            receivedOn: { $exists: true },
+          },
+        },
+        {
+          $lookup: {
+            localField: "sourcePOId",
+            from: "ConsumablePOs",
+            foreignField: "_id",
+            as: "sourcePOId",
+          },
+        },
+      ]).exec();
 
+      const receivedDeliveries = [...receiveConsumables, ...receivedWorkOrders];
       const data = { receivedDeliveries };
       return { data };
     },

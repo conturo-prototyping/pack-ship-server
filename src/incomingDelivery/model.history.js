@@ -19,19 +19,17 @@ const schema = new Schema({
   // The fields below are exact copies of the same fields in the "model" file.
   label: String,
   createdBy: { type: ObjectId, ref: "user" },
+  sourcePoType: String,
   sourcePOId: {
     type: ObjectId,
     refPath: "sourcePOType",
   },
-  sourcePoType: String,
   linesReceived: [
     {
       poLineId: ObjectId,
       qtyReceived: Number,
     },
   ],
-  sourceShipmentId: { type: ObjectId, ref: "shipment" },
-  receivedQuantities: [{ item: ObjectId, qty: Number }],
   isDueBackOn: String,
   receivedOn: Date,
   receivedBy: { type: ObjectId, ref: "user" },
