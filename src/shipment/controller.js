@@ -208,7 +208,7 @@ async function createOne(req, res) {
           return packingSlip.items.map((m) => {
             return {
               packingSlipId: packingSlip._id,
-              itemId: m._id,
+              itemId: m.item,
               qtyRequested: m.qty,
             };
           });
