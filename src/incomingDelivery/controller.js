@@ -88,7 +88,7 @@ function undoReceive(req, res, next) {
 function undoReceipt(req, res, next) {
   ExpressHandler(
     async () => {
-      const { _id, ...incomingDel } = res.locals.data;
+      const { _id, receivedBy, receivedOn, ...incomingDel } = res.locals.data;
 
       try {
         await IncomingDelivery.updateOne(
@@ -97,6 +97,10 @@ function undoReceipt(req, res, next) {
             $set: {
               ...incomingDel,
               linesReceived: [],
+            },
+            $unset: {
+              receivedOn: 1,
+              receivedBy: 1,
             },
           }
         );
