@@ -450,59 +450,87 @@ function getOne(req, res) {
       const { deliveryId } = req.params;
       if (!deliveryId) return HTTPError("DeliveryId is required.", 400);
 
-      const incomingDelivery = await IncomingDelivery.findOne({
+      let incomingDelivery = await IncomingDelivery.findOne({
         _id: deliveryId,
-      })
-        .populate({
-          path: "sourceShipmentId",
-          populate: {
-            path: "manifest",
-            model: "packingSlip",
-          },
-        })
-        .lean()
-        .exec();
+      }).lean();
 
       if (!incomingDelivery)
         return HTTPError("Incoming delivery not found.", 404);
-
-      const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
 
       // mutate data as needed
       if (!incomingDelivery.createdBy) incomingDelivery.createdBy = "AUTO";
       incomingDelivery.source = "VENDOR";
 
+      let items = undefined;
       //get item information from workOrder
-      const workOrder = await WorkOrder.findOne({ OrderNumber: orderNumber })
-        .lean()
-        .select("Items")
+      if (incomingDelivery.sourcePoType === POTypes.WorkOrder) {
+        items = await WorkOrderPO.findById(incomingDelivery.sourcePOId).lean();
 
-        .exec();
+        const itemList = [];
 
-      if (!workOrder) return HTTPError("Work Order not found.", 404);
-      if (workOrder.Items.length === 0)
-        return HTTPError("No Work Order Items found on Work Order.", 404);
+        // set incomingDelivery.receivedQuantities[].item to item info
+        // (can reduce what info is set to reduce the amount of data being sent)
+        for (const el of incomingDelivery.linesReceived) {
+          const lineId = String(el.poLineId);
+          const woMatch = items.lines.find((x) => String(x._id) === lineId);
 
-      // set incomingDelivery.receivedQuantities[].item to item info
-      // (can reduce what info is set to reduce the amount of data being sent)
-      for (const el of incomingDelivery.receivedQuantities) {
-        const itemId = String(el.item);
-        const itemMatch = workOrder.Items.find((x) => String(x._id) === itemId);
+          if (!woMatch) return HTTPError(`Item not found on workOrder.`);
 
-        if (!itemMatch)
-          return HTTPError(`Item not found on workOrder ${orderNumber}.`);
+          const workOrder = await WorkOrder.aggregate([
+            { $match: { "Items._id": woMatch["itemId"] } },
+            {
+              $project: {
+                Items: {
+                  $filter: {
+                    input: "$Items",
+                    as: "item",
+                    cond: { $eq: ["$$item._id", woMatch["itemId"]] },
+                  },
+                },
+              },
+            },
+          ]);
 
-        const { PartNumber, PartName, Revision, Quantity, batchNumber } =
-          itemMatch;
-        el.item = {
-          PartNumber,
-          PartName,
-          Revision,
-          Quantity,
-          batchNumber,
-          _id: itemId,
-        };
+          if (!workOrder) return HTTPError(`WorkOrder not found for Item.`);
+
+          const { PartNumber, PartName, Revision, Quantity, batchNumber } =
+            workOrder[0].Items[0];
+          itemList.push({
+            PartNumber,
+            PartName,
+            Revision,
+            Quantity,
+            batchNumber,
+            _id: lineId,
+            poLineId: lineId,
+            ...el,
+          });
+        }
+
+        incomingDelivery.linesReceived = itemList;
+      } else if (incomingDelivery.sourcePoType === POTypes.Consumable) {
+        items = await ConsumablePO.findById(incomingDelivery.sourcePOId).lean();
+
+        const itemList = [];
+
+        for (const el of incomingDelivery.linesReceived) {
+          const lineId = String(el.poLineId);
+          const poMatch = items.lines.find((x) => String(x._id) === lineId);
+
+          itemList.push({
+            ...el,
+            ...poMatch,
+            Quantity: poMatch.qtyRequested,
+            qty: el.qtyReceived,
+          });
+        }
+
+        incomingDelivery.linesReceived = itemList;
       }
+
+      if (!items) return HTTPError("Order not found.", 404);
+      if (items.lines.length === 0)
+        return HTTPError("No Order Items found on Order.", 404);
 
       const data = { incomingDelivery };
       return { data };
