@@ -259,7 +259,7 @@ function getQueue(req, res) {
           $match: {
             sourcePoType: POTypes.WorkOrder,
             receivedOn: { $exists: false },
-            canceled: false,
+            $or: [{ canceled: false }, { canceled: undefined }],
           },
         },
         {
