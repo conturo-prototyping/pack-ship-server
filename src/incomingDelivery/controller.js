@@ -32,7 +32,6 @@ router.put(
   (req, res, next) => checkId(res, next, IncomingDelivery, req.body._id),
   setCanceled
 );
-// router.put("/cancel", setCanceled);
 
 router.patch(
   "/:deliveryId",
@@ -579,11 +578,6 @@ function setCanceled(req, res) {
       const { _id, reason } = req.body;
 
       if (!reason) return HTTPError(`Reason is required.`, 400);
-
-      // const incomingDelivery = await IncomingDelivery.findById(_id);
-
-      // if (!incomingDelivery)
-      //   return HTTPError(`Incoming Delivery doesn't exist.`);
 
       if (incomingDelivery.canceled)
         return HTTPError(`Incoming Delivery already canceled.`, 400);
