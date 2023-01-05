@@ -27,6 +27,12 @@ router.post(
 router.get("/allReceived", getAllReceived);
 router.get("/:deliveryId", getOne);
 
+router.put(
+  "/cancel",
+  (req, res, next) => checkId(res, next, IncomingDelivery, req.body._id),
+  setCanceled
+);
+
 router.patch(
   "/:deliveryId",
   (req, res, next) =>
@@ -249,6 +255,7 @@ function getQueue(req, res) {
           $match: {
             sourcePoType: POTypes.WorkOrder,
             receivedOn: { $exists: false },
+            canceled: false,
           },
         },
         {
@@ -560,6 +567,47 @@ function getAllReceived(req, res) {
     "getting all received incoming deliveries"
   );
 }
+
+/**
+ * Used to cancel an incomingDelivery
+ */
+function setCanceled(req, res) {
+  ExpressHandler(
+    async () => {
+      const { ...incomingDelivery } = res.locals.data;
+      const { _id, reason } = req.body;
+
+      if (!reason) return HTTPError(`Reason is required.`, 400);
+
+      if (incomingDelivery.canceled)
+        return HTTPError(`Incoming Delivery already canceled.`, 400);
+
+      if (incomingDelivery.receivedBy)
+        return HTTPError(
+          `Incoming Delivery isn't available to be canceled.`,
+          400
+        );
+
+      await IncomingDelivery.updateOne(
+        { _id: _id },
+        {
+          $set: {
+            canceled: true,
+            canceledReason: reason,
+            canceledOn: Date.now(),
+            canceledBy: req.user._id,
+          },
+        }
+      );
+
+      const data = { message: "success" };
+      return { data };
+    },
+    res,
+    "creating an incoming delivery"
+  );
+}
+
 async function checkId(res, next, model, id) {
   if (!id) {
     // Make sure id is provided
