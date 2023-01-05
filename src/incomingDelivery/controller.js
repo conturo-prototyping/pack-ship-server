@@ -457,15 +457,13 @@ function getOne(req, res) {
       if (!incomingDelivery)
         return HTTPError("Incoming delivery not found.", 404);
 
-      // const { orderNumber } = incomingDelivery.sourceShipmentId.manifest[0];
-
       // mutate data as needed
       if (!incomingDelivery.createdBy) incomingDelivery.createdBy = "AUTO";
       incomingDelivery.source = "VENDOR";
 
       let items = undefined;
       //get item information from workOrder
-      if(incomingDelivery.sourcePoType === POTypes.WorkOrder) {
+      if (incomingDelivery.sourcePoType === POTypes.WorkOrder) {
         items = await WorkOrderPO.findById(incomingDelivery.sourcePOId).lean();
 
         const itemList = [];
@@ -475,10 +473,9 @@ function getOne(req, res) {
         for (const el of incomingDelivery.linesReceived) {
           const lineId = String(el.poLineId);
           const woMatch = items.lines.find((x) => String(x._id) === lineId);
-  
-          if (!woMatch)
-            return HTTPError(`Item not found on workOrder.`);
-          
+
+          if (!woMatch) return HTTPError(`Item not found on workOrder.`);
+
           const workOrder = await WorkOrder.aggregate([
             { $match: { "Items._id": woMatch["itemId"] } },
             {
@@ -494,9 +491,8 @@ function getOne(req, res) {
             },
           ]);
 
-          if(!workOrder)
-            return HTTPError(`WorkOrder not found for Item.`);
-          
+          if (!workOrder) return HTTPError(`WorkOrder not found for Item.`);
+
           const { PartNumber, PartName, Revision, Quantity, batchNumber } =
             workOrder[0].Items[0];
           itemList.push({
@@ -507,12 +503,12 @@ function getOne(req, res) {
             batchNumber,
             _id: lineId,
             poLineId: lineId,
-            ...el
+            ...el,
           });
-        };
+        }
 
         incomingDelivery.linesReceived = itemList;
-      } else if (incomingDelivery.sourcePoType === POTypes.Consumable) {        
+      } else if (incomingDelivery.sourcePoType === POTypes.Consumable) {
         items = await ConsumablePO.findById(incomingDelivery.sourcePOId).lean();
 
         const itemList = [];
@@ -520,14 +516,13 @@ function getOne(req, res) {
         for (const el of incomingDelivery.linesReceived) {
           const lineId = String(el.poLineId);
           const poMatch = items.lines.find((x) => String(x._id) === lineId);
-          
+
           itemList.push({
             ...el,
             ...poMatch,
             Quantity: poMatch.qtyRequested,
-            qty: el.qtyReceived
+            qty: el.qtyReceived,
           });
-
         }
 
         incomingDelivery.linesReceived = itemList;
