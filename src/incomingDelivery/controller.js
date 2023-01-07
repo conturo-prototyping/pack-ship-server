@@ -307,6 +307,7 @@ function getQueue(req, res) {
           $match: {
             sourcePoType: POTypes.Consumable,
             receivedOn: { $exists: false },
+            $or: [{ canceled: false }, { canceled: undefined }],
           },
         },
         {
