@@ -390,7 +390,8 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer, destination, destinationCode } = req.body;
+      const { items, orderNumber, customer, destination, destinationCode } =
+        req.body;
 
       if (destination !== "VENDOR" && destination !== "CUSTOMER") {
         return HTTPError("Destination must be either vendor or customer.", 400);
@@ -456,6 +457,12 @@ async function editPackingSlip(req, res) {
       const { pid } = req.params;
       const { items, destination } = req.body;
 
+      const doc = await PackingSlip.findOne({ _id: pid }).lean();
+
+      if (doc.shipment) {
+        return HTTPError("That packing slip has already been shipped.", 400);
+      }
+
       await updatePackingSlipTrackingHistory(pid);
 
       let updateDict = {};
@@ -515,7 +522,7 @@ async function deletePackingSlip(req, res) {
 async function mergePackingSlips(req, res) {
   ExpressHandler(
     async () => {
-      return HTTPError('Not implemented.', 501);
+      return HTTPError("Not implemented.", 501);
 
       const { pids, orderNumber, tag } = req.body;
 
