@@ -10,10 +10,10 @@ import { ChaiRequest, LocalReset } from '../config';
 require('../config'); // recommended way of loading root hooks
 
 const ENDPOINT_ROOT_URL = '/routers/';
-const ROUTER_TEMPLATE_COLLECTION_NAME = RouteTemplateModel.collection.name;
 const JOB_COLLECTION_NAME = JobModel.collection.name;
 const ROUTER_COLLECTION_NAME = RouterModel.collection.name;
 const ROUTE_STEP_COLLECTION_NAME = RouteStepModel.collection.name;
+const ROUTER_TEMPLATE_COLLECTION_NAME = RouteTemplateModel.collection.name;
 
 // set up DB_URL - NOTE: this only works with a local db, if not set up use the /debug/reset route to generate data (this might not be needed)
 const DB_URL: string = process.env.MONGO_DB_URI!;
@@ -161,7 +161,68 @@ describe('# ROUTER', () => {
     }
   });
 
-  it('Import Router router template not found', async () => {
+  it('Export Router name should already exist.', async () => {
+    const testName = 'Test Name';
+    // create routeStep using mongodb driver
+    const doc = {
+      name: testName,
+      router: [
+        {
+          id: undefined,
+          details: 'Test String',
+        },
+      ],
+    };
+    await CLIENT.db()
+      .collection(ROUTER_TEMPLATE_COLLECTION_NAME)
+      .insertOne(doc);
+
+    try {
+      // hit endpoint to get all routeSteps in collection
+      const res = await ChaiRequest('post', ENDPOINT_ROOT_URL + 'export', {
+        name: testName,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.equal('Template name already exists');
+    }
+  });
+
+  it('Export Router no name provided.', async () => {
+    try {
+      await ChaiRequest('post', ENDPOINT_ROOT_URL + 'export');
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('No name provided');
+    }
+  });
+
+  it('Export Router should create router template.', async () => {
+    const testName = 'Test Name';
+    // create routeStep using mongodb driver
+    const router = {
+      name: testName,
+      router: [
+        {
+          id: undefined,
+          details: 'Test String',
+        },
+      ],
+    };
+
+    try {
+      // hit endpoint to get all routeSteps in collection
+      const res = await ChaiRequest('post', ENDPOINT_ROOT_URL + 'export', {
+        name: testName,
+        router,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.equal('Template name already exists');
+    }
+  });
+
+  it('Import Router router should import existing steps', async () => {
     const routerId = '111111111111111111111111';
     const id = new ObjectId(routerId);
 
@@ -232,14 +293,14 @@ describe('# ROUTER', () => {
       .collection(ROUTER_COLLECTION_NAME)
       .findOne({ _id: id });
 
-    expect(routerData.path[0].step.category).to.be.equal('test');
-    expect(routerData.path[0].step.name).to.be.equal('test');
-    expect(routerData.path[0].stepCode).to.be.equal(1);
-    expect(routerData.path[0].stepDetails).to.be.equal('');
+    expect(routerData!.path[0].step.category).to.be.equal('test');
+    expect(routerData!.path[0].step.name).to.be.equal('test');
+    expect(routerData!.path[0].stepCode).to.be.equal(1);
+    expect(routerData!.path[0].stepDetails).to.be.equal('');
 
-    expect(routerData.path[1].step.category).to.be.equal('category');
-    expect(routerData.path[1].step.name).to.be.equal('Test name');
-    expect(routerData.path[1].stepCode).to.be.equal(undefined);
-    expect(routerData.path[1].stepDetails).to.be.equal('details');
+    expect(routerData!.path[1].step.category).to.be.equal('category');
+    expect(routerData!.path[1].step.name).to.be.equal('Test name');
+    expect(routerData!.path[1].stepCode).to.be.equal(undefined);
+    expect(routerData!.path[1].stepDetails).to.be.equal('details');
   });
 });
