@@ -24,7 +24,7 @@ export const RouteTemplateSchema = new Schema<IRouteTemplate>({
   steps: [{
     id: {
       type: Schema.Types.ObjectId,
-      ref: COLLECTIONS.ROUTE_TEMPLATE,
+      ref: COLLECTIONS.ROUTE_STEP,
     },
     details: String,
   }],
