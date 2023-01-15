@@ -40,21 +40,22 @@ function patchRouteStep(req: express.Request, res: express.Response) {
     async () => {
       const { routeStepId, category, name } = req.body;
 
-      if (!routeStepId)
+      if (!routeStepId) {
         return HTTPError('Route Step ID must be specified.', 400);
+      }
 
       const routeStep = await RouteStepModel.findById(routeStepId);
 
       if (!routeStep) return HTTPError('Step does not exist.', 404);
 
-      let updateDict = {};
+      const updateDict = {};
 
       if (category) {
-        updateDict = { ...updateDict, category };
+        Object.assign(updateDict, { category });
       }
 
       if (name) {
-        updateDict = { ...updateDict, name };
+        Object.assign(updateDict, { name });
       }
 
       await RouteStepModel.updateOne(
@@ -98,8 +99,9 @@ function deleteRouteStep(req: express.Request, res: express.Response) {
   ExpressHandler(
     async () => {
       const { routeStepId } = req.body;
-      if (!routeStepId)
+      if (!routeStepId) {
         return HTTPError('Route Step ID must be specified.', 400);
+      }
 
       const deletedRouteStep = await RouteStepModel.findByIdAndDelete(
         routeStepId,
