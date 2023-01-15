@@ -2,10 +2,11 @@ import express from 'express';
 import { ExpressHandler, HTTPError } from '../utils';
 import { RouteTemplateModel } from '../routeTemplate/model';
 
-const router = express.Router();
-export default router;
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const _router = express.Router();
+export default _router;
 
-router.post('/export', exportRouter);
+_router.post('/export', exportRouter);
 
 function exportRouter(req: express.Request, res: express.Response) {
   ExpressHandler(
