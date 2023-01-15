@@ -2,7 +2,6 @@ import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient, ObjectId } from 'mongodb';
 import { LotModel } from '../../src/lot/model';
-import { DropAllCollections } from '../../src/router.debug';
 import { RouterModel } from '../../src/router/model';
 import { RouteStepModel } from '../../src/routeStep/model';
 import { ChaiRequest } from '../config';
@@ -237,60 +236,76 @@ describe('# LOT', () => {
     expect(actual?.path[1].stepDetails).to.be.eq('step 2 Details');
   });
 
-  it('Ensure 400 is raised when no lotId provided', async () => {
-    try {
-      await ChaiRequest('patch', `${URL}/step`);
-    } catch (err) {
-      expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.equal('Please provide a lotId');
+  it('Ensure 400 is raised when no lotId provided for patch, delete, put', async () => {
+    const methods = ['patch', 'put', 'delete'];
+    for (let index = 0; index < methods.length; index++) {
+      try {
+        await ChaiRequest(methods[index], `${URL}/step`);
+      } catch (err) {
+        expect(err.status).to.be.eq(400);
+        expect(err.text).to.be.equal('Please provide a lotId');
+      }
     }
   });
 
-  it('Ensure 404 is raised when lotId provided but doesnt exist', async () => {
-    try {
-      await ChaiRequest('patch', `${URL}/step`, { lotId: 'fake_id' });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal(`Lot fake_id not found`);
+  it('Ensure 404 is raised when lotId provided but doesnt exist for patch, delete, put', async () => {
+    const methods = ['patch', 'put', 'delete'];
+    for (let index = 0; index < methods.length; index++) {
+      try {
+        await ChaiRequest(methods[index], `${URL}/step`, { lotId: 'fake_id' });
+      } catch (err) {
+        expect(err.status).to.be.eq(404);
+        expect(err.text).to.be.equal(`Lot fake_id not found`);
+      }
     }
   });
 
-  it('Ensure 400 is raised when no stepId is provided', async () => {
-    try {
-      const jobId = new ObjectId('111111111111111111111111');
-      const lotId = new ObjectId('444444444444444444444444');
-      // Create lot
-      const lotDoc = {
-        _id: lotId,
-        jobId: jobId,
-        quantity: 1,
-      };
-      await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
-      await ChaiRequest('patch', `${URL}/step`, { lotId: lotId.toString() });
-    } catch (err) {
-      expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.equal('Please provide a stepId');
+  it('Ensure 400 is raised when no stepId is provided for patch, delete, put', async () => {
+    const jobId = new ObjectId('111111111111111111111111');
+    const lotId = new ObjectId('444444444444444444444444');
+    // Create lot
+    const lotDoc = {
+      _id: lotId,
+      jobId: jobId,
+      quantity: 1,
+    };
+    await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+
+    const methods = ['patch', 'put', 'delete'];
+    for (let index = 0; index < methods.length; index++) {
+      try {
+        await ChaiRequest(methods[index], `${URL}/step`, {
+          lotId: lotId.toString(),
+        });
+      } catch (err) {
+        expect(err.status).to.be.eq(400);
+        expect(err.text).to.be.equal('Please provide a stepId');
+      }
     }
   });
 
-  it('Ensure 404 is raised when stepId is provided but doesnt exist', async () => {
-    try {
-      const jobId = new ObjectId('111111111111111111111111');
-      const lotId = new ObjectId('444444444444444444444444');
-      // Create lot
-      const lotDoc = {
-        _id: lotId,
-        jobId: jobId,
-        quantity: 1,
-      };
-      await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
-      await ChaiRequest('patch', `${URL}/step`, {
-        lotId: lotId.toString(),
-        stepId: 'fake_id',
-      });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal('Router Step fake_id not found');
+  it('Ensure 404 is raised when stepId is provided but doesnt exist for patch, delete, put', async () => {
+    const jobId = new ObjectId('111111111111111111111111');
+    const lotId = new ObjectId('444444444444444444444444');
+    // Create lot
+    const lotDoc = {
+      _id: lotId,
+      jobId: jobId,
+      quantity: 1,
+    };
+    await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
+
+    const methods = ['patch', 'put', 'delete'];
+    for (let index = 0; index < methods.length; index++) {
+      try {
+        await ChaiRequest(methods[index], `${URL}/step`, {
+          lotId: lotId.toString(),
+          stepId: 'fake_id',
+        });
+      } catch (err) {
+        expect(err.status).to.be.eq(404);
+        expect(err.text).to.be.equal('Router Step fake_id not found');
+      }
     }
   });
 
@@ -322,38 +337,6 @@ describe('# LOT', () => {
       expect(err.text).to.be.equal(
         `Router Step ${routerStep1Id.toString()} not found in any lot specialRouters with lot id ${lotId.toString()}`,
       );
-    }
-  });
-
-  it('Ensure 404 is raised when lotId provided but doesnt exist for PUT /step', async () => {
-    try {
-      await ChaiRequest('patch', `${URL}/step`, { lotId: 'fake_id' });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal(`Lot fake_id not found`);
-    }
-  });
-
-  it('Ensure 404 is raised when stepId is provided but doesnt exist for PUT /step', async () => {
-    try {
-      const jobId = new ObjectId('111111111111111111111111');
-      const lotId = new ObjectId('444444444444444444444444');
-      // Create lot
-      const lotDoc = {
-        _id: lotId,
-        jobId: jobId,
-        quantity: 1,
-        specialRouter: [],
-      };
-      await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
-      await ChaiRequest('put', `${URL}/step`, {
-        lotId: lotId.toString(),
-        stepId: 'fake_id',
-        insertAfterIndex: 0,
-      });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal('Router Step fake_id not found');
     }
   });
 
@@ -517,51 +500,109 @@ describe('# LOT', () => {
     expect(c?.path[2]?.stepCode).to.be.eq(200);
   });
 
-  it('Ensure 400 is raised when lotId is not provided for put /lots/step', async () => {
-    try {
-      await ChaiRequest('put', `${URL}/step`, {});
-    } catch (err) {
-      expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.equal(`Please provide a lotId`);
-    }
-  });
+  it('Ensure stepId is marked as isRemoved in a router of a lot for a released job on delete lotes/step', async () => {
+    const step1Id = new ObjectId('111111111111111111111111');
+    await insertOneRouterStep({
+      id: step1Id,
+      name: 'nameA',
+      category: 'catA',
+    });
 
-  it('Ensure 404 is raised when lotId is provided but doesnt exist for put /lots/step', async () => {
-    try {
-      await ChaiRequest('put', `${URL}/step`, { lotId: 'fake_id' });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal(`Lot fake_id not found`);
-    }
-  });
+    const step2Id = new ObjectId('222222222222222222222222');
+    await insertOneRouterStep({
+      id: step2Id,
+      name: 'nameB',
+      category: 'catB',
+    });
 
-  it('Ensure 400 is raised when stepId is not provided for put /lots/step', async () => {
-    try {
-      const routerId = new ObjectId('111111111111111111111111');
-      const jobId = new ObjectId('111111111111111111111111');
-      const lotId = new ObjectId('555555555555555555555555');
-      await insertOneLot({ id: lotId, jobId: jobId, specialRouter: routerId });
-      await ChaiRequest('put', `${URL}/step`, { lotId: lotId.toString() });
-    } catch (err) {
-      expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.equal(`Please provide a stepId`);
-    }
-  });
-
-  it('Ensure 404 is raised when stepId is provided but doesnt exist for put /lots/step', async () => {
-    const routerId = new ObjectId('111111111111111111111111');
     const jobId = new ObjectId('111111111111111111111111');
+    // @ts-ignore
+    await insertOneJob({ id: jobId, released: true });
+
+    const routerId = new ObjectId('111111111111111111111111');
+    const step1: any = {
+      step: { _id: step1Id, name: 'nameA', category: 'catA' },
+      stepDetails: 'step 1 Details',
+    };
+    const step2: any = {
+      step: { _id: step2Id, name: 'nameB', category: 'catB' },
+      stepDetails: 'step 2 Details',
+    };
+    const path: any = [step1, step2];
+    await insertOneRouter({
+      id: routerId,
+      path,
+    });
+
     const lotId = new ObjectId('555555555555555555555555');
     await insertOneLot({ id: lotId, jobId: jobId, specialRouter: routerId });
-    try {
-      await ChaiRequest('put', `${URL}/step`, {
-        lotId: lotId.toString(),
-        stepId: 'fake_id',
-      });
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal(`Router Step fake_id not found`);
-    }
+
+    // hit endpoint to put step
+    await ChaiRequest('delete', `${URL}/step`, {
+      lotId: lotId.toString(),
+      stepId: '111111111111111111111111',
+    });
+
+    const a = await CLIENT.db()
+      .collection(RouterModel.collection.name)
+      .findOne({ _id: routerId });
+
+    expect(a?.path[0].isRemoved).to.be.true;
+    expect(a?.path.length).to.be.eq(2);
+  });
+
+  it('Ensure stepId step is deleted in a router of a lot for an ureleased job on delete lotes/step', async () => {
+    const step1Id = new ObjectId('111111111111111111111111');
+    await insertOneRouterStep({
+      id: step1Id,
+      name: 'nameA',
+      category: 'catA',
+    });
+
+    const step2Id = new ObjectId('222222222222222222222222');
+    await insertOneRouterStep({
+      id: step2Id,
+      name: 'nameB',
+      category: 'catB',
+    });
+
+    const jobId = new ObjectId('111111111111111111111111');
+    // @ts-ignore
+    await insertOneJob({ id: jobId, released: false });
+
+    const routerId = new ObjectId('111111111111111111111111');
+    const step1: any = {
+      step: { _id: step1Id, name: 'nameA', category: 'catA' },
+      stepDetails: 'step 1 Details',
+    };
+    const step2: any = {
+      step: { _id: step2Id, name: 'nameB', category: 'catB' },
+      stepDetails: 'step 2 Details',
+    };
+    const path: any = [step1, step2];
+    await insertOneRouter({
+      id: routerId,
+      path,
+    });
+
+    const lotId = new ObjectId('555555555555555555555555');
+    await insertOneLot({ id: lotId, jobId: jobId, specialRouter: routerId });
+
+    // hit endpoint to put step
+    await ChaiRequest('delete', `${URL}/step`, {
+      lotId: lotId.toString(),
+      stepId: '111111111111111111111111',
+    });
+
+    const a = await CLIENT.db()
+      .collection(RouterModel.collection.name)
+      .findOne({ _id: routerId });
+
+    expect(a?.path.length).to.be.eq(1);
+    expect(a?.path[0].stepDetails).to.be.eq('step 2 Details');
+    expect(a?.path[0].step._id.toString()).to.be.eq(step2Id.toString());
+    expect(a?.path[0].step.name).to.be.eq('nameB');
+    expect(a?.path[0].step.category).to.be.eq('catB');
   });
 });
 
