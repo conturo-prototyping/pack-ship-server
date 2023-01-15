@@ -9,7 +9,6 @@ const URL = '/jobs';
 const COLLECTION_NAME = 'jobs';
 
 describe('# JOB', () => {
-
   it('Should find 1 inserted job.', async () => {
     // create job using mongodb driver
     const doc = {
@@ -24,7 +23,7 @@ describe('# JOB', () => {
       canceled: true,
       stdLotSize: 1,
     };
-    await TEST_DB_CLIENT.db().collection( COLLECTION_NAME ).insertOne(doc);
+    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).insertOne(doc);
 
     // hit endpoint to get all jobs in collection
     const res = await ChaiRequest('get', `${URL}/`);
@@ -43,7 +42,7 @@ describe('# JOB', () => {
     expect(job.stdLotSize).to.be.eq(1);
   });
 
-  it('Should find 1 released planning job.', async () => {    
+  it('Should find 1 released planning job.', async () => {
     await insertOnePart();
     await insertOneJob({});
 
@@ -76,7 +75,9 @@ describe('# JOB', () => {
     await ChaiRequest('post', `${URL}/hold`, {
       jobId,
     });
-    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
     expect(actual!.onHold).to.be.eq(true);
   });
 
@@ -140,7 +141,7 @@ describe('# JOB', () => {
   it('Should fail since the job is onHold already.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, onHold: true });
 
@@ -169,7 +170,9 @@ describe('# JOB', () => {
       jobId,
     });
 
-    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
     expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
     expect(actual!.released, 'released should be true').to.be.eq(true);
 
@@ -196,7 +199,6 @@ describe('# JOB', () => {
       await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
   });
-
 
   it('Should find released job(s) matching orderNumber regex', async () => {
     await insertOneJob({});
@@ -232,7 +234,7 @@ describe('# JOB', () => {
     expect(job.canceled).to.be.eq(false);
     expect(job.customerParts[0].partDescription).to.be.eq('dummy');
   });
-  
+
   it('Should find released job(s) matching partNumber regex', async () => {
     await insertOnePart();
     await insertOneJob({});
@@ -264,7 +266,9 @@ describe('# JOB', () => {
       lotSize: 12,
     });
 
-    const actual = await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).findOne({ _id: id });
+    const actual = await TEST_DB_CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: id });
 
     // check data
     expect(actual!.stdLotSize).to.be.eq(12);
@@ -276,7 +280,7 @@ describe('# JOB', () => {
   it('lot size needs to be included.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, released: false, stdLotSize: 0 });
 
@@ -297,7 +301,7 @@ describe('# JOB', () => {
   it('lot size cannot be edited for released job.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, stdLotSize: 0 });
 
@@ -319,7 +323,7 @@ describe('# JOB', () => {
   it('lot size must be greater than 0.', async () => {
     const jobId = '111111111111111111111111';
     const id = new ObjectId(jobId);
-    
+
     // @ts-ignore
     await insertOneJob({ id, released: false, stdLotSize: 0 });
 
@@ -357,7 +361,7 @@ async function insertOnePart() {
 /**
  * Create a test job document with given criteria
  */
-async function insertOneJob({
+export async function insertOneJob({
   id = undefined,
   released = true,
   onHold = false,
