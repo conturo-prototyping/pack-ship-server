@@ -46,7 +46,6 @@ describe('# ROUTER', () => {
         name: testName,
       });
     } catch (err) {
-      console.log(err);
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.equal('Template name already exists');
     }
@@ -81,7 +80,6 @@ describe('# ROUTER', () => {
         router,
       });
     } catch (err) {
-      console.log(err);
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.equal('Template name already exists');
     }
