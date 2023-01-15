@@ -10,6 +10,7 @@ import debugRouter from './router.debug';
 import LotRouter from './lot/controller';
 import JobRouter from './job/controller';
 import RouteStepRouter from './routeStep/controller';
+import RouterRouter from './router/controller';
 
 require('dotenv').config();
 require('./config.passport')(passport);
@@ -57,6 +58,7 @@ app.use('/users', require('./user/controller'));
 app.use('/routeSteps', RouteStepRouter);
 app.use('/lots', LotRouter);
 app.use('/jobs', JobRouter);
+app.use('/routers', RouterRouter);
 
 app.all('*', (_req, res) => res.sendStatus(404));
 
