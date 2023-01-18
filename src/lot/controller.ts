@@ -10,7 +10,6 @@ import {
   verifyStepId,
   verifyStepIdInLot,
 } from './utils';
-import { RouteStepModel } from '../routeStep/model';
 import { RouterModel } from '../router/model';
 import STEP_CODE_INCREMENT from '../constants';
 
@@ -18,38 +17,19 @@ const LotRouter = express.Router();
 
 // Middleware to verify ids exists in the req body
 // as well as if the it pertains to a valid object
-LotRouter.post(['/scrap'], async (req, res, next) => {
-  verifyLotId(req, res, next, LotModel);
-});
-LotRouter.patch(['/step'], async (req, res, next) => {
-  verifyLotId(req, res, next, LotModel);
-});
-LotRouter.patch(['/step'], async (req, res, next) => {
-  verifyStepId(req, res, next, RouteStepModel);
-});
-LotRouter.patch(['/step'], async (req, res, next) => {
-  verifyStepIdInLot(req, res, next, RouterModel);
-});
-LotRouter.put(['/step'], async (req, res, next) => {
-  verifyLotId(req, res, next, LotModel);
-});
-LotRouter.put(['/step'], async (req, res, next) => {
-  verifyStepId(req, res, next, RouteStepModel);
-});
-LotRouter.delete(['/step'], async (req, res, next) => {
-  verifyLotId(req, res, next, LotModel);
-});
-LotRouter.delete(['/step'], async (req, res, next) => {
-  verifyStepId(req, res, next, RouteStepModel);
-});
-LotRouter.delete(['/step'], async (req, res, next) => {
-  verifyStepIdInLot(req, res, next, RouterModel);
+LotRouter.post(['/scrap'], verifyLotId);
+LotRouter.patch(['/step'], verifyLotId, verifyStepId, verifyStepIdInLot);
+LotRouter.put(['/step'], verifyLotId, verifyStepId);
+LotRouter.delete(['/step'], verifyLotId, verifyStepId, verifyStepIdInLot);
+LotRouter.get(['/:lotId/router'], async (req, res, next) => {
+  verifyLotId(req, res, next, 'param');
 });
 
 LotRouter.post('/scrap', scrapLot);
 LotRouter.patch('/step', patchStep);
 LotRouter.put('/step', addRouteStep);
 LotRouter.delete('/step', deleteRouteStep);
+LotRouter.get('/:lotId/router', getLotRouter);
 
 async function scrapLot(_req: express.Request, res: express.Response) {
   ExpressHandler(
@@ -72,8 +52,8 @@ async function scrapLot(_req: express.Request, res: express.Response) {
 
       const currentRev: string = lot.rev;
       const revN = getRevNumber(currentRev);
-      lot.rev = getRevCode(revN + 1);
-      lot.save();
+      const rev = getRevCode(revN + 1);
+      await LotModel.updateOne({ _id: lot._id }, { $set: { rev } });
       return {};
     },
     res,
@@ -222,6 +202,7 @@ async function patchStep(req: express.Request, res: express.Response) {
     async () => {
       const { lot, specialRouter } = res.locals;
       const { stepDetails, stepId } = req.body;
+
       if (!stepDetails) {
         return HTTPError('stepDetails is empty.', 404);
       }
@@ -241,7 +222,34 @@ async function patchStep(req: express.Request, res: express.Response) {
       return {};
     },
     res,
-    'putting route step',
+    'patch step',
+  );
+}
+
+async function getLotRouter(_req: express.Request, res: express.Response) {
+  ExpressHandler(
+    async () => {
+      const { lot } = res.locals;
+
+      try {
+        const { specialRouter } = lot;
+
+        //get the routher via `specialRouter` id.
+        const foundRouter = await RouterModel.findOne({
+          _id: specialRouter,
+        });
+
+        const data = { router: { path: foundRouter?.path } };
+        return { data };
+      } catch (e) {
+        return HTTPError(
+          `Error occurred trying to get lot's router for lot ${lot._id}.`,
+          500,
+        );
+      }
+    },
+    res,
+    'get lot router',
   );
 }
 
