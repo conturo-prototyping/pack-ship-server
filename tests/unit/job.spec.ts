@@ -389,7 +389,7 @@ async function insertOneRoute(id) {
 /**
  * Create a test job document with given criteria
  */
-async function insertOneJob({
+export async function insertOneJob({
   id = undefined,
   released = true,
   onHold = false,
