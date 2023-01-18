@@ -4,7 +4,7 @@ import { JobModel } from './model';
 import { ExpressHandler, HTTPError } from '../utils';
 import { CustomerPartModel } from '../customerPart/model';
 import { RouterModel } from '../router/model';
-import { STEP_CODE_INCREMENT } from '../constants';
+import STEP_CODE_INCREMENT from '../constants';
 
 const JobRouter = express.Router();
 export default JobRouter;
