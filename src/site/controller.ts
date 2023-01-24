@@ -4,7 +4,7 @@
  * This is where we handle basic functions of sites.
  */
 import { Request, Response, Router } from 'express';
-import { ExpressHandler } from '../utils';
+import { ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
 
 const SiteRouter = Router();
