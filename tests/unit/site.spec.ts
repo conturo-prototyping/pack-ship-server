@@ -63,5 +63,7 @@ async function insertOneSite({
     jobQueues,
     lotQueues,
   };
-  await CLIENT.db().collection(SiteModel.collection.name).insertOne(doc);
+  await TEST_DB_CLIENT.db()
+    .collection(SiteModel.collection.name)
+    .insertOne(doc);
 }
