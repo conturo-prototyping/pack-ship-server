@@ -8,6 +8,7 @@ import { LotModel } from './lot/model';
 import { RouteStepModel } from './routeStep/model';
 import { RouteTemplateModel } from './routeTemplate/model';
 import { IRouter, RouterModel } from './router/model';
+import { SiteModel } from './site/model';
 
 const Customer = require('./customer/model');
 
@@ -219,6 +220,7 @@ export async function DropAllCollections() {
     await dropCollection(RouteStepModel),
     await dropCollection(RouteTemplateModel),
     await dropCollection(RouterModel),
+    await dropCollection(SiteModel),
   ];
 
   if (ok.some((x) => !x)) return [new Error('Error dropping collections')];
