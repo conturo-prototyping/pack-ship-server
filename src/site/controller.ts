@@ -6,9 +6,14 @@
 import { Request, Response, Router } from 'express';
 import { ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
+import { verifySiteId } from './utils';
 
 const SiteRouter = Router();
 export default SiteRouter;
+
+SiteRouter.get(['/:siteId'], (res, req, next) =>
+  verifySiteId(res, req, next, 'param'),
+);
 
 SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
@@ -86,9 +91,9 @@ async function closeSite(_req: Request, res: Response) {
 async function getOneSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
-
-      return {};
+      const { site } = res.locals;
+      const data = { site };
+      return { data };
     },
     res,
     'get one site',
