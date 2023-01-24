@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 const { createTransport } = require('nodemailer');
+const { ObjectId } = require('mongodb');
 
 // Maximum number of times to attempt the MyRetry function before giving up.
 const MAX_ATTEMPTS = 100;
@@ -21,7 +22,12 @@ const HTTPError = (errorMessage, status = 500) => ({
  * @param {Function} f The function to run
  * @param {String} errorMessage A message to display should there be errors.
  */
-const MyRetry = async (f, errorMessage, delay_ms = undefined, maxAttempts = MAX_ATTEMPTS) => {
+const MyRetry = async (
+  f,
+  errorMessage,
+  delay_ms = undefined,
+  maxAttempts = MAX_ATTEMPTS,
+) => {
   const errors = [];
 
   for (let i = 0; i < maxAttempts; i++) {
@@ -35,9 +41,9 @@ const MyRetry = async (f, errorMessage, delay_ms = undefined, maxAttempts = MAX_
 
     if (delay_ms) {
       // eslint-disable-next-line no-await-in-loop
-      await (new Promise((resolve) => {
+      await new Promise((resolve) => {
         setTimeout(resolve, delay_ms);
-      }));
+      });
     }
   }
 
@@ -113,7 +119,9 @@ async function sendMailTo(toAddr, subject, text, html) {
 
   if (process.env.NO_EMAIL === '1') {
     if (process.env.NO_EMAIL_LOG === '1') {
-      console.debug('Email suppressed. Use env NO_EMAIL_LOG=0 to see contents.');
+      console.debug(
+        'Email suppressed. Use env NO_EMAIL_LOG=0 to see contents.',
+      );
     } else {
       console.debug(mailOptions);
     }
@@ -151,7 +159,36 @@ async function sendMailP(mailOptions) {
 }
 
 function stackToDivs(stack) {
-  return stack?.split('\n').map((line) => `<div>${line}</div>`).join('');
+  return stack
+    ?.split('\n')
+    .map((line) => `<div>${line}</div>`)
+    .join('');
+}
+
+async function checkId(res, next, model, id) {
+  if (!id) {
+    // Make sure id is provided
+    res
+      .status(400)
+      .send(`Please provide an id for ${model.collection.collectionName}`);
+  } else if (!ObjectId.isValid(id)) {
+    // Verify if id is valid
+    res
+      .status(404)
+      .send(`${id} for ${model.collection.collectionName} not valid`);
+  } else {
+    // Find the id and if it doesnt exist, raise an error
+    const data = await model.findById(id).lean();
+    // Check if the data exists
+    if (!data) {
+      res
+        .status(404)
+        .send(`${id} for ${model.collection.collectionName} not found`);
+    } else {
+      res.locals.data = data;
+      next();
+    }
+  }
 }
 
 module.exports = {
@@ -159,4 +196,5 @@ module.exports = {
   HTTPError,
   LogError,
   MyRetry,
+  checkId,
 };
