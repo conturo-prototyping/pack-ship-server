@@ -3,22 +3,35 @@
  *
  * This is where we handle basic functions of sites.
  */
-
 import { Request, Response, Router } from 'express';
+import { ExpressHandler } from '../utils';
+import { SiteModel } from './model';
 
-const router = Router();
+const SiteRouter = Router();
+export default SiteRouter;
 
-router.get('/', getAllSites);
-router.put('/', createSite);
-router.delete('/', closeSite);
+SiteRouter.get('/', getAllSites);
+SiteRouter.put('/', createSite);
+SiteRouter.delete('/', closeSite);
 
-router.get('/:siteId', getOneSite);
-router.get('/:siteId/members', getSiteMembers);
-router.put('/:siteId/members', assignMemberToSite);
-router.delete('/:siteId/members', removeMemberFromSite);
+SiteRouter.get('/:siteId', getOneSite);
+SiteRouter.get('/:siteId/members', getSiteMembers);
+SiteRouter.put('/:siteId/members', assignMemberToSite);
+SiteRouter.delete('/:siteId/members', removeMemberFromSite);
 
-function getAllSites(_req: Request, res: Response) {
-  res.sendStatus(501);
+/**
+ * Get a list of all sites
+ */
+async function getAllSites(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const sites = await SiteModel.find().lean();
+      const data = { sites };
+      return { data };
+    },
+    res,
+    'getting all sites',
+  );
 }
 
 function createSite(_req: Request, res: Response) {
