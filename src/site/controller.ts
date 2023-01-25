@@ -4,7 +4,8 @@
  * This is where we handle basic functions of sites.
  */
 import { Request, Response, Router } from 'express';
-import { ExpressHandler, HTTPError } from '../utils';
+import { UserModel } from '../user/model';
+import { checkId, ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
 import { verifySiteId } from './utils';
 
@@ -21,7 +22,14 @@ SiteRouter.delete('/', closeSite);
 
 SiteRouter.get('/:siteId', getOneSite);
 SiteRouter.get('/:siteId/members', getSiteMembers);
-SiteRouter.put('/:siteId/members', assignMemberToSite);
+
+SiteRouter.put(
+  '/:siteId/members',
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
+  assignMemberToSite,
+);
+
 SiteRouter.delete('/:siteId/members', removeMemberFromSite);
 
 /**
@@ -115,7 +123,10 @@ async function getSiteMembers(_req: Request, res: Response) {
 async function assignMemberToSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
+      const _id = _req.params.siteId;
+      const { memberId } = _req.body;
+
+      await SiteModel.updateOne({ _id }, { $push: { staff: memberId } });
 
       return {};
     },

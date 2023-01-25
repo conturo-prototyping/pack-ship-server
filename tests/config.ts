@@ -1,8 +1,9 @@
 import { Express } from 'express';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
-import { DropAllCollections } from '../src/router.debug';
+import { DropAllCollections, dropCollection } from '../src/router.debug';
 import { MongoClient } from 'mongodb';
+import { UserModel } from '../src/user/model';
 
 require('dotenv').config();
 
@@ -38,7 +39,10 @@ after(async () => {
 });
 
 // Local tearn down
-beforeEach(async () => await DropAllCollections());
+beforeEach(async () => {
+  await DropAllCollections();
+  await dropCollection(UserModel);
+});
 
 // Use this db client as needed in spec files
 export const TEST_DB_CLIENT = new MongoClient(process.env.MONGO_DB_URI!);

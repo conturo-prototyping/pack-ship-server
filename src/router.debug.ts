@@ -193,25 +193,25 @@ async function createRandomSetupData(customers) {
   await Promise.all(promises);
 }
 
+export const dropCollection = async (model) => {
+  try {
+    await model.collection.drop();
+
+    return true;
+  } catch (e: any) {
+    // collection doesn't exist; ok
+    if (e.name === 'MongoServerError' && e.code === 26) {
+      return true;
+    }
+    console.error(e);
+    return false;
+  }
+};
+
 /**
  * Drop all collections.
  */
 export async function DropAllCollections() {
-  const dropCollection = async (model) => {
-    try {
-      await model.collection.drop();
-
-      return true;
-    } catch (e: any) {
-      // collection doesn't exist; ok
-      if (e.name === 'MongoServerError' && e.code === 26) {
-        return true;
-      }
-      console.error(e);
-      return false;
-    }
-  };
-
   const ok = [
     await dropCollection(Customer),
     await dropCollection(CustomerPartModel),
