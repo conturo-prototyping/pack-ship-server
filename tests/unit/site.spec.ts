@@ -161,7 +161,8 @@ describe('# SITE', () => {
   });
 
   it('Delete a site with :siteId.', async () => {
-    const siteAId = new ObjectId('111111111111111111111111');
+    const id = '111111111111111111111111';
+    const siteAId = new ObjectId(id);
     await insertOneSite({
       id: siteAId,
       name: 'nameA',
@@ -170,21 +171,18 @@ describe('# SITE', () => {
     });
 
     // make sure its inserted
-    const res1 = await ChaiRequest('get', `${URL}/111111111111111111111111`);
-    const site = res1.body;
-    expect(site.name).to.be.eq('nameA');
+    const res1 = await ChaiRequest('get', `${URL}/${id}`);
+    const site1 = res1.body;
+    expect(site1.name).to.be.eq('nameA');
 
     // delete the site
     await ChaiRequest('delete', `${URL}/`, {
-      siteId: '111111111111111111111111',
+      siteId: id,
     });
 
-    try {
-      await ChaiRequest('get', `${URL}/`);
-    } catch (err) {
-      expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal(`Site ${site.id} not found`);
-    }
+    const res2 = await ChaiRequest('get', `${URL}/${id}`);
+    const site2 = res2.body;
+    expect(site2.inactive).to.be.true;
   });
 
   it('Attempt to delete a site with no :siteId.', async () => {
