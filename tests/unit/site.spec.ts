@@ -10,21 +10,50 @@ require('../config'); // recommended way of loading root hooks
 const URL = '/sites';
 
 describe('# SITE', () => {
-  beforeEach(async () => {
-    try {
-      await UserModel.collection.drop();
-
-      return true;
-    } catch (e: any) {
-      // collection doesn't exist; ok
-      if (e.name === 'MongoServerError' && e.code === 26) {
-        return true;
-      }
-      console.error(e);
-      return false;
-    }
+  it('Insert a new site.', async () => {
+    await ChaiRequest('put', `${URL}/`, {
+      name: 'TEST SITE',
+      location: 'TEST',
+      timezone: 'EST',
+    });
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ name: 'TEST SITE' });
+    expect(site.name).to.be.eq('TEST SITE');
+    expect(site.location[0]).to.be.eq('TEST');
+    expect(site.timezone).to.be.eq('EST');
   });
 
+  it('Should get a list of all sites.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'nameA',
+      location: 'warioLand',
+      timezone: 'pst',
+    });
+
+    const siteBId = new ObjectId('222222222222222222222222');
+    await insertOneSite({
+      id: siteBId,
+      name: 'nameB',
+      location: 'marioLand',
+      timezone: 'est',
+    });
+
+    const res = await ChaiRequest('get', `${URL}/`);
+    expect(res.body.sites.length).to.be.eq(2);
+
+    const siteA = res.body.sites[0];
+    expect(siteA.name).to.be.eq('nameA');
+    expect(siteA.location).to.be.eq('warioLand');
+    expect(siteA.timezone).to.be.eq('pst');
+
+    const siteB = res.body.sites[1];
+    expect(siteB.name).to.be.eq('nameB');
+    expect(siteB.location).to.be.eq('marioLand');
+    expect(siteB.timezone).to.be.eq('est');
+  });
   it('Insert a new site.', async () => {
     await ChaiRequest('put', `${URL}/`, {
       name: 'TEST SITE',
@@ -100,8 +129,14 @@ describe('# SITE', () => {
     await insertUser({ id: memberId });
 
     await ChaiRequest('put', `${URL}/${siteAId}/members`, {
-      memberId,
+      memberId: memberId.toString(),
     });
+
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ _id: siteAId });
+
+    expect(site.staff[0].toString()).to.be.eq('222222222222222222222222');
   });
 
   it('Update a member fails on site exists.', async () => {
@@ -130,7 +165,7 @@ describe('# SITE', () => {
       await ChaiRequest('put', `${URL}/${siteAId}/members`);
     } catch (err) {
       expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.equal('Missing required arg, memberId.');
+      expect(err.text).to.be.equal('Please provide an id for users');
     }
   });
 
@@ -145,7 +180,9 @@ describe('# SITE', () => {
       });
     } catch (err) {
       expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal('Member does not exist.');
+      expect(err.text).to.be.equal(
+        '222222222222222222222222 for users not found',
+      );
     }
   });
 });

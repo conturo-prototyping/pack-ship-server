@@ -3,32 +3,43 @@
  *
  * This is where we handle basic functions of sites.
  */
-
 import { Request, Response, Router } from 'express';
 import { UserModel } from '../user/model';
 import { checkId, ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
 
-const router = Router();
-export default router;
+const SiteRouter = Router();
+export default SiteRouter;
 
-router.get('/', getAllSites);
-router.put('/', createSite);
-router.delete('/', closeSite);
+SiteRouter.get('/', getAllSites);
+SiteRouter.put('/', createSite);
+SiteRouter.delete('/', closeSite);
 
-router.get('/:siteId', getOneSite);
+SiteRouter.get('/:siteId', getOneSite);
+SiteRouter.get('/:siteId/members', getSiteMembers);
 
-router.get('/:siteId/members', getSiteMembers);
-
-router.put(
+SiteRouter.put(
   '/:siteId/members',
   (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
   assignMemberToSite,
 );
-router.delete('/:siteId/members', removeMemberFromSite);
 
-function getAllSites(_req: Request, res: Response) {
-  res.sendStatus(501);
+SiteRouter.delete('/:siteId/members', removeMemberFromSite);
+
+/**
+ * Get a list of all sites
+ */
+async function getAllSites(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const sites = await SiteModel.find().lean();
+      const data = { sites };
+      return { data };
+    },
+    res,
+    'getting all sites',
+  );
 }
 
 async function createSite(_req: Request, res: Response) {
@@ -107,14 +118,8 @@ async function getSiteMembers(_req: Request, res: Response) {
 async function assignMemberToSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      const { _id } = res.locals.data;
+      const _id = _req.params.siteId;
       const { memberId } = _req.body;
-
-      if (!memberId) return HTTPError('Missing required arg, memberId.', 400);
-
-      const user = await UserModel.findById(memberId);
-
-      if (!user) return HTTPError('Member does not exist.', 404);
 
       await SiteModel.updateOne({ _id }, { $push: { staff: memberId } });
 
