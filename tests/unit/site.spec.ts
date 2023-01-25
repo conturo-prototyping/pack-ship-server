@@ -134,13 +134,16 @@ describe('# SITE', () => {
       location: 'warioLand',
       timezone: 'pst',
     });
+
     // make sure its inserted
-    const res1 = await ChaiRequest('get', `${URL}/${siteAId.id}`);
+    const res1 = await ChaiRequest('get', `${URL}/111111111111111111111111`);
     const site = res1.body.site;
     expect(site.name).to.be.eq('nameA');
 
     // delete the site
-    await ChaiRequest('delete', `${URL}/`, { siteId: site.id });
+    await ChaiRequest('delete', `${URL}/`, {
+      siteId: '111111111111111111111111',
+    });
 
     try {
       await ChaiRequest('get', `${URL}/`);
@@ -149,41 +152,41 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal(`Site ${site.id} not found`);
     }
   });
-});
 
-it('Attempt to delete a site with not :siteId.', async () => {
-  const siteAId = new ObjectId('111111111111111111111111');
-  await insertOneSite({
-    id: siteAId,
-    name: 'nameA',
-    location: 'warioLand',
-    timezone: 'pst',
+  it('Attempt to delete a site with no :siteId.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'nameA',
+      location: 'warioLand',
+      timezone: 'pst',
+    });
+    // make sure its inserted
+    const res1 = await ChaiRequest('get', `${URL}/111111111111111111111111`);
+    const site = res1.body.site;
+    expect(site.name).to.be.eq('nameA');
+
+    // delete the site with no siteId
+
+    try {
+      await ChaiRequest('delete', `${URL}/`, {});
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Please provide a siteId');
+    }
   });
-  // make sure its inserted
-  const res1 = await ChaiRequest('get', `${URL}/${siteAId.id}`);
-  const site = res1.body.site;
-  expect(site.name).to.be.eq('nameA');
 
-  // delete the site with no siteId
-
-  try {
-    await ChaiRequest('delete', `${URL}/`, {});
-  } catch (err) {
-    expect(err.status).to.be.eq(400);
-    expect(err.text).to.be.equal('Please provide a siteId');
-  }
-});
-
-it('Delete a site that does not exist', async () => {
-  const site = new ObjectId('111111111111111111111111');
-
-  // delete the site that doesnt exist
-  try {
-    await ChaiRequest('delete', `${URL}/`, {});
-  } catch (err) {
-    expect(err.status).to.be.eq(404);
-    expect(err.text).to.be.equal(`Site ${site.id} not found`);
-  }
+  it('Delete a site that does not exist', async () => {
+    // delete the site that doesnt exist
+    try {
+      await ChaiRequest('delete', `${URL}/`, {
+        siteId: '111111111111111111111111',
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(`Site 111111111111111111111111 not found`);
+    }
+  });
 });
 
 async function insertOneSite({

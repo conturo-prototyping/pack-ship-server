@@ -11,10 +11,10 @@ import { verifySiteId } from './utils';
 const SiteRouter = Router();
 export default SiteRouter;
 
-SiteRouter.get(['/:siteId'], (res, req, next) =>
+SiteRouter.get(['/:siteId'], async (res, req, next) =>
   verifySiteId(res, req, next, 'param'),
 );
-SiteRouter.delete(['/:siteId'], verifySiteId);
+SiteRouter.delete(['/'], verifySiteId);
 
 SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
