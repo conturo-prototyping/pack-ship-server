@@ -125,6 +125,65 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal('Name already exists.');
     }
   });
+
+  it('Delete a site with :siteId.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'nameA',
+      location: 'warioLand',
+      timezone: 'pst',
+    });
+    // make sure its inserted
+    const res1 = await ChaiRequest('get', `${URL}/${siteAId.id}`);
+    const site = res1.body.site;
+    expect(site.name).to.be.eq('nameA');
+
+    // delete the site
+    await ChaiRequest('delete', `${URL}/`, { siteId: site.id });
+
+    try {
+      await ChaiRequest('get', `${URL}/`);
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(`Site ${site.id} not found`);
+    }
+  });
+});
+
+it('Attempt to delete a site with not :siteId.', async () => {
+  const siteAId = new ObjectId('111111111111111111111111');
+  await insertOneSite({
+    id: siteAId,
+    name: 'nameA',
+    location: 'warioLand',
+    timezone: 'pst',
+  });
+  // make sure its inserted
+  const res1 = await ChaiRequest('get', `${URL}/${siteAId.id}`);
+  const site = res1.body.site;
+  expect(site.name).to.be.eq('nameA');
+
+  // delete the site with no siteId
+
+  try {
+    await ChaiRequest('delete', `${URL}/`, {});
+  } catch (err) {
+    expect(err.status).to.be.eq(400);
+    expect(err.text).to.be.equal('Please provide a siteId');
+  }
+});
+
+it('Delete a site that does not exist', async () => {
+  const site = new ObjectId('111111111111111111111111');
+
+  // delete the site that doesnt exist
+  try {
+    await ChaiRequest('delete', `${URL}/`, {});
+  } catch (err) {
+    expect(err.status).to.be.eq(404);
+    expect(err.text).to.be.equal(`Site ${site.id} not found`);
+  }
 });
 
 async function insertOneSite({

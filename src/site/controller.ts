@@ -14,6 +14,7 @@ export default SiteRouter;
 SiteRouter.get(['/:siteId'], (res, req, next) =>
   verifySiteId(res, req, next, 'param'),
 );
+SiteRouter.delete(['/:siteId'], verifySiteId);
 
 SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
@@ -79,7 +80,8 @@ async function createSite(_req: Request, res: Response) {
 async function closeSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
+      const { site } = res.locals;
+      await SiteModel.deleteOne({ _id: site.id });
 
       return {};
     },
