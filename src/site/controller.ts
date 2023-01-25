@@ -15,7 +15,7 @@ SiteRouter.get(['/:siteId'], (req, res, next) =>
   checkId(res, next, SiteModel, req.params.siteId),
 );
 SiteRouter.delete(['/'], (req, res, next) =>
-  checkId(res, next, SiteModel, req.body.memberId),
+  checkId(res, next, SiteModel, req.body.siteId),
 );
 
 SiteRouter.get('/', getAllSites);

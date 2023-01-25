@@ -171,7 +171,7 @@ describe('# SITE', () => {
 
     // make sure its inserted
     const res1 = await ChaiRequest('get', `${URL}/111111111111111111111111`);
-    const site = res1.body.site;
+    const site = res1.body;
     expect(site.name).to.be.eq('nameA');
 
     // delete the site
@@ -197,7 +197,7 @@ describe('# SITE', () => {
     });
     // make sure its inserted
     const res1 = await ChaiRequest('get', `${URL}/111111111111111111111111`);
-    const site = res1.body.site;
+    const site = res1.body;
     expect(site.name).to.be.eq('nameA');
 
     // delete the site with no siteId
@@ -206,7 +206,7 @@ describe('# SITE', () => {
       await ChaiRequest('delete', `${URL}/`, {});
     } catch (err) {
       expect(err.status).to.be.eq(400);
-      expect(err.text).to.be.equal('Please provide a siteId');
+      expect(err.text).to.be.equal('Please provide an id for sites');
     }
   });
 
@@ -218,7 +218,12 @@ describe('# SITE', () => {
       });
     } catch (err) {
       expect(err.status).to.be.eq(404);
-      expect(err.text).to.be.equal(`Site 111111111111111111111111 not found`);
+      expect(err.text).to.be.equal(
+        '111111111111111111111111 for sites not found',
+      );
+    }
+  });
+
   it('Update a member.', async () => {
     const siteAId = new ObjectId('111111111111111111111111');
     await insertOneSite({ id: siteAId, name: 'TEST SITE', location: 'TEST' });
