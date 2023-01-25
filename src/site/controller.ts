@@ -4,17 +4,19 @@
  * This is where we handle basic functions of sites.
  */
 import { Request, Response, Router } from 'express';
-import { ExpressHandler, HTTPError } from '../utils';
+import { UserModel } from '../user/model';
+import { checkId, ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
-import { verifySiteId } from './utils';
 
 const SiteRouter = Router();
 export default SiteRouter;
 
-SiteRouter.get(['/:siteId'], async (res, req, next) =>
-  verifySiteId(res, req, next, 'param'),
+SiteRouter.get(['/:siteId'], (req, res, next) =>
+  checkId(res, next, SiteModel, req.params.siteId),
 );
-SiteRouter.delete(['/'], verifySiteId);
+SiteRouter.delete(['/'], (req, res, next) =>
+  checkId(res, next, SiteModel, req.body.memberId),
+);
 
 SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
@@ -22,7 +24,14 @@ SiteRouter.delete('/', closeSite);
 
 SiteRouter.get('/:siteId', getOneSite);
 SiteRouter.get('/:siteId/members', getSiteMembers);
-SiteRouter.put('/:siteId/members', assignMemberToSite);
+
+SiteRouter.put(
+  '/:siteId/members',
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
+  assignMemberToSite,
+);
+
 SiteRouter.delete('/:siteId/members', removeMemberFromSite);
 
 /**
@@ -80,8 +89,15 @@ async function createSite(_req: Request, res: Response) {
 async function closeSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      const { site } = res.locals;
-      await SiteModel.deleteOne({ _id: site.id });
+      const { data } = res.locals;
+      await SiteModel.updateOne(
+        { _id: data.id },
+        {
+          $set: {
+            inactive: true,
+          },
+        },
+      );
 
       return {};
     },
@@ -93,8 +109,7 @@ async function closeSite(_req: Request, res: Response) {
 async function getOneSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      const { site } = res.locals;
-      const data = { site };
+      const { data } = res.locals;
       return { data };
     },
     res,
@@ -117,7 +132,10 @@ async function getSiteMembers(_req: Request, res: Response) {
 async function assignMemberToSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
+      const _id = _req.params.siteId;
+      const { memberId } = _req.body;
+
+      await SiteModel.updateOne({ _id }, { $push: { staff: memberId } });
 
       return {};
     },
