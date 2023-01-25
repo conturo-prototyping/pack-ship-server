@@ -7,13 +7,12 @@ import { Request, Response, Router } from 'express';
 import { UserModel } from '../user/model';
 import { checkId, ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
-import { verifySiteId } from './utils';
 
 const SiteRouter = Router();
 export default SiteRouter;
 
-SiteRouter.get(['/:siteId'], (res, req, next) =>
-  verifySiteId(res, req, next, 'param'),
+SiteRouter.get(['/:siteId'], (req, res, next) =>
+  checkId(res, next, SiteModel, req.params.siteId),
 );
 
 SiteRouter.get('/', getAllSites);
@@ -99,8 +98,7 @@ async function closeSite(_req: Request, res: Response) {
 async function getOneSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      const { site } = res.locals;
-      const data = { site };
+      const { data } = res.locals;
       return { data };
     },
     res,

@@ -66,12 +66,23 @@ describe('# SITE', () => {
     });
 
     const res = await ChaiRequest('get', `${URL}/${id}`);
-    const siteA = res.body.site;
+    const siteA = res.body;
 
     expect(siteA.name).to.be.eq('nameA');
     expect(siteA.location[0]).to.be.eq('warioLand');
     expect(siteA.location[1]).to.be.eq("bowser's castle");
     expect(siteA.timezone).to.be.eq('pst');
+  });
+
+  it('Attempt to get site with nonexistant :siteId.', async () => {
+    try {
+      await ChaiRequest('get', `${URL}/111111111111111111111111`);
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        '111111111111111111111111 for sites not found',
+      );
+    }
   });
 
   it('Insert a new site.', async () => {
@@ -80,6 +91,7 @@ describe('# SITE', () => {
       location: 'TEST',
       timezone: 'EST',
     });
+  });
 
   it('Insert a new site.', async () => {
     await ChaiRequest('put', `${URL}/`, {
