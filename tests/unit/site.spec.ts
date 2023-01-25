@@ -185,6 +185,39 @@ describe('# SITE', () => {
       );
     }
   });
+
+  it('Get staff members.', async () => {
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'TEST SITE',
+      location: 'TEST',
+      staff: [memberId],
+    });
+
+    const res = await ChaiRequest('get', `${URL}/${siteAId}/members`);
+
+    expect(res.body[0].toString()).to.be.eq('222222222222222222222222');
+  });
+
+  it("Get staff members but site doesn't exist.", async () => {
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    const siteAId = new ObjectId('111111111111111111111111');
+
+    try {
+      await ChaiRequest('get', `${URL}/${siteAId}/members`);
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        '111111111111111111111111 for sites not found',
+      );
+    }
+  });
 });
 
 async function insertOneSite({

@@ -16,12 +16,19 @@ SiteRouter.put('/', createSite);
 SiteRouter.delete('/', closeSite);
 
 SiteRouter.get('/:siteId', getOneSite);
-SiteRouter.get('/:siteId/members', getSiteMembers);
+SiteRouter.get(
+  '/:siteId/members',
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.params.siteId),
+  getSiteMembers,
+);
 
 SiteRouter.put(
   '/:siteId/members',
-  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
-  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.params.siteId),
+  async (req, res, next) =>
+    await checkId(res, next, UserModel, req.body.memberId),
   assignMemberToSite,
 );
 
@@ -106,9 +113,9 @@ async function getOneSite(_req: Request, res: Response) {
 async function getSiteMembers(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
+      const { staff } = res.locals.data;
 
-      return {};
+      return { data: staff };
     },
     res,
     'get site members',
