@@ -38,22 +38,42 @@ describe('# SITE', () => {
     expect(siteB.name).to.be.eq('nameB');
     expect(siteB.location).to.be.eq('marioLand');
     expect(siteB.timezone).to.be.eq('est');
-  }),
-    it('Insert a new site.', async () => {
-      await ChaiRequest('put', `${URL}/`, {
-        name: 'TEST SITE',
-        location: 'TEST',
-        timezone: 'EST',
-      });
+  });
 
-      const site = await TEST_DB_CLIENT.db()
-        .collection(SiteModel.collection.name)
-        .findOne({ name: 'TEST SITE' });
-
-      expect(site.name).to.be.eq('TEST SITE');
-      expect(site.location[0]).to.be.eq('TEST');
-      expect(site.timezone).to.be.eq('EST');
+  it('Should get a single id with :siteId.', async () => {
+    const id = '111111111111111111111111';
+    const siteAId = new ObjectId(id);
+    await insertOneSite({
+      id: siteAId,
+      name: 'nameA',
+      location: ['warioLand', "bowser's castle"],
+      timezone: 'pst',
     });
+
+    const res = await ChaiRequest('get', `${URL}/${id}`);
+    const siteA = res.body.site;
+
+    expect(siteA.name).to.be.eq('nameA');
+    expect(siteA.location[0]).to.be.eq('warioLand');
+    expect(siteA.location[1]).to.be.eq("bowser's castle");
+    expect(siteA.timezone).to.be.eq('pst');
+  });
+
+  it('Insert a new site.', async () => {
+    await ChaiRequest('put', `${URL}/`, {
+      name: 'TEST SITE',
+      location: 'TEST',
+      timezone: 'EST',
+    });
+
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ name: 'TEST SITE' });
+
+    expect(site.name).to.be.eq('TEST SITE');
+    expect(site.location[0]).to.be.eq('TEST');
+    expect(site.timezone).to.be.eq('EST');
+  });
 
   it('Insert a new site name missing.', async () => {
     try {
