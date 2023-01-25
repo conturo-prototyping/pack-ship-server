@@ -3,12 +3,27 @@ import { describe, it } from 'mocha';
 import { ObjectId } from 'mongodb';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
 import { SiteModel } from '../../src/site/model';
+import { UserModel } from '../../src/user/model';
 
 require('../config'); // recommended way of loading root hooks
 
 const URL = '/sites';
 
 describe('# SITE', () => {
+  it('Insert a new site.', async () => {
+    await ChaiRequest('put', `${URL}/`, {
+      name: 'TEST SITE',
+      location: 'TEST',
+      timezone: 'EST',
+    });
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ name: 'TEST SITE' });
+    expect(site.name).to.be.eq('TEST SITE');
+    expect(site.location[0]).to.be.eq('TEST');
+    expect(site.timezone).to.be.eq('EST');
+  });
+
   it('Should get a list of all sites.', async () => {
     const siteAId = new ObjectId('111111111111111111111111');
     await insertOneSite({
@@ -38,22 +53,22 @@ describe('# SITE', () => {
     expect(siteB.name).to.be.eq('nameB');
     expect(siteB.location).to.be.eq('marioLand');
     expect(siteB.timezone).to.be.eq('est');
-  }),
-    it('Insert a new site.', async () => {
-      await ChaiRequest('put', `${URL}/`, {
-        name: 'TEST SITE',
-        location: 'TEST',
-        timezone: 'EST',
-      });
-
-      const site = await TEST_DB_CLIENT.db()
-        .collection(SiteModel.collection.name)
-        .findOne({ name: 'TEST SITE' });
-
-      expect(site.name).to.be.eq('TEST SITE');
-      expect(site.location[0]).to.be.eq('TEST');
-      expect(site.timezone).to.be.eq('EST');
+  });
+  it('Insert a new site.', async () => {
+    await ChaiRequest('put', `${URL}/`, {
+      name: 'TEST SITE',
+      location: 'TEST',
+      timezone: 'EST',
     });
+
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ name: 'TEST SITE' });
+
+    expect(site.name).to.be.eq('TEST SITE');
+    expect(site.location[0]).to.be.eq('TEST');
+    expect(site.timezone).to.be.eq('EST');
+  });
 
   it('Insert a new site name missing.', async () => {
     try {
@@ -105,6 +120,71 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal('Name already exists.');
     }
   });
+
+  it('Update a member.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({ id: siteAId, name: 'TEST SITE', location: 'TEST' });
+
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    await ChaiRequest('put', `${URL}/${siteAId}/members`, {
+      memberId: memberId.toString(),
+    });
+
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ _id: siteAId });
+
+    expect(site.staff[0].toString()).to.be.eq('222222222222222222222222');
+  });
+
+  it('Update a member fails on site exists.', async () => {
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    try {
+      await ChaiRequest('put', `${URL}/111111111111111111111111/members`, {
+        memberId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        '111111111111111111111111 for sites not found',
+      );
+    }
+  });
+
+  it('Update a member fails on site exists.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({ id: siteAId, name: 'TEST SITE', location: 'TEST' });
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    try {
+      await ChaiRequest('put', `${URL}/${siteAId}/members`);
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Please provide an id for users');
+    }
+  });
+
+  it("Update a member fails on member doesn't exist.", async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({ id: siteAId, name: 'TEST SITE', location: 'TEST' });
+    const memberId = new ObjectId('222222222222222222222222');
+
+    try {
+      await ChaiRequest('put', `${URL}/${siteAId}/members`, {
+        memberId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        '222222222222222222222222 for users not found',
+      );
+    }
+  });
 });
 
 async function insertOneSite({
@@ -127,5 +207,14 @@ async function insertOneSite({
   };
   await TEST_DB_CLIENT.db()
     .collection(SiteModel.collection.name)
+    .insertOne(doc);
+}
+
+async function insertUser({ id }) {
+  const doc = {
+    _id: id,
+  };
+  await TEST_DB_CLIENT.db()
+    .collection(UserModel.collection.name)
     .insertOne(doc);
 }
