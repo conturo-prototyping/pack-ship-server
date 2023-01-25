@@ -91,7 +91,7 @@ async function closeSite(_req: Request, res: Response) {
     async () => {
       const { data } = res.locals;
       await SiteModel.updateOne(
-        { _id: data.id },
+        { _id: data._id },
         {
           $set: {
             inactive: true,
