@@ -14,9 +14,20 @@ export default SiteRouter;
 
 SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
-SiteRouter.delete('/', closeSite);
+SiteRouter.delete(
+  '/',
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.body.siteId),
+  closeSite,
+);
 
-SiteRouter.get('/:siteId', getOneSite);
+SiteRouter.get(
+  '/:siteId',
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.params.siteId),
+  getOneSite,
+);
+
 SiteRouter.get(
   '/:siteId/members',
   async (req, res, next) =>
@@ -95,7 +106,15 @@ async function createSite(_req: Request, res: Response) {
 async function closeSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
+      const { data } = res.locals;
+      await SiteModel.updateOne(
+        { _id: data._id },
+        {
+          $set: {
+            inactive: true,
+          },
+        },
+      );
 
       return {};
     },
@@ -107,9 +126,8 @@ async function closeSite(_req: Request, res: Response) {
 async function getOneSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
-
-      return {};
+      const { data } = res.locals;
+      return { data };
     },
     res,
     'get one site',
