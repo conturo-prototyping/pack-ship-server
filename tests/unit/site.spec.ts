@@ -112,6 +112,8 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal('Missing required arg, timezone.');
       return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Insert a new site name missing.', async () => {
