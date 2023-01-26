@@ -4,6 +4,7 @@
  * This is where we handle basic functions of sites.
  */
 import { Request, Response, Router } from 'express';
+import { ObjectId } from 'mongoose';
 import { UserModel } from '../user/model';
 import { checkId, ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
@@ -29,7 +30,12 @@ SiteRouter.put(
   assignMemberToSite,
 );
 
-SiteRouter.delete('/:siteId/members', removeMemberFromSite);
+SiteRouter.delete(
+  '/:siteId/members',
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.params.siteId),
+  removeMemberFromSite,
+);
 
 /**
  * Get a list of all sites
@@ -136,7 +142,22 @@ async function assignMemberToSite(_req: Request, res: Response) {
 async function removeMemberFromSite(_req: Request, res: Response) {
   ExpressHandler(
     async () => {
-      res.sendStatus(501);
+      const { memberId } = _req.body;
+      const { _id, staff } = res.locals.data;
+
+      if (!memberId) return HTTPError('Missing required arg, memberId.', 400);
+
+      if (!staff.some((e: ObjectId) => e.toString() === memberId))
+        return HTTPError('User is not a member of that site.', 405);
+
+      await SiteModel.updateOne(
+        { _id },
+        {
+          $pull: {
+            staff: memberId,
+          },
+        },
+      );
 
       return {};
     },
