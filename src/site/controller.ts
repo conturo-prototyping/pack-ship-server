@@ -16,7 +16,8 @@ SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
 SiteRouter.delete(
   '/',
-  (req, res, next) => checkId(res, next, SiteModel, req.body.siteId),
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.body.siteId),
   closeSite,
 );
 
