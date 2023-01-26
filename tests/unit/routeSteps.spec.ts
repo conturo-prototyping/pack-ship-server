@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient, ObjectId } from 'mongodb';
 import { RouteStepModel } from '../../src/routeStep/model';
@@ -19,7 +19,7 @@ const CLIENT = new MongoClient(DB_URL);
 describe('# ROUTE STEPS', () => {
   // connect to db before all
   before(async () => await CLIENT.connect().catch(console.error));
-  
+
   // teardown after each test
   afterEach(async () => await LocalReset());
 
@@ -39,21 +39,32 @@ describe('# ROUTE STEPS', () => {
   });
 
   it('PUT /routeStep should insert 1 successfully.', async () => {
-    await ChaiRequest('put', ENDPOINT_ROOT_URL, { category: 'cat', name: 'nam' });
-    const sniff = await CLIENT.db().collection(COLLECTION_NAME).find().toArray();
+    await ChaiRequest('put', ENDPOINT_ROOT_URL, {
+      category: 'cat',
+      name: 'nam',
+    });
+    const sniff = await CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .find()
+      .toArray();
 
     expect(sniff.length).to.be.eq(1);
   });
 
   it('DELETE /routeStep should delete 1 successfully.', async () => {
-    await CLIENT.db().collection(COLLECTION_NAME).insertOne({ category: 'cat', name: 'nam' });
+    await CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .insertOne({ category: 'cat', name: 'nam' });
     const doc = await CLIENT.db().collection(COLLECTION_NAME).findOne();
 
     await ChaiRequest('delete', ENDPOINT_ROOT_URL, { routeStepId: doc!._id });
-    const sniff = await CLIENT.db().collection(COLLECTION_NAME).find().toArray();
+    const sniff = await CLIENT.db()
+      .collection(COLLECTION_NAME)
+      .find()
+      .toArray();
 
     expect(sniff.length).to.be.eq(0);
-  })
+  });
 
   it('PATCH /routeStep should update category correctly.', async () => {
     const stepId = '111111111111111111111111';
@@ -144,7 +155,10 @@ describe('# ROUTE STEPS', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Route Step ID must be specified.');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('PATCH /routeStep should error with no RouteStep to update.', async () => {
@@ -159,6 +173,9 @@ describe('# ROUTE STEPS', () => {
     } catch (err) {
       expect(err.status).to.be.eq(404);
       expect(err.text).to.be.equal('Step does not exist.');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 });

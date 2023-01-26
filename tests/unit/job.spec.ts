@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { describe, it } from 'mocha';
 import { ObjectId } from 'mongodb';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
@@ -89,14 +89,21 @@ describe('# JOB', () => {
       `${URL}/lotSize`,
     ];
 
-    for (const i in routes) {
-      try {
-        await ChaiRequest('post', routes[i]);
-      } catch (err) {
-        expect(err.status).to.be.eq(400);
-        expect(err.text).to.be.equal('Please provide a jobId');
-      }
-    }
+    const failures = [true, true, true, true];
+
+    await Promise.all(
+      routes.map(async (value, index) => {
+        try {
+          await ChaiRequest('post', value);
+        } catch (err) {
+          expect(err.status).to.be.eq(400);
+          expect(err.text).to.be.equal('Please provide a jobId');
+          failures[index] = false;
+        }
+      }),
+    );
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should fail where jobId is provided but does not exist.', async () => {
@@ -109,16 +116,23 @@ describe('# JOB', () => {
       `${URL}/lotSize`,
     ];
 
-    for (const i in routes) {
-      try {
-        await ChaiRequest('post', routes[i], {
-          jobId,
-        });
-      } catch (err) {
-        expect(err.status).to.be.eq(404);
-        expect(err.text).to.equal(`Job ${jobId} not found`);
-      }
-    }
+    const failures = [true, true, true, true];
+
+    await Promise.all(
+      routes.map(async (value, index) => {
+        try {
+          await ChaiRequest('post', value, {
+            jobId,
+          });
+        } catch (err) {
+          expect(err.status).to.be.eq(404);
+          expect(err.text).to.equal(`Job ${jobId} not found`);
+          failures[index] = false;
+        }
+      }),
+    );
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should fail since the job is not released.', async () => {
@@ -135,7 +149,10 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} has not been released yet`);
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should fail since the job is onHold already.', async () => {
@@ -152,10 +169,10 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} is already on hold`);
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should release job from on hold.', async () => {
@@ -175,9 +192,6 @@ describe('# JOB', () => {
       .findOne({ _id: id });
     expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
     expect(actual!.released, 'released should be true').to.be.eq(true);
-
-    // drop collection to maintain stateless tests
-    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
   });
 
   it('Should fail since the job is already canceled.', async () => {
@@ -194,10 +208,10 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} has already been canceled`);
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should find released job(s) matching orderNumber regex', async () => {
@@ -292,10 +306,13 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.eq(`Please provide a lotSize`);
+      return;
     } finally {
       // drop collection to maintain stateless tests
       await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('lot size cannot be edited for released job.', async () => {
@@ -314,10 +331,10 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job cannot be released.`);
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('lot size must be greater than 0.', async () => {
@@ -336,10 +353,10 @@ describe('# JOB', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.eq(`lotSize must be > 0`);
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 });
 

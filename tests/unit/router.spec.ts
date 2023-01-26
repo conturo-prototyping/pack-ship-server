@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient, ObjectId } from 'mongodb';
 import { JobModel } from '../../src/job/model';
@@ -36,7 +36,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('No routerId provided');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Import Router name no router template ID', async () => {
@@ -47,7 +50,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('No routerTemplateId provided');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Import Router job released', async () => {
@@ -95,7 +101,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.equal('Router is already released');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Import Router router not found', async () => {
@@ -110,7 +119,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(404);
       expect(err.text).to.be.equal('Router not found');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Import Router router template not found', async () => {
@@ -158,7 +170,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(404);
       expect(err.text).to.be.equal('Router Template not found');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Export Router name should already exist.', async () => {
@@ -185,7 +200,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.equal('Template name already exists');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Export Router no name provided.', async () => {
@@ -194,7 +212,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('No name provided');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Export Router should create router template.', async () => {
@@ -210,6 +231,19 @@ describe('# ROUTER', () => {
       ],
     };
 
+    const doc = {
+      name: testName,
+      router: [
+        {
+          id: undefined,
+          details: 'Test String',
+        },
+      ],
+    };
+    await CLIENT.db()
+      .collection(ROUTER_TEMPLATE_COLLECTION_NAME)
+      .insertOne(doc);
+
     try {
       // hit endpoint to get all routeSteps in collection
       const res = await ChaiRequest('post', ENDPOINT_ROOT_URL + 'export', {
@@ -219,7 +253,10 @@ describe('# ROUTER', () => {
     } catch (err) {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.equal('Template name already exists');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Import Router router should import existing steps', async () => {
