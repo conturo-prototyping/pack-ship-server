@@ -220,7 +220,10 @@ describe('# SITE', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Please provide an id for sites');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Delete a site that does not exist', async () => {
