@@ -170,9 +170,6 @@ describe('# JOB', () => {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} is already on hold`);
       return;
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
 
     assert.fail(0, 1, 'Exception not thrown');
@@ -195,9 +192,6 @@ describe('# JOB', () => {
       .findOne({ _id: id });
     expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
     expect(actual!.released, 'released should be true').to.be.eq(true);
-
-    // drop collection to maintain stateless tests
-    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
   });
 
   it('Should fail since the job is already canceled.', async () => {
@@ -215,9 +209,6 @@ describe('# JOB', () => {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job ${jobId} has already been canceled`);
       return;
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
 
     assert.fail(0, 1, 'Exception not thrown');
@@ -341,9 +332,6 @@ describe('# JOB', () => {
       expect(err.status).to.be.eq(405);
       expect(err.text).to.be.eq(`Job cannot be released.`);
       return;
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
 
     assert.fail(0, 1, 'Exception not thrown');
@@ -366,9 +354,6 @@ describe('# JOB', () => {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.eq(`lotSize must be > 0`);
       return;
-    } finally {
-      // drop collection to maintain stateless tests
-      await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
     }
 
     assert.fail(0, 1, 'Exception not thrown');
