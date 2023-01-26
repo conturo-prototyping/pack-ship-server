@@ -175,6 +175,74 @@ describe('# SITE', () => {
     assert.fail(0, 1, 'Exception not thrown');
   });
 
+  it('Delete a site with :siteId.', async () => {
+    const id = '111111111111111111111111';
+    const siteAId = new ObjectId(id);
+    await insertOneSite({
+      id: siteAId,
+      name: 'nameA',
+      location: 'warioLand',
+      timezone: 'pst',
+    });
+
+    // make sure its inserted
+    const res1 = await ChaiRequest('get', `${URL}/${id}`);
+    const site1 = res1.body;
+    expect(site1.name).to.be.eq('nameA');
+
+    // delete the site
+    await ChaiRequest('delete', `${URL}/`, {
+      siteId: id,
+    });
+
+    const res2 = await ChaiRequest('get', `${URL}/${id}`);
+    const site2 = res2.body;
+    expect(site2.inactive).to.be.true;
+  });
+
+  it('Attempt to delete a site with no :siteId.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'nameA',
+      location: 'warioLand',
+      timezone: 'pst',
+    });
+    // make sure its inserted
+    const res1 = await ChaiRequest('get', `${URL}/111111111111111111111111`);
+    const site = res1.body;
+    expect(site.name).to.be.eq('nameA');
+
+    // delete the site with no siteId
+
+    try {
+      await ChaiRequest('delete', `${URL}/`, {});
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Please provide an id for sites');
+      return;
+    }
+
+    assert.fail(0, 1, 'Exception not thrown');
+  });
+
+  it('Delete a site that does not exist', async () => {
+    // delete the site that doesnt exist
+    try {
+      await ChaiRequest('delete', `${URL}/`, {
+        siteId: '111111111111111111111111',
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        '111111111111111111111111 for sites not found',
+      );
+      return;
+    }
+
+    assert.fail(0, 1, 'Exception not thrown');
+  });
+
   it('Update a member.', async () => {
     const siteAId = new ObjectId('111111111111111111111111');
     await insertOneSite({ id: siteAId, name: 'TEST SITE', location: 'TEST' });

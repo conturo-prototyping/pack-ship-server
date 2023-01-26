@@ -12,6 +12,9 @@ export interface ISite extends Document {
   // The name of the site; e.g. HQ
   name: string;
 
+  // Has beeen closed
+  inactive: boolean;
+
   // Shipping address of the site; each line is a new string in the array.
   location: string[];
 
@@ -29,6 +32,7 @@ export interface ISite extends Document {
 }
 
 export const SiteSchema = new Schema<ISite>({
+  inactive: Boolean,
   name: String,
   location: [String],
   timezone: String,
