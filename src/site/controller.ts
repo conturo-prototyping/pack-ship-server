@@ -12,21 +12,25 @@ import { SiteModel } from './model';
 const SiteRouter = Router();
 export default SiteRouter;
 
-SiteRouter.get(['/:siteId'], (req, res, next) =>
-  checkId(res, next, SiteModel, req.params.siteId),
-);
-
 SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
 SiteRouter.delete('/', closeSite);
 
-SiteRouter.get('/:siteId', getOneSite);
+SiteRouter.get(
+  '/:siteId',
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.params.siteId),
+  getOneSite,
+);
+
 SiteRouter.get('/:siteId/members', getSiteMembers);
 
 SiteRouter.put(
   '/:siteId/members',
-  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
-  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
+  async (req, res, next) =>
+    await checkId(res, next, SiteModel, req.params.siteId),
+  async (req, res, next) =>
+    await checkId(res, next, UserModel, req.body.memberId),
   assignMemberToSite,
 );
 
