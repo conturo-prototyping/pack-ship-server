@@ -234,7 +234,10 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal(
         '111111111111111111111111 for sites not found',
       );
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Update a member.', async () => {
