@@ -1,9 +1,8 @@
 import express, { NextFunction } from 'express';
 import { ObjectId } from 'mongodb';
-import { Model } from 'mongoose';
-import { IRouter } from '../router/model';
-import { IRouteStep } from '../routeStep/model';
-import { ILot } from './model';
+import { RouterModel } from '../router/model';
+import { RouteStepModel } from '../routeStep/model';
+import { LotModel } from './model';
 
 export function getRevCode(n: number) {
   if (n < 1) {
@@ -40,9 +39,9 @@ export async function verifyLotId(
   req: express.Request,
   res: express.Response,
   next: NextFunction,
-  model: Model<ILot, {}, {}, {}, any>,
+  check: 'param' | 'body' = 'body',
 ) {
-  const { lotId } = req.body;
+  const { lotId } = check === 'body' ? req.body : req.params;
   if (!lotId) {
     // Make sure lotId is provided
     res.status(400).send('Please provide a lotId');
@@ -51,7 +50,7 @@ export async function verifyLotId(
     res.status(404).send(`Lot ${lotId} not found`);
   } else {
     // Find the lot and if it doesnt exist, raise an error
-    const lot = await model.findById(lotId);
+    const lot = await LotModel.findById(lotId).lean();
 
     // Check if the lot exists
     if (!lot) {
@@ -67,7 +66,6 @@ export async function verifyStepId(
   req: express.Request,
   res: express.Response,
   next: NextFunction,
-  model: Model<IRouteStep, {}, {}, {}, any>,
 ) {
   const { stepId } = req.body;
   if (!stepId) {
@@ -78,7 +76,7 @@ export async function verifyStepId(
     res.status(404).send(`Router Step ${stepId} not found`);
   } else {
     // Find the step and if it doesnt exist, raise an error
-    const step = await model.findById(stepId);
+    const step = await RouteStepModel.findById(stepId).lean();
 
     // Check if the step exists
     if (!step) {
@@ -94,7 +92,6 @@ export async function verifyStepIdInLot(
   req: express.Request,
   res: express.Response,
   next: NextFunction,
-  model: Model<IRouter, {}, {}, {}, any>,
 ) {
   const { stepId, lotId } = req.body;
   if (!stepId) {
@@ -105,27 +102,40 @@ export async function verifyStepIdInLot(
     res.status(404).send(`Router Step ${stepId} not found`);
   } else {
     // Find the step with stepId in a specialRouter in a lot with lotId
-    const specialRouterOId = res.locals.lot?.specialRouter;
-    if (!specialRouterOId) {
-      res.status(404).send(`specialRouter doesnt exist for lotId: ${lotId}.`);
-    }
-
     const stepOid = new ObjectId(stepId);
+    const lotpOid = new ObjectId(lotId);
+    const result = await LotModel.aggregate([
+      {
+        $lookup: {
+          from: RouterModel.collection.collectionName,
+          localField: 'specialRouter',
+          foreignField: '_id',
+          as: 'specialRouter',
+        },
+      },
+      {
+        $match: {
+          $and: [{ 'specialRouter.path.step._id': stepOid }, { _id: lotpOid }],
+        },
+      },
+    ]);
 
-    // Ensure the router has the specified step id
-    const specialRouter = await model.findOne({
-      'path.step._id': stepOid,
-      _id: specialRouterOId._id,
-    });
-
-    if (!specialRouter) {
+    // Check if the step exists
+    if (result.length === 0) {
       res
         .status(404)
         .send(
           `Router Step ${stepId} not found in any lot specialRouters with lot id ${lotId}`,
         );
+    }
+    if (result.length > 1) {
+      res
+        .status(404)
+        .send(
+          `Found more than one lot with Router Step ${stepId} and lot ${lotId}`,
+        );
     } else {
-      res.locals.specialRouter = specialRouter;
+      res.locals.specialRouter = result[0].specialRouter[0];
       next();
     }
   }
