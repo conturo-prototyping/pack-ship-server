@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { describe, it } from 'mocha';
 import { ObjectId } from 'mongodb';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
@@ -82,7 +82,10 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal(
         '111111111111111111111111 for sites not found',
       );
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Insert a new site.', async () => {
@@ -118,7 +121,10 @@ describe('# SITE', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Missing required arg, name.');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Insert a new site location missing.', async () => {
@@ -130,7 +136,10 @@ describe('# SITE', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Missing required arg, location.');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Insert a new site timezone missing.', async () => {
@@ -142,7 +151,10 @@ describe('# SITE', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Missing required arg, timezone.');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Insert a new site name missing.', async () => {
@@ -157,7 +169,10 @@ describe('# SITE', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Name already exists.');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Delete a site with :siteId.', async () => {
@@ -253,7 +268,9 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal(
         '111111111111111111111111 for sites not found',
       );
+      return;
     }
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Update a member fails on site exists.', async () => {
@@ -267,7 +284,10 @@ describe('# SITE', () => {
     } catch (err) {
       expect(err.status).to.be.eq(400);
       expect(err.text).to.be.equal('Please provide an id for users');
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it("Update a member fails on member doesn't exist.", async () => {
@@ -284,7 +304,99 @@ describe('# SITE', () => {
       expect(err.text).to.be.equal(
         '222222222222222222222222 for users not found',
       );
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
+  });
+
+  it('Delete staff members.', async () => {
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'TEST SITE',
+      location: 'TEST',
+      staff: [memberId],
+    });
+
+    const res = await ChaiRequest('delete', `${URL}/${siteAId}/members`, {
+      memberId,
+    });
+
+    const site = await TEST_DB_CLIENT.db()
+      .collection(SiteModel.collection.name)
+      .findOne({ _id: siteAId });
+
+    expect(site.staff).to.be.eql([]);
+  });
+
+  it("Delete staff members but site doesn't exist.", async () => {
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    const siteAId = new ObjectId('111111111111111111111111');
+
+    try {
+      await ChaiRequest('delete', `${URL}/${siteAId}/members`, {
+        memberId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(
+        '111111111111111111111111 for sites not found',
+      );
+      return;
+    }
+
+    assert.fail(0, 1, 'Exception not thrown');
+  });
+
+  it('Delete staff members but member not in staff.', async () => {
+    const memberId = new ObjectId('222222222222222222222222');
+    await insertUser({ id: memberId });
+
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'TEST SITE',
+      location: 'TEST',
+      staff: [],
+    });
+
+    try {
+      await ChaiRequest('delete', `${URL}/${siteAId}/members`, {
+        memberId,
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(405);
+      expect(err.text).to.be.equal('User is not a member of that site.');
+      return;
+    }
+
+    assert.fail(0, 1, 'Exception not thrown');
+  });
+
+  it('Delete staff members but member not in input.', async () => {
+    const siteAId = new ObjectId('111111111111111111111111');
+    await insertOneSite({
+      id: siteAId,
+      name: 'TEST SITE',
+      location: 'TEST',
+      staff: [],
+    });
+
+    try {
+      await ChaiRequest('delete', `${URL}/${siteAId}/members`);
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Missing required arg, memberId.');
+      return;
+    }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 });
 
