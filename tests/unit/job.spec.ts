@@ -1,6 +1,7 @@
 import { assert, expect } from 'chai';
 import { describe, it } from 'mocha';
 import { ObjectId } from 'mongodb';
+import { RouterModel } from '../../src/router/model';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
 
 require('../config'); // recommended way of loading root hooks
@@ -177,21 +178,41 @@ describe('# JOB', () => {
 
   it('Should release job from on hold.', async () => {
     const jobId = '111111111111111111111111';
-    const id = new ObjectId(jobId);
+    const jobIdObj = new ObjectId(jobId);
+    const routerId = '333333333333333333333333';
+    const routerIdObj = new ObjectId(routerId);
 
-    // @ts-ignore
-    await insertOneJob({ id, onHold: true, released: false });
+    await insertOneRoute(routerIdObj);
+    await insertOneJob({
+      // @ts-ignore
+      id: jobIdObj,
+      onHold: true,
+      released: false,
+      // @ts-ignore
+      router: routerIdObj,
+    });
 
     // hit endpoint to get the job and check if onHold is true
-    const res = await ChaiRequest('post', `${URL}/release`, {
+    await ChaiRequest('post', `${URL}/release`, {
       jobId,
     });
 
-    const actual = await TEST_DB_CLIENT.db()
+    const actualJob = await TEST_DB_CLIENT.db()
       .collection(COLLECTION_NAME)
-      .findOne({ _id: id });
-    expect(actual!.onHold, 'onhold should be false').to.be.eq(false);
-    expect(actual!.released, 'released should be true').to.be.eq(true);
+      .findOne({ _id: jobIdObj });
+    expect(actualJob!.onHold, 'onhold should be false').to.be.eq(false);
+    expect(actualJob!.released, 'released should be true').to.be.eq(true);
+
+    // Make sure route path stepCodes are present and incremented
+    const actualRoute = await TEST_DB_CLIENT.db()
+      .collection(RouterModel.collection.name)
+      .findOne({ _id: routerIdObj });
+
+    expect(actualRoute!.path[0].stepCode, 'first is 100').to.be.eq(100);
+    expect(actualRoute!.path[1].stepCode, 'second is 200').to.be.eq(200);
+
+    // drop collection to maintain stateless tests
+    await TEST_DB_CLIENT.db().collection(COLLECTION_NAME).drop();
   });
 
   it('Should fail since the job is already canceled.', async () => {
@@ -375,6 +396,16 @@ async function insertOnePart() {
   await TEST_DB_CLIENT.db().collection('customerParts').insertOne(partDoc);
 }
 
+async function insertOneRoute(id) {
+  const routeDoc = {
+    _id: id,
+    path: [{ step: 'step1' }, { step: 'step2' }],
+  };
+  await TEST_DB_CLIENT.db()
+    .collection(RouterModel.collection.name)
+    .insertOne(routeDoc);
+}
+
 /**
  * Create a test job document with given criteria
  */
@@ -384,6 +415,7 @@ export async function insertOneJob({
   onHold = false,
   canceled = false,
   stdLotSize = 1,
+  router = undefined,
 }) {
   const jobDoc = {
     partId: DUMMY_PART_ID,
@@ -400,6 +432,7 @@ export async function insertOneJob({
     onHold,
     canceled,
     stdLotSize,
+    router,
   };
 
   // @ts-ignore

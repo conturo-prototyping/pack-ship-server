@@ -3,6 +3,8 @@ import { ObjectId } from 'mongodb';
 import { JobModel } from './model';
 import { ExpressHandler, HTTPError } from '../utils';
 import { CustomerPartModel } from '../customerPart/model';
+import { RouterModel } from '../router/model';
+import STEP_CODE_INCREMENT from '../constants';
 
 const JobRouter = express.Router();
 export default JobRouter;
@@ -144,11 +146,26 @@ async function releaseJob(_req: express.Request, res: express.Response) {
     async () => {
       const { job } = res.locals;
 
-      // update job onHold status
-      job.onHold = false;
-      job.released = true;
-      job.save();
-      return {};
+      if (!job.released) {
+        // update job onHold status
+        job.onHold = false;
+        job.released = true;
+        job.save();
+
+        if (job.router) {
+          const router = await RouterModel.findById(job.router);
+          if (router) {
+            for (let i = 0; i < router.path.length; i++) {
+              router.path[i].stepCode = STEP_CODE_INCREMENT * (i + 1);
+            }
+            router.save();
+          }
+        }
+
+        res.status(200).send('Success');
+      } else {
+        res.status(200).send('Job already released');
+      }
     },
     res,
     'release job',
@@ -181,7 +198,8 @@ async function setStdLotSize(req: express.Request, res: express.Response) {
       // If there is no Job ID, we can't do anything
       if (lotSize === undefined) {
         return HTTPError('Please provide a lotSize', 400);
-      } if (lotSize <= 0) {
+      }
+      if (lotSize <= 0) {
         return HTTPError('lotSize must be > 0', 400);
       }
 

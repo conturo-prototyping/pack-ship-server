@@ -373,6 +373,66 @@ describe('# LOT', () => {
     assert.fail(0, 1, 'Exception not thrown');
   });
 
+  it('Ensure 404 is raised when lotId is provided but doesnt exist, when getting a router for lotId', async () => {
+    try {
+      const lolId = 'fake_id';
+      await ChaiRequest('get', `${URL}/${lolId}/router`);
+    } catch (err) {
+      expect(err.status).to.be.eq(404);
+      expect(err.text).to.be.equal(`Lot fake_id not found`);
+    }
+  });
+
+  it('When lotId is provided and does exist, get the full router', async () => {
+    const jobId = new ObjectId('111111111111111111111111');
+    const routerStep1Id = new ObjectId('222222222222222222222222');
+    const routerStep2Id = new ObjectId('333333333333333333333333');
+    const routerElement1Id = new ObjectId('222222222222222222222222');
+    const routerElement2Id = new ObjectId('333333333333333333333333');
+    const lotId = new ObjectId('444444444444444444444444');
+    const routerId = new ObjectId('555555555555555555555555');
+
+    const routerStep1 = {
+      id: routerStep1Id.toString(),
+      name: 'routerName',
+      category: 'routerCat',
+    };
+    const routerStep2 = {
+      id: routerStep2Id.toString(),
+      name: 'routerName',
+      category: 'routerCat',
+    };
+    // Create routerSteps
+    await insertOneRouterStep(routerStep1);
+    await insertOneRouterStep(routerStep2);
+
+    // Create router
+    const path: any = [
+      {
+        step: routerStep1,
+        stepCode: 100,
+        stepDetails: 'step 1 Details',
+        _id: routerElement1Id.toString(),
+      },
+      {
+        step: routerStep2,
+        stepCode: 200,
+        stepDetails: 'step 2 Details',
+        _id: routerElement2Id.toString(),
+      },
+    ];
+    await insertOneRouter({
+      id: routerId,
+      path,
+    });
+
+    // Create Lot
+    await insertOneLot({ id: lotId, jobId: jobId, specialRouter: routerId });
+
+    const res = await ChaiRequest('get', `${URL}/${lotId.toString()}/router`);
+    expect(res.body.router.path).to.eql(path);
+  });
+
   it("Update Lot's router to add consecutive steps of path for unreleased job", async () => {
     await insertOneRouterStep({
       id: new ObjectId('111111111111111111111111'),
