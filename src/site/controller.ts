@@ -8,6 +8,7 @@ import { ObjectId } from 'mongoose';
 import { UserModel } from '../user/model';
 import { checkId, ExpressHandler, HTTPError } from '../utils';
 import { SiteModel } from './model';
+import { isValidTimeZone } from '../util/timezone';
 
 const SiteRouter = Router();
 export default SiteRouter;
@@ -76,6 +77,9 @@ async function createSite(_req: Request, res: Response) {
       if (!timezone) {
         return HTTPError('Missing required arg, timezone.', 400);
       }
+
+      if (!isValidTimeZone(timezone))
+        return HTTPError('Timezone must be valid.', 400);
 
       const existingSite = await SiteModel.findOne({ name });
 

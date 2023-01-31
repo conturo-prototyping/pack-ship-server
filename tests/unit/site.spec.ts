@@ -175,6 +175,22 @@ describe('# SITE', () => {
     assert.fail(0, 1, 'Exception not thrown');
   });
 
+  it('Insert a new site bad timezone.', async () => {
+    try {
+      await ChaiRequest('put', `${URL}/`, {
+        name: 'TEST SITE',
+        location: 'TEST',
+        timezone: 'BAD TIMEZONE',
+      });
+    } catch (err) {
+      expect(err.status).to.be.eq(400);
+      expect(err.text).to.be.equal('Timezone must be valid.');
+      return;
+    }
+
+    assert.fail(0, 1, 'Exception not thrown');
+  });
+
   it('Delete a site with :siteId.', async () => {
     const id = '111111111111111111111111';
     const siteAId = new ObjectId(id);
