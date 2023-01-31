@@ -21,7 +21,7 @@ LotRouter.post(['/scrap'], verifyLotId);
 LotRouter.patch(['/step'], verifyLotId, verifyStepId, verifyStepIdInLot);
 LotRouter.put(['/step'], verifyLotId, verifyStepId);
 LotRouter.delete(['/step'], verifyLotId, verifyStepId, verifyStepIdInLot);
-LotRouter.get(['/:lotId/router'], async (req, res, next) => {
+LotRouter.get(['/:lotId/router'], (req, res, next) => {
   verifyLotId(req, res, next, 'param');
 });
 

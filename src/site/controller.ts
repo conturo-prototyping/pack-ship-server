@@ -16,38 +16,32 @@ SiteRouter.get('/', getAllSites);
 SiteRouter.put('/', createSite);
 SiteRouter.delete(
   '/',
-  async (req, res, next) =>
-    await checkId(res, next, SiteModel, req.body.siteId),
+  (req, res, next) => checkId(res, next, SiteModel, req.body.siteId),
   closeSite,
 );
 
 SiteRouter.get(
   '/:siteId',
-  async (req, res, next) =>
-    await checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
   getOneSite,
 );
 
 SiteRouter.get(
   '/:siteId/members',
-  async (req, res, next) =>
-    await checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
   getSiteMembers,
 );
 
 SiteRouter.put(
   '/:siteId/members',
-  async (req, res, next) =>
-    await checkId(res, next, SiteModel, req.params.siteId),
-  async (req, res, next) =>
-    await checkId(res, next, UserModel, req.body.memberId),
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
   assignMemberToSite,
 );
 
 SiteRouter.delete(
   '/:siteId/members',
-  async (req, res, next) =>
-    await checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
   removeMemberFromSite,
 );
 
