@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { ChaiRequest, TEST_DB_CLIENT } from '../config';
 import { SiteModel } from '../../src/site/model';
 import { UserModel } from '../../src/user/model';
+import { PLURAL_COLLECTIONS } from '../../src/global.collectionNames';
 
 require('../config'); // recommended way of loading root hooks
 
@@ -17,7 +18,7 @@ describe('# SITE', () => {
       timezone: 'EST',
     });
     const site = await TEST_DB_CLIENT.db()
-      .collection(SiteModel.collection.name)
+      .collection(PLURAL_COLLECTIONS.SITE)
       .findOne({ name: 'TEST SITE' });
     expect(site.name).to.be.eq('TEST SITE');
     expect(site.location[0]).to.be.eq('TEST');
@@ -104,7 +105,7 @@ describe('# SITE', () => {
     });
 
     const site = await TEST_DB_CLIENT.db()
-      .collection(SiteModel.collection.name)
+      .collection(PLURAL_COLLECTIONS.SITE)
       .findOne({ name: 'TEST SITE' });
 
     expect(site.name).to.be.eq('TEST SITE');
@@ -255,7 +256,7 @@ describe('# SITE', () => {
     });
 
     const site = await TEST_DB_CLIENT.db()
-      .collection(SiteModel.collection.name)
+      .collection(PLURAL_COLLECTIONS.SITE)
       .findOne({ _id: siteAId });
 
     expect(site.staff[0].toString()).to.be.eq('222222222222222222222222');
@@ -333,7 +334,7 @@ describe('# SITE', () => {
     });
 
     const site = await TEST_DB_CLIENT.db()
-      .collection(SiteModel.collection.name)
+      .collection(PLURAL_COLLECTIONS.SITE)
       .findOne({ _id: siteAId });
 
     expect(site.staff).to.be.eql([]);
@@ -457,16 +458,12 @@ async function insertOneSite({
     jobQueues,
     lotQueues,
   };
-  await TEST_DB_CLIENT.db()
-    .collection(SiteModel.collection.name)
-    .insertOne(doc);
+  await TEST_DB_CLIENT.db().collection(PLURAL_COLLECTIONS.SITE).insertOne(doc);
 }
 
 async function insertUser({ id }) {
   const doc = {
     _id: id,
   };
-  await TEST_DB_CLIENT.db()
-    .collection(UserModel.collection.name)
-    .insertOne(doc);
+  await TEST_DB_CLIENT.db().collection(PLURAL_COLLECTIONS.USER).insertOne(doc);
 }
