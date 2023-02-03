@@ -6,29 +6,22 @@
  *  more useful to process the entire job once all lots are present, rather than lot by lot.
  */
 
-import {
-  model, Schema, Document, Types,
-} from 'mongoose';
+import { model, Schema } from 'mongoose';
 import { COLLECTIONS } from '../global.collectionNames';
+import { IQueue } from '../queues/model';
 
-export interface IJobQueue extends Document {
-  // The name of this queue; e.g. "Planning"
-  name: string;
-
-  // Description of this queue
-  description: string;
-
-  // Jobs currently in this queue
-  jobsInQueue: Types.ObjectId[];
-}
-
-export const JobQueueSchema = new Schema<IJobQueue>({
+export const JobQueueSchema = new Schema<IQueue>({
   name: String,
   description: String,
-  jobsInQueue: [{
-    type: Schema.Types.ObjectId,
-    ref: COLLECTIONS.JOB,
-  }],
+  itemsInQueue: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: COLLECTIONS.JOB,
+    },
+  ],
 });
 
-export const JobQueueModel = model<IJobQueue>(COLLECTIONS.JOB_QUEUE, JobQueueSchema);
+export const JobQueueModel = model<IQueue>(
+  COLLECTIONS.JOB_QUEUE,
+  JobQueueSchema,
+);
