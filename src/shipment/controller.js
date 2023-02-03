@@ -530,6 +530,7 @@ async function getAsPdf(req, res) {
 
         promises.push(GetOrderFulfillmentInfo(orderNumber));
 
+        // eslint-disable-next-line
         const [woDoc, [shippingError, shipmentInfo]] = await Promise.all(promises);
         const { purchaseOrderNumber } = woDoc;
         purchaseOrderNumbers.push(purchaseOrderNumber);

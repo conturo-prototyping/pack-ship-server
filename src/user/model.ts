@@ -1,7 +1,10 @@
-// models/employees/User.js
-// document Schema for every user that logs in via Google OAuth2
+/**
+ * For now, User only referns to an employee or staff member.
+ * They all log in via Google OAuth2.0
+ */
 
-import { Document, model, Schema } from 'mongoose';
+import { model, Schema, Document } from 'mongoose';
+import { COLLECTIONS } from '../global.collectionNames';
 
 export interface IUser extends Document {
   google: {
@@ -29,4 +32,4 @@ export const UserSchema = new Schema<IUser>({
   IsActive: Boolean,
 });
 
-export const UserModel = model<IUser>('user', UserSchema);
+export const UserModel = model<IUser>(COLLECTIONS.USER, UserSchema);

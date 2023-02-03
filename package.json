@@ -34,6 +34,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.2",
     "express": "^4.18.1",
+    "mongodb": "^4.10.0",
     "mongoose": "^6.5.4",
     "node-redis": "^0.1.7",
     "nodemailer": "^6.7.8",
@@ -42,12 +43,20 @@
     "typescript": "^4.8.2"
   },
   "engines": {
-    "node": "19.x"
+    "node": "19"
   },
   "scripts": {
     "dev": "ts-node-dev ./src/app.ts",
     "build": "tsc",
     "test": "ts-mocha -p ./tsconfig.json --bail --recursive --exit --timeout 5000 tests/**/*.spec.ts",
     "lint": "eslint ."
+  },
+  "eslintIgnore": [
+    "tests"
+  ],
+  "prettier": {
+    "jsxSingleQuote": true,
+    "singleQuote": true,
+    "trailingComma": "all"
   }
 }
