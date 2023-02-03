@@ -5,30 +5,23 @@
  * Lots move from queue to queue as determined by their router.
  */
 
-import {
-  model, Schema, Document, Types,
-} from 'mongoose';
+import { model, Schema } from 'mongoose';
 import { COLLECTIONS } from '../global.collectionNames';
+import { IQueue } from '../queues/model';
 
-export interface ILotQueue extends Document {
-  // The name of this queue; e.g. "Material"
-  name: string;
-
-  // Description of this queue
-  description: string;
-
-  // Lots currently in this queue
-  lotsInQueue: Types.ObjectId[];
-}
-
-export const LotQueueSchema = new Schema<ILotQueue>({
+export const LotQueueSchema = new Schema<IQueue>({
   name: String,
   description: String,
 
-  lotsInQueue: [{
-    type: Schema.Types.ObjectId,
-    ref: COLLECTIONS.LOT,
-  }],
+  itemsInQueue: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: COLLECTIONS.LOT,
+    },
+  ],
 });
 
-export const LotQueueModel = model<ILotQueue>(COLLECTIONS.LOT_QUEUE, LotQueueSchema);
+export const LotQueueModel = model<IQueue>(
+  COLLECTIONS.LOT_QUEUE,
+  LotQueueSchema,
+);
