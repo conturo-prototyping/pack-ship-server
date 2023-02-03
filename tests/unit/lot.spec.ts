@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { describe, it } from 'mocha';
 import { MongoClient, ObjectId } from 'mongodb';
 import { LotModel } from '../../src/lot/model';
@@ -123,14 +123,21 @@ describe('# LOT', () => {
 
   it('Should fail with no lotId provided.', async () => {
     const routes = [`${URL}/scrap`];
-    for (const i in routes) {
-      try {
-        await ChaiRequest('post', routes[i]);
-      } catch (err) {
-        expect(err.status).to.be.eq(400);
-        expect(err.text).to.be.equal('Please provide a lotId');
-      }
-    }
+    const failures = [true];
+
+    await Promise.all(
+      routes.map(async (value, index) => {
+        try {
+          await ChaiRequest('post', value);
+        } catch (err) {
+          expect(err.status).to.be.eq(400);
+          expect(err.text).to.be.equal('Please provide a lotId');
+          failures[index] = false;
+        }
+      }),
+    );
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should fail to update lot rev, since job is released', async () => {
@@ -184,7 +191,10 @@ describe('# LOT', () => {
       expect(err.text).to.be.equal(
         `Job ${jobId.toString()} has already been released. Can't scrap lot.`,
       );
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Should update stepDetails of specialRouter found via lotId and stepId', async () => {
@@ -238,26 +248,36 @@ describe('# LOT', () => {
 
   it('Ensure 400 is raised when no lotId provided for patch, delete, put', async () => {
     const methods = ['patch', 'put', 'delete'];
+
+    const failures = [true, true, true];
     for (let index = 0; index < methods.length; index++) {
       try {
         await ChaiRequest(methods[index], `${URL}/step`);
       } catch (err) {
         expect(err.status).to.be.eq(400);
         expect(err.text).to.be.equal('Please provide a lotId');
+        failures[index] = false;
       }
     }
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Ensure 404 is raised when lotId provided but doesnt exist for patch, delete, put', async () => {
     const methods = ['patch', 'put', 'delete'];
+
+    const failures = [true, true, true];
     for (let index = 0; index < methods.length; index++) {
       try {
         await ChaiRequest(methods[index], `${URL}/step`, { lotId: 'fake_id' });
       } catch (err) {
         expect(err.status).to.be.eq(404);
         expect(err.text).to.be.equal(`Lot fake_id not found`);
+        failures[index] = false;
       }
     }
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Ensure 400 is raised when no stepId is provided for patch, delete, put', async () => {
@@ -272,6 +292,8 @@ describe('# LOT', () => {
     await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
 
     const methods = ['patch', 'put', 'delete'];
+
+    const failures = [true, true, true];
     for (let index = 0; index < methods.length; index++) {
       try {
         await ChaiRequest(methods[index], `${URL}/step`, {
@@ -280,8 +302,11 @@ describe('# LOT', () => {
       } catch (err) {
         expect(err.status).to.be.eq(400);
         expect(err.text).to.be.equal('Please provide a stepId');
+        failures[index] = false;
       }
     }
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Ensure 404 is raised when stepId is provided but doesnt exist for patch, delete, put', async () => {
@@ -296,6 +321,8 @@ describe('# LOT', () => {
     await CLIENT.db().collection(LotModel.collection.name).insertOne(lotDoc);
 
     const methods = ['patch', 'put', 'delete'];
+
+    const failures = [true, true, true];
     for (let index = 0; index < methods.length; index++) {
       try {
         await ChaiRequest(methods[index], `${URL}/step`, {
@@ -305,8 +332,11 @@ describe('# LOT', () => {
       } catch (err) {
         expect(err.status).to.be.eq(404);
         expect(err.text).to.be.equal('Router Step fake_id not found');
+        failures[index] = false;
       }
     }
+
+    if (failures.indexOf(true) > -1) assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Ensure 404 is raised when stepId and lotId both exist, but the stepId is not within the specialRouter', async () => {
@@ -337,7 +367,10 @@ describe('# LOT', () => {
       expect(err.text).to.be.equal(
         `Router Step ${routerStep1Id.toString()} not found in any lot specialRouters with lot id ${lotId.toString()}`,
       );
+      return;
     }
+
+    assert.fail(0, 1, 'Exception not thrown');
   });
 
   it('Ensure 404 is raised when lotId is provided but doesnt exist, when getting a router for lotId', async () => {

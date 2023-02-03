@@ -3,44 +3,185 @@
  *
  * This is where we handle basic functions of sites.
  */
-
 import { Request, Response, Router } from 'express';
+import { ObjectId } from 'mongoose';
+import { UserModel } from '../user/model';
+import { checkId, ExpressHandler, HTTPError } from '../utils';
+import { SiteModel } from './model';
+import { isValidTimeZone } from '../util/timezone';
 
-const router = Router();
+const SiteRouter = Router();
+export default SiteRouter;
 
-router.get('/', getAllSites);
-router.put('/', createSite);
-router.delete('/', closeSite);
+SiteRouter.get('/', getAllSites);
+SiteRouter.put('/', createSite);
+SiteRouter.delete(
+  '/',
+  (req, res, next) => checkId(res, next, SiteModel, req.body.siteId),
+  closeSite,
+);
 
-router.get('/:siteId', getOneSite);
-router.get('/:siteId/members', getSiteMembers);
-router.put('/:siteId/members', assignMemberToSite);
-router.delete('/:siteId/members', removeMemberFromSite);
+SiteRouter.get(
+  '/:siteId',
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  getOneSite,
+);
 
-function getAllSites(_req: Request, res: Response) {
-  res.sendStatus(501);
+SiteRouter.get(
+  '/:siteId/members',
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  getSiteMembers,
+);
+
+SiteRouter.put(
+  '/:siteId/members',
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  (req, res, next) => checkId(res, next, UserModel, req.body.memberId),
+  assignMemberToSite,
+);
+
+SiteRouter.delete(
+  '/:siteId/members',
+  (req, res, next) => checkId(res, next, SiteModel, req.params.siteId),
+  removeMemberFromSite,
+);
+
+/**
+ * Get a list of all sites
+ */
+async function getAllSites(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const sites = await SiteModel.find().lean();
+      const data = { sites };
+      return { data };
+    },
+    res,
+    'getting all sites',
+  );
 }
 
-function createSite(_req: Request, res: Response) {
-  res.sendStatus(501);
+async function createSite(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const { name, location, timezone } = _req.body;
+
+      if (!name) {
+        return HTTPError('Missing required arg, name.', 400);
+      }
+
+      if (!location) {
+        return HTTPError('Missing required arg, location.', 400);
+      }
+
+      if (!timezone) {
+        return HTTPError('Missing required arg, timezone.', 400);
+      }
+
+      if (!isValidTimeZone(timezone))
+        return HTTPError('Timezone must be valid.', 400);
+
+      const existingSite = await SiteModel.findOne({ name });
+
+      if (existingSite) {
+        return HTTPError('Name already exists.', 400);
+      }
+
+      const siteModel = new SiteModel({
+        name,
+        location: [location],
+        timezone,
+      });
+
+      await siteModel.save();
+      return {};
+    },
+    res,
+    'creating site',
+  );
 }
 
-function closeSite(_req: Request, res: Response) {
-  res.sendStatus(501);
+async function closeSite(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const { data } = res.locals;
+      await SiteModel.updateOne(
+        { _id: data._id },
+        {
+          $set: {
+            inactive: true,
+          },
+        },
+      );
+
+      return {};
+    },
+    res,
+    'closing site',
+  );
 }
 
-function getOneSite(_req: Request, res: Response) {
-  res.sendStatus(501);
+async function getOneSite(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const { data } = res.locals;
+      return { data };
+    },
+    res,
+    'get one site',
+  );
 }
 
-function getSiteMembers(_req: Request, res: Response) {
-  res.sendStatus(501);
+async function getSiteMembers(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const { staff } = res.locals.data;
+
+      return { data: staff };
+    },
+    res,
+    'get site members',
+  );
 }
 
-function assignMemberToSite(_req: Request, res: Response) {
-  res.sendStatus(501);
+async function assignMemberToSite(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const _id = _req.params.siteId;
+      const { memberId } = _req.body;
+
+      await SiteModel.updateOne({ _id }, { $push: { staff: memberId } });
+
+      return {};
+    },
+    res,
+    'assign site members',
+  );
 }
 
-function removeMemberFromSite(_req: Request, res: Response) {
-  res.sendStatus(501);
+async function removeMemberFromSite(_req: Request, res: Response) {
+  ExpressHandler(
+    async () => {
+      const { memberId } = _req.body;
+      const { _id, staff } = res.locals.data;
+
+      if (!memberId) return HTTPError('Missing required arg, memberId.', 400);
+
+      if (!staff.some((e: ObjectId) => e.toString() === memberId))
+        return HTTPError('User is not a member of that site.', 405);
+
+      await SiteModel.updateOne(
+        { _id },
+        {
+          $pull: {
+            staff: memberId,
+          },
+        },
+      );
+
+      return {};
+    },
+    res,
+    'remove members from site',
+  );
 }

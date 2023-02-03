@@ -8,6 +8,7 @@ import { LotModel } from './lot/model';
 import { RouteStepModel } from './routeStep/model';
 import { RouteTemplateModel } from './routeTemplate/model';
 import { IRouter, RouterModel } from './router/model';
+import { SiteModel } from './site/model';
 
 const Customer = require('./customer/model');
 
@@ -192,25 +193,25 @@ async function createRandomSetupData(customers) {
   await Promise.all(promises);
 }
 
+export const dropCollection = async (model) => {
+  try {
+    await model.collection.drop();
+
+    return true;
+  } catch (e: any) {
+    // collection doesn't exist; ok
+    if (e.name === 'MongoServerError' && e.code === 26) {
+      return true;
+    }
+    console.error(e);
+    return false;
+  }
+};
+
 /**
  * Drop all collections.
  */
 export async function DropAllCollections() {
-  const dropCollection = async (model) => {
-    try {
-      await model.collection.drop();
-
-      return true;
-    } catch (e: any) {
-      // collection doesn't exist; ok
-      if (e.name === 'MongoServerError' && e.code === 26) {
-        return true;
-      }
-      console.error(e);
-      return false;
-    }
-  };
-
   const ok = [
     await dropCollection(Customer),
     await dropCollection(CustomerPartModel),
@@ -219,6 +220,7 @@ export async function DropAllCollections() {
     await dropCollection(RouteStepModel),
     await dropCollection(RouteTemplateModel),
     await dropCollection(RouterModel),
+    await dropCollection(SiteModel),
   ];
 
   if (ok.some((x) => !x)) return [new Error('Error dropping collections')];

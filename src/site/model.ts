@@ -5,14 +5,15 @@
  * A centralized sales module feeds work to each site.
  */
 
-import {
-  model, Schema, Document, Types,
-} from 'mongoose';
+import { model, Schema, Document, Types } from 'mongoose';
 import { COLLECTIONS } from '../global.collectionNames';
 
 export interface ISite extends Document {
   // The name of the site; e.g. HQ
   name: string;
+
+  // Has beeen closed
+  inactive: boolean;
 
   // Shipping address of the site; each line is a new string in the array.
   location: string[];
@@ -21,7 +22,7 @@ export interface ISite extends Document {
   timezone: string;
 
   // Array of staff members employed at the site.
-  staff: Types.ObjectId;
+  staff: Types.ObjectId[];
 
   // Array of Job Queues.
   jobQueues: Types.ObjectId[];
@@ -31,13 +32,16 @@ export interface ISite extends Document {
 }
 
 export const SiteSchema = new Schema<ISite>({
+  inactive: Boolean,
   name: String,
   location: [String],
   timezone: String,
-  staff: [{
-    type: Schema.Types.ObjectId,
-    ref: COLLECTIONS.USER,
-  }],
+  staff: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: COLLECTIONS.USER,
+    },
+  ],
 });
 
 export const SiteModel = model<ISite>(COLLECTIONS.SITE, SiteSchema);
