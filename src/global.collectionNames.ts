@@ -1,5 +1,7 @@
 /* eslint-disable import/prefer-default-export */
 
+import { pluralize } from 'mongoose';
+
 /**
  * global.collectionNames.ts
  *
@@ -19,3 +21,15 @@ export const COLLECTIONS = {
   SITE: 'site',
   USER: 'user',
 };
+
+export const PLURAL_COLLECTIONS = Object.entries(COLLECTIONS).reduce(
+  (accumulator, currVal) => {
+    const [key, value] = currVal;
+    const pluralizeFn = pluralize();
+
+    if (pluralizeFn) accumulator[key] = pluralizeFn(value);
+
+    return accumulator;
+  },
+  COLLECTIONS,
+);
