@@ -6,8 +6,6 @@
  * They are now being called packingSlip.label & shipment.label
  */
 
- const { DEFAULT_DESTINATION_CODE } = require("../src/workOrder/controller");
-
  const PACKING_SLIP_COLLECTION = 'packingSlips';
  const SHIPMENTS_COLLECTION = 'shipments';
  
@@ -22,6 +20,7 @@
         (await db.collection(SHIPMENTS_COLLECTION).find().toArray())
           .map(async d => upgradeShipment(db, d))
       )
+
     ]
   },
 
@@ -54,7 +53,6 @@ async function downgradePackingSlip(db, ps) {
   const packingSlipNum = labelMatch[2];
 
   const packingSlipId = `${customerTag}-PS${packingSlipNum}`;
-  ps.packingSlipId = packingSlipId;
   
   await db.collection(PACKING_SLIP_COLLECTION).updateOne({ _id }, { $set: { packingSlipId } });
 }
@@ -72,7 +70,6 @@ async function downgradeShipment(db, sh) {
   const shipmentNum = labelMatch[2];
 
   const shipmentId = `${customerTag}-SH${shipmentNum}`;
-  sh.shipmentId = shipmentId;
   
   await db.collection(SHIPMENTS_COLLECTION).updateOne({ _id }, { $set: { shipmentId } });
 }
@@ -93,7 +90,6 @@ async function upgradePackingSlip(db, ps) {
   const packingSlipNum = labelMatch[3];
 
   const label = `PACK-${customerTag}-${packingSlipNum}`;
-  ps.label = label;
   
   await db.collection(PACKING_SLIP_COLLECTION).updateOne({ _id }, { $set: { label } });
 }
@@ -111,7 +107,6 @@ async function upgradeShipment(db, sh) {
   const shipmentNum = labelMatch[3];
 
   const label = `SHIP-${customerTag}-${shipmentNum}`;
-  sh.label = label;
   
   await db.collection(SHIPMENTS_COLLECTION).updateOne({ _id }, { $set: { label } });
 }
