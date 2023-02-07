@@ -13,6 +13,7 @@ const ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 const currency = require('currency.js');
 const { SetAirTableFields, FIELD_NAMES } =  require('../service.airtable'); 
+const { BlockNonAdmin } = require("../user/controller");
 
 module.exports = router;
 
@@ -26,8 +27,8 @@ router.get("/queue", getQueue);
 router.post("/pdf", getAsPdf);
 
 router.get("/:sid", getOne);
-router.patch("/:sid", editOne);
-router.delete("/:sid", deleteOne);
+router.patch("/:sid", BlockNonAdmin, editOne);
+router.delete("/:sid", BlockNonAdmin, deleteOne);
 
 /**
  * Compute a search of shipment documents that match either a given order or a given part.
@@ -496,7 +497,7 @@ async function editOne(req, res) {
       await Promise.all(promises);
 
       //if no updates are needed return out
-      if (isDueBack || (!isDueBack && !isDueBackOn)) return;
+      if (!isDueBack && !isDueBackOn) return;
 
       //update incoming deliveries as needed
       const incomingDeliveries = await IncomingDelivery.find({

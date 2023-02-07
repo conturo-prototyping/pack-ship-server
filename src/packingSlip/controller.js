@@ -6,6 +6,7 @@ const Customer = require("../customer/model");
 const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const { default: mongoose } = require("mongoose");
 const { GetOrderFulfillmentInfo } = require("../shopQ/controller.js");
+const { BlockNonAdmin } = require("../user/controller.js");
 
 module.exports = {
   router,
@@ -22,7 +23,7 @@ router.post("/merge", mergePackingSlips);
 
 router.get("/:pid", getPackingSlip);
 router.patch("/:pid", editPackingSlip);
-router.delete("/:pid", deletePackingSlip);
+router.delete("/:pid", BlockNonAdmin, deletePackingSlip);
 
 router.post("/pdf", getAsPDF);
 

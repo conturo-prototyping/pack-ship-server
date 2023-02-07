@@ -43,7 +43,7 @@ app.use("/shipments",           require("./shipment/controller") );
 app.use("/packingSlips",        require("./packingSlip/controller").router );
 app.use('/incomingDeliveries',  require('./incomingDelivery/controller').router);
 app.use("/workOrders",          require("./workOrder/controller").router );
-app.use('/users',               require('./user/controller'));
+app.use('/users',               require('./user/controller').router);
 
 app.all('*', (_req, res) => res.sendStatus(404));
 

@@ -10,6 +10,7 @@ const WorkOrderPO = require("../workOrderPO/model");
 const ConsumablePO = require("../consumablePO/model");
 const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
+const { BlockNonAdmin } = require("../user/controller");
 
 router.get("/", getAll);
 router.put("/", createOne);
@@ -18,6 +19,7 @@ router.post("/receive", setReceived);
 
 router.post(
   "/:deliveryId/undoReceive",
+  BlockNonAdmin,
   (req, res, next) =>
     checkId(res, next, IncomingDelivery, req.params.deliveryId),
   undoReceive,
