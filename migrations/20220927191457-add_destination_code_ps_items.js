@@ -20,67 +20,66 @@ const { DEFAULT_DESTINATION_CODE } = require("../src/workOrder/controller");
 const TARGET_COLLECTION = 'packingSlips';
 
 module.exports = {
+
+  // MITCH MIGRATION
   async up(db, _client) {
-    // 1) get all shipped packing slips & their work order items
+    const agg = [
+      { $match: {
+        shipment: { $exists: true },
+        isPastVersion: { $ne: true }
+      } },
+      { $unwind: '$items' },
+      { $lookup: {
+        from: 'workorders',
+        localField: 'orderNumber',
+        foreignField: 'OrderNumber',
+        as: 'workOrder'
+      } },
+      { $unwind: '$workOrder' },
+      { $unwind: '$workOrder.Items' }, 
+      { $match: {
+        $expr: { $eq: ['$items.item', '$workOrder.Items._id']}
+      } },
+      { $addFields: {
+        'items.partRouter': { $ifNull: ['$workOrder.Items.partRouter', [] ] },
+        somethingelse: 'soemthingelse'
+      } },
+      { $group: {
+        _id: '$_id',
+        items: { $push: '$items' },
+        packingSlipId: { $first: '$packingSlipId' },
+        destination: { $first: '$destination' },
+        orderNumber: { $first: '$orderNumber'}
+      } }
+    ];
+
     const packingSlips = await db.collection( TARGET_COLLECTION )
-      .aggregate([
-        { $match: {
-          shipment: { $exists: true },
-          isPastVersion: { $ne: true }
-        } },
-        { $unwind: '$items' },
-        { $lookup: {
-          from: 'workorders',
-          let: { orderNumber: '$orderNumber', itemId: '$items.item' },
-          as: 'items.item',
-          pipeline: [
-            { $match: {
-              $expr: { $eq: ['$$orderNumber', '$OrderNumber'] }
-            } },
-            { $unwind: '$Items' },
-            { $match: {
-              $expr: { $eq: ['$$itemId', '$Items._id'] },
-            } },
-            { $project: {
-              'Items.partRouter': 1,
-              'Items._id': 1,
-            } }
-          ],
-        } },
-        { $addFields: {
-          'items.item': { $arrayElemAt: ['$items.item.Items', 0] },
-        } },
-        { $group: {
-          _id: '$_id',
-          items: { $push: '$items' },
-          packingSlipId: { $first: '$packingSlipId' },
-          destination: { $first: '$destination' }
-        } }
-      ])
+      .aggregate(agg)
       .toArray();
+
 
     // 2) if item doesn't have a router -> insert default destination code
     for (const p of packingSlips) {
       for (const i of p.items) {
-
+  
         // No part router -> insert default code
-        if ( !i.item?.partRouter?.length ) {
+        if ( !i?.partRouter?.length ) {
           i.destinationCode = DEFAULT_DESTINATION_CODE;
         }
-
+  
         // part router exists, find appropriate code
         else {
           // if destination = CUSTOMER -> attach i.destinationCode = last router step
           if (p.destination === 'CUSTOMER') {
-            i.destinationCode = 'CUSTOMER-' + (i.item.partRouter.at(-1)).stepCode;
+            i.destinationCode = 'CUSTOMER-' + (i.partRouter.at(-1).stepCode);
           }
           else if (p.destination === 'VENDOR' ) {
-
-            const numVendorSteps = i.item.partRouter.filter(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')?.length || 0;
-
+  
+            const numVendorSteps = i.partRouter.filter(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')?.length || 0;
+  
             // only 1 vendor step, easy fix
             if ( numVendorSteps === 1 ) {
-              i.destinationCode = 'VENDOR-' + (i.item.partRouter.find(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')).stepCode;
+              i.destinationCode = 'VENDOR-' + (i.partRouter.find(s => s.step.name.toUpperCase() === 'SHIP TO VENDOR')).stepCode;
             }
             else if (numVendorSteps === 0) {
               console.debug(`No VENDOR steps found: ${p.packingSlipId} - ${JSON.stringify(i.item._id)}`);
@@ -90,34 +89,48 @@ module.exports = {
             }
           }
         }
-
-        i.item = i.item._id;
+  
+        // remove partRouter
+        delete i.partRouter;
       }
-      // console.debug(p.items);
     }
-
+  
     const promises = packingSlips.map(async (p) => {
-      await db
-        .collection( TARGET_COLLECTION )
-        .updateOne(
-          { _id: p._id },
-          { $set: {
-            items: p.items
-          } }
-        );
-    });
-
-    await Promise.all(promises);
-  },
-
-  async down(db, _client) {
-    await db
-      .collection( TARGET_COLLECTION )
-      .updateMany(
-        { },
-        { $unset: {
-          'items.destinationCode': 1
+      await db.collection( TARGET_COLLECTION ).updateOne(
+        { _id: p._id },
+        { $set: {
+          items: p.items
         } }
       );
+    });
+  
+    await Promise.all(promises);
+  }, 
+
+  async down(db, _client) {
+
+    const packingSlips = await db
+      .collection( TARGET_COLLECTION )
+      .find().toArray();
+
+    const promises =[];
+    packingSlips.forEach( x => {
+      const newItems = x.items.map( i => { 
+        delete i.destinationCode;
+        return i;
+      } )
+
+      promises.push( _updatePS(x._id, newItems) )
+    } );
+
+    async function _updatePS(id, items) {
+      await db.collection( TARGET_COLLECTION )
+        .updateOne(
+          { _id: id }, 
+          { $set: { items: items } } 
+        );
+    };
+
+    await Promise.all(promises);
   }
 };
