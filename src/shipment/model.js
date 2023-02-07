@@ -2,7 +2,7 @@
 // Schema for new packing slip which is part of the split shipping modules (2.19^)
 // A packing slip consists of:
 // - orderNumber (to aggregate easily)
-// - shipmentId (unique human-readable identifier)
+// - label (unique human-readable identifier)
 // - manifest (pointers to all packing slips in this shipment)
 
 const { Schema, model } = require("mongoose");
@@ -14,7 +14,7 @@ const schema = new Schema({
     ref: "oldClient-v2",
   },
 
-  shipmentId: {
+  label: {
     type: String,
     required: true,
   },

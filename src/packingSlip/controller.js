@@ -6,6 +6,7 @@ const Customer = require("../customer/model");
 const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const { default: mongoose } = require("mongoose");
 const { GetOrderFulfillmentInfo } = require("../shopQ/controller.js");
+const { BlockNonAdmin } = require("../user/controller.js");
 
 module.exports = {
   router,
@@ -22,14 +23,14 @@ router.post("/merge", mergePackingSlips);
 
 router.get("/:pid", getPackingSlip);
 router.patch("/:pid", editPackingSlip);
-router.delete("/:pid", deletePackingSlip);
+router.delete("/:pid", BlockNonAdmin, deletePackingSlip);
 
 router.post("/pdf", getAsPDF);
 
 /**
  * Get all packing slips with an option to hide shipped.
  * @param {Boolean?} hideShipped Hide packing slips that have already shipped?
- * @param {mongoose.Schema.Types.ObjectId?} matchId If specified, only populate the specified packingSlipId
+ * @param {mongoose.Schema.Types.ObjectId?} matchId If specified, only populate the specified label
  */
 async function GetPopulatedPackingSlips(
   hideShipped = false,
@@ -105,7 +106,7 @@ async function GetPopulatedPackingSlips(
               qty: "$items.qty",
             },
           },
-          packingSlipId: { $first: "$packingSlipId" },
+          label: { $first: "$label" },
           customer: { $first: "$customer" },
           dateCreated: { $first: "$dateCreated" },
           shipment: { $first: "$shipment" },
@@ -320,7 +321,7 @@ async function searchHistPackingSlips(req, res) {
       const sortTypes = {
         ORDER: "orderNumber",
         DATE: "dateCreated",
-        SLIPNUM: "packingSlipId",
+        SLIPNUM: "label",
       };
 
       if (isNaN(+resultsPerPage) || resultsPerPage <= 0) {
@@ -390,21 +391,22 @@ async function getAllPackingSlips(_req, res) {
 async function createPackingSlip(req, res) {
   ExpressHandler(
     async () => {
-      const { items, orderNumber, customer, destination } = req.body;
+      const { items, orderNumber, customer, destination, destinationCode } =
+        req.body;
 
       if (destination !== "VENDOR" && destination !== "CUSTOMER") {
         return HTTPError("Destination must be either vendor or customer.", 400);
       }
 
       const customerDoc = await Customer.findOne({ _id: customer });
-      const { numPackingSlips } = customerDoc;
+      const { numPackingSlips, tag } = customerDoc;
 
-      const packingSlipId = `${orderNumber}-PS${numPackingSlips + 1}`;
+      const label = `PACK-${tag}-${numPackingSlips + 1}`;
 
       const packingSlip = new PackingSlip({
         customer,
         orderNumber,
-        packingSlipId,
+        label,
         items,
         createdBy: req.user._id,
         destination,
@@ -455,6 +457,12 @@ async function editPackingSlip(req, res) {
     async () => {
       const { pid } = req.params;
       const { items, destination } = req.body;
+
+      const doc = await PackingSlip.findOne({ _id: pid }).lean();
+
+      if (doc.shipment) {
+        return HTTPError("That packing slip has already been shipped.", 400);
+      }
 
       await updatePackingSlipTrackingHistory(pid);
 
@@ -515,7 +523,9 @@ async function deletePackingSlip(req, res) {
 async function mergePackingSlips(req, res) {
   ExpressHandler(
     async () => {
-      const { pids, orderNumber } = req.body;
+      return HTTPError("Not implemented.", 501);
+
+      const { pids, orderNumber, tag } = req.body;
 
       const numPackingSlips = await PackingSlip.countDocuments({
         orderNumber,
@@ -530,9 +540,7 @@ async function mergePackingSlips(req, res) {
         return HTTPError("Packing slips not found.", 400);
       }
 
-      const packingSlipId = `${orderNumber}-PS${
-        numPackingSlips - pids.length + 1
-      }`;
+      const label = `PACK-${orderNumber}-${numPackingSlips - pids.length + 1}`;
       const itemsFlat = [].concat(...packingSlips.map((x) => x.items));
 
       // fix qties to not have a bunch of packing slips with repeat item(Ids) & qties all over the place
@@ -545,7 +553,7 @@ async function mergePackingSlips(req, res) {
 
       const packingSlip = new PackingSlip({
         orderNumber,
-        packingSlipId,
+        label,
         items,
       });
 
@@ -578,8 +586,7 @@ async function updatePackingSlipTrackingHistory(pid) {
 }
 
 function _pdf_MakeDocDef(packingSlipDoc, shopQOrderInfo) {
-  const { orderNumber, packingSlipId, items, dateCreated, createdBy } =
-    packingSlipDoc;
+  const { orderNumber, label, items, dateCreated, createdBy } = packingSlipDoc;
   const { shippingContact, purchaseOrderNumber } = shopQOrderInfo;
   const customerTitle = packingSlipDoc.customer.title;
 
@@ -594,17 +601,12 @@ function _pdf_MakeDocDef(packingSlipDoc, shopQOrderInfo) {
 
   const docDefinition = {
     watermark: {
-      text: 'PREVIEW ONLY',
-      color: 'red'
-    }, 
-    content: [
-      bannerBlock,
-      shipToBlock,
-      manifestBlock,
-      signaturesBlock,
-    ],
+      text: "PREVIEW ONLY",
+      color: "red",
+    },
+    content: [bannerBlock, shipToBlock, manifestBlock, signaturesBlock],
     header: {
-      text: packingSlipId,
+      text: label,
       alignment: "left",
       margin: [10, 20, 0, 0],
       fontSize: 10,
@@ -616,7 +618,7 @@ function _pdf_MakeDocDef(packingSlipDoc, shopQOrderInfo) {
     },
   };
 
-  const filename = packingSlipId + ".pdf";
+  const filename = label + ".pdf";
 
   return { docDefinition, filename };
 }
@@ -841,8 +843,6 @@ function _pdf_makeSignaturesBlock(packedByUsername) {
     unbreakable: true,
   };
 }
-
-
 
 /**
  * Instead of the method used by ShopQ that relies on awaiting fetching image from imgur,
