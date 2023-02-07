@@ -435,8 +435,7 @@ async function editOne(req, res) {
       } = req.body;
 
       const p_deleted =
-        deletedPackingSlips?.map((x) => unassignPackingSlipFromShipment(x)) ??
-        [];
+        deletedPackingSlips?.map((x) => unassignPackingSlipFromShipment(x)) ?? [];
 
       const p_added =
         newPackingSlips?.map((x) => assignPackingSlipToShipment(x, sid)) ?? [];
@@ -472,14 +471,26 @@ async function editOne(req, res) {
       );
 
       // then update newPackingSlips otherwise a conflict will occur
-      await Shipment.updateOne(
+      const updatedShipment = await Shipment.updateOne(
         { _id: sid },
         {
           $push: {
             manifest: { $each: newPackingSlips?.map((e) => ObjectId(e)) ?? [] },
           },
-        }
+        },
+        { new: true }
       );
+
+      /**
+       * In case we delete all the packing slips in the shipment,
+       * the shipment should now get deleted.
+       * 
+       * NOTE(jarrilla): doing it this way seems REALLY stupid.
+       * Perhaps we should pass the manifest length from the FE & if that's 0, just delete & skip updates.
+       */
+      if (!updatedShipment?.manifest?.length) {
+        await Shipment.deleteOne({ _id: sid });
+      }
 
       const promises = p_deleted.concat(p_added);
       await Promise.all(promises);
