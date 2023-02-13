@@ -472,11 +472,13 @@ async function editOne(req, res) {
       );
 
       // then update newPackingSlips otherwise a conflict will occur
-      const updatedShipment = await Shipment.updateOne(
+      const updatedShipment = await Shipment.findOneAndUpdate(
         { _id: sid },
         {
           $push: {
-            manifest: { $each: newPackingSlips?.map((e) => ObjectId(e)) ?? [] },
+            manifest: {
+              $each: newPackingSlips?.map((e) => ObjectId(e)) ?? []
+            },
           },
         },
         { new: true }
