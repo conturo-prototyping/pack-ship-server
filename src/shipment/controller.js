@@ -238,7 +238,7 @@ async function getPending(_req, res) {
       };
     },
     res,
-    "fetching shipments"
+    "fetching pending shipments"
   );
 }
 
