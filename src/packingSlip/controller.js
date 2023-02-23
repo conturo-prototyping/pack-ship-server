@@ -420,7 +420,7 @@ async function getPendingPackingSlips(_req, res) {
         true,
         true
       );
-      if (e) return HTTPError("Error fetching packing slip history.");
+      if (e) return HTTPError("Error fetching pending packing slips.");
 
       return {
         data: {
@@ -429,7 +429,7 @@ async function getPendingPackingSlips(_req, res) {
       };
     },
     res,
-    "fetching packing slips"
+    "fetching pending packing slips"
   );
 }
 
