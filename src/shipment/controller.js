@@ -167,6 +167,9 @@ async function getPending(_req, res) {
                 // (!shipment.deliverySpeed || !shipment.trackingNumber || shipment.cost == null | undefined)
                 $and: [
                   {
+                    isPastVersion: false,
+                  },
+                  {
                     deliveryMethod: "CARRIER",
                   },
                   {
@@ -187,6 +190,9 @@ async function getPending(_req, res) {
               {
                 // If( PICKUP or DROPOFF ) &  customerHandoffName not set
                 $and: [
+                  {
+                    isPastVersion: false,
+                  },
                   {
                     $or: [
                       {
