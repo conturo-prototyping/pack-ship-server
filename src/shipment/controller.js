@@ -86,7 +86,7 @@ async function searchShipments(req, res) {
       const sortFunc = (a, b) => {
         let testVal;
         if (sortBy === "CUSTOMER") {
-          testVal = a.label.localeCompare(b.label);
+          testVal = a.label?.localeCompare(b.label);
         } else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
 
         if (testVal * sortOrder < 1) return -1;
@@ -158,78 +158,109 @@ async function getAll(_req, res) {
 async function getPending(_req, res) {
   ExpressHandler(
     async () => {
-      const shipments = await Shipment.find({
-        $or: [
-          {
-            // shipment.deliveryMethod === "CARRIER" &&
-            // (!shipment.deliverySpeed || !shipment.trackingNumber || shipment.cost == null | undefined)
-            $and: [
+      const agg = [
+        {
+          $match: {
+            $or: [
               {
-                deliveryMethod: "CARRIER",
+                // shipment.deliveryMethod === "CARRIER" &&
+                // (!shipment.deliverySpeed || !shipment.trackingNumber || shipment.cost == null | undefined)
+                $and: [
+                  {
+                    deliveryMethod: "CARRIER",
+                  },
+                  {
+                    $or: [
+                      {
+                        $or: [{ deliverySpeed: { $eq: null } }],
+                      },
+                      {
+                        $or: [{ trackingNumber: { $eq: null } }],
+                      },
+                      {
+                        $or: [{ cost: { $eq: null } }],
+                      },
+                    ],
+                  },
+                ],
               },
               {
-                $or: [
+                // If( PICKUP or DROPOFF ) &  customerHandoffName not set
+                $and: [
                   {
                     $or: [
-                      { deliverySpeed: { $exists: false } },
-                      { deliverySpeed: { $eq: undefined } },
-                      { deliverySpeed: { $eq: null } },
+                      {
+                        deliveryMethod: "PICKUP",
+                      },
+                      {
+                        deliveryMethod: "DROPOFF",
+                      },
                     ],
                   },
                   {
                     $or: [
-                      { trackingNumber: { $exists: false } },
-                      { trackingNumber: { $eq: undefined } },
-                      { trackingNumber: { $eq: null } },
-                    ],
-                  },
-                  {
-                    $or: [
-                      { cost: { $exists: false } },
-                      { cost: { $eq: undefined } },
-                      { cost: { $eq: null } },
+                      {},
+                      {
+                        customerHandoffName: { $eq: null },
+                      },
+                      {
+                        customerHandoffName: "",
+                      },
+                      {},
                     ],
                   },
                 ],
               },
             ],
           },
-          {
-            // If( PICKUP or DROPOFF ) &  customerHandoffName not set
-            $and: [
+        },
+        {
+          $lookup: {
+            from: "packingSlips",
+            localField: "manifest",
+            foreignField: "_id",
+            as: "_manifest",
+          },
+        },
+        { $unwind: "$_manifest" },
+        { $unwind: "$_manifest.items" },
+        {
+          $lookup: {
+            from: "workorders",
+            let: {
+              workOrderItemId: "$_manifest.items.item",
+            },
+            pipeline: [
+              { $unwind: "$Items" },
               {
-                $or: [
-                  {
-                    deliveryMethod: "PICKUP",
+                $match: {
+                  $expr: {
+                    $eq: ["$Items._id", "$$workOrderItemId"],
                   },
-                  {
-                    deliveryMethod: "DROPOFF",
-                  },
-                ],
-              },
-              {
-                $or: [
-                  {
-                    customerHandoffName: { $eq: undefined },
-                  },
-                  {
-                    customerHandoffName: { $eq: null },
-                  },
-                  {
-                    customerHandoffName: "",
-                  },
-                  {
-                    customerHandoffName: { $exists: false },
-                  },
-                ],
+                },
               },
             ],
+            as: "_manifest.items.item",
           },
-        ],
-      })
-        .populate("customer")
-        .lean()
-        .exec();
+        },
+        {
+          $group: {
+            _id: "$_manifest.shipment",
+            orderNumber: { $first: "$_manifest.orderNumber" },
+            customer: { $first: "$customer" },
+            customerHandoffName: { $first: "$customerHandoffName" },
+            trackingNumber: { $first: "$trackingNumber" },
+            dateCreated: { $first: "$dateCreated" },
+            destination: { $first: "$destination" },
+            label: { $first: "$label" },
+            shipment: { $first: "$_manifest.shipment" },
+            destination: { $first: "$_manifest.destination" },
+            deliveryMethod: { $first: "$deliveryMethod" },
+            items: { $push: "$_manifest.items" },
+          },
+        },
+      ];
+      const shipments = await Shipment.aggregate(agg);
 
       return {
         data: {
@@ -665,7 +696,6 @@ async function deleteOne(req, res) {
   ExpressHandler(
     async () => {
       const { sid } = req.params;
-
       await updateShipmentTrackingHistory(sid);
 
       // delete shipment
