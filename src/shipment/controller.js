@@ -199,14 +199,12 @@ async function getPending(_req, res) {
                   },
                   {
                     $or: [
-                      {},
                       {
                         customerHandoffName: { $eq: null },
                       },
                       {
                         customerHandoffName: "",
                       },
-                      {},
                     ],
                   },
                 ],
@@ -243,19 +241,20 @@ async function getPending(_req, res) {
             as: "_manifest.items.item",
           },
         },
+        { $unwind: "$_manifest.items.item" },
         {
           $group: {
             _id: "$_manifest.shipment",
             orderNumber: { $first: "$_manifest.orderNumber" },
+            label: { $first: "$label" },
             customer: { $first: "$customer" },
             customerHandoffName: { $first: "$customerHandoffName" },
             trackingNumber: { $first: "$trackingNumber" },
             dateCreated: { $first: "$dateCreated" },
             destination: { $first: "$destination" },
-            label: { $first: "$label" },
             shipment: { $first: "$_manifest.shipment" },
             destination: { $first: "$_manifest.destination" },
-            deliveryMethod: { $first: "$deliveryMethod" },
+            deliveryMethod: { $first: "deliveryMethod" },
             items: { $push: "$_manifest.items" },
           },
         },
