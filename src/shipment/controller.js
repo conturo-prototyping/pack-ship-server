@@ -260,7 +260,7 @@ async function getPending(_req, res) {
             destination: { $first: "$destination" },
             shipment: { $first: "$_manifest.shipment" },
             destination: { $first: "$_manifest.destination" },
-            deliveryMethod: { $first: "deliveryMethod" },
+            deliveryMethod: { $first: "$deliveryMethod" },
             items: { $push: "$_manifest.items" },
           },
         },
