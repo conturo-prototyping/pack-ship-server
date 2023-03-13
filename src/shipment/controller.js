@@ -66,6 +66,7 @@ async function searchShipments(req, res) {
       const [_, { allShipments }] = await getPopulatedShipmentData();
 
       let matchShipments;
+      // let matchShipments;
       if (!matchOrder && !matchPart) {
         matchShipments = allShipments;
       } else {
@@ -82,6 +83,10 @@ async function searchShipments(req, res) {
           )
         );
       }
+
+      matchShipments = matchShipments.filter((e) => {
+        return e.customerHandoffName || (e.trackingNumber && e.cost);
+      });
 
       const sortFunc = (a, b) => {
         let testVal;
