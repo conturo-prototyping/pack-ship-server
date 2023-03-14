@@ -66,7 +66,6 @@ async function searchShipments(req, res) {
       const [_, { allShipments }] = await getPopulatedShipmentData();
 
       let matchShipments;
-      // let matchShipments;
       if (!matchOrder && !matchPart) {
         matchShipments = allShipments;
       } else {
