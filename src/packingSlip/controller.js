@@ -25,6 +25,8 @@ router.get("/:pid", getPackingSlip);
 router.patch("/:pid", editPackingSlip);
 router.delete("/:pid", BlockNonAdmin, deletePackingSlip);
 
+router.patch("/routerUpload/:pid", routerUploadPackingSlip);
+
 router.post("/pdf", getAsPDF);
 
 /**
@@ -514,6 +516,31 @@ async function deletePackingSlip(req, res) {
     },
     res,
     "deleting packing slip"
+  );
+}
+
+/**
+ * Upload a document to
+ */
+async function routerUploadPackingSlip(req, res) {
+  ExpressHandler(
+    async () => {
+      const { pid } = req.params;
+
+      const { fileURL, fileID } = req.body;
+
+      await PackingSlip.updateOne(
+        { _id: pid },
+        {
+          $set: {
+            routerUploadURL: fileURL,
+            routerUploadId: fileID,
+          },
+        }
+      );
+    },
+    res,
+    "Router packing slip upload URL"
   );
 }
 
