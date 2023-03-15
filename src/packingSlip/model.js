@@ -38,6 +38,8 @@ const schema = new Schema({
 
       // Upload URL for router documents
       routerUploadURL: String,
+
+      routerUploadId: String,
     },
   ],
 
