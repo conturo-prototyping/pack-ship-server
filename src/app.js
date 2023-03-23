@@ -1,51 +1,55 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const cookieParser = require('cookie-parser');
-const passport = require('passport');
-const cookieSession = require('cookie-session');
+const cookieParser = require("cookie-parser");
+const passport = require("passport");
+const cookieSession = require("cookie-session");
 
 require("dotenv").config();
-require('./config.passport')(passport);
+require("./config.passport")(passport);
 
 const app = express();
 
-app.use(cors({
-  origin: [
-    process.env.CORS_CLIENT_URL,
-  ],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [process.env.CORS_CLIENT_URL],
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use( cookieSession({
-  name: process.env.SESSION_NAME,
-  keys: [ process.env.SESSION_SECRET ]
-}));
+app.use(
+  cookieSession({
+    name: process.env.SESSION_NAME,
+    keys: [process.env.SESSION_SECRET],
+  })
+);
 app.use(passport.initialize());
 app.use(passport.session());
 
-if( process.env.NODE_ENV === 'DEBUG' ) {
-  console.debug('DEBUGGING ROUTES ARE ON !!!');
+if (process.env.NODE_ENV === "DEBUG") {
+  console.debug("DEBUGGING ROUTES ARE ON !!!");
 
-  app.use('/debug', require('./router.debug'));
+  app.use("/debug", require("./router.debug"));
 }
 
 // This handles authentication
-app.use('/auth', require('./router.auth'));
-app.all("*", function(req, res, next) {
+app.use("/auth", require("./router.auth"));
+app.all("*", function (req, res, next) {
   if (req.isAuthenticated()) return next();
   else res.redirect(req.baseUrl + "/auth/google");
 });
 
-app.use("/shipments",           require("./shipment/controller") );
-app.use("/packingSlips",        require("./packingSlip/controller").router );
-app.use('/incomingDeliveries',  require('./incomingDelivery/controller').router);
-app.use("/workOrders",          require("./workOrder/controller").router );
-app.use('/users',               require('./user/controller').router);
+app.use("/shipments", require("./shipment/controller"));
+app.use("/packingSlips", require("./packingSlip/controller").router);
+app.use("/incomingDeliveries", require("./incomingDelivery/controller").router);
+app.use("/workOrders", require("./workOrder/controller").router);
+app.use("/users", require("./user/controller").router);
 
-app.all('*', (_req, res) => res.sendStatus(404));
+app.use("/storage", require("./cloudStorage/controller").router);
+
+app.all("*", (_req, res) => res.sendStatus(404));
 
 // -----------------------------------------
 // -----------------------------------------

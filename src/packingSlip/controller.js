@@ -520,21 +520,20 @@ async function deletePackingSlip(req, res) {
 }
 
 /**
- * Upload a document to
+ * Stores file location of packing slip router
  */
 async function routerUploadPackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
 
-      const { fileURL, fileID } = req.body;
+      const { filePath } = req.body;
 
       await PackingSlip.updateOne(
         { _id: pid },
         {
           $set: {
-            routerUploadURL: fileURL,
-            routerUploadId: fileID,
+            routerUploadPath: filePath,
           },
         }
       );
