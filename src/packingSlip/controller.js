@@ -7,6 +7,7 @@ const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const { default: mongoose } = require("mongoose");
 const { GetOrderFulfillmentInfo } = require("../shopQ/controller.js");
 const { BlockNonAdmin } = require("../user/controller.js");
+const { deleteCloudStorageObject } = require("../cloudStorage/controller.js");
 
 module.exports = {
   router,
@@ -26,6 +27,7 @@ router.patch("/:pid", editPackingSlip);
 router.delete("/:pid", BlockNonAdmin, deletePackingSlip);
 
 router.patch("/routerUpload/:pid", routerUploadPackingSlip);
+router.delete("/routerUpload/:pid", BlockNonAdmin, routerDeletePackingSlip);
 
 router.post("/pdf", getAsPDF);
 
@@ -540,6 +542,30 @@ async function routerUploadPackingSlip(req, res) {
     },
     res,
     "Router packing slip upload URL"
+  );
+}
+
+/**
+ * Deletes the router from the packing slip
+ */
+async function routerDeletePackingSlip(req, res) {
+  ExpressHandler(
+    async () => {
+      const { pid } = req.params;
+
+      await deleteCloudStorageObject().then(() => {
+        await PackingSlip.updateOne(
+          { _id: pid },
+          {
+            $unset: {
+              routerUploadPath: 1,
+            },
+          }
+        );
+      });
+    },
+    res,
+    "Router packing slip delete"
   );
 }
 

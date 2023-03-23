@@ -37,3 +37,13 @@ async function generateSignedUploadURL(req, res) {
     "fetching packing slips"
   );
 }
+
+export async function deleteCloudStorageObject(filepath) {
+  const deleteOptions = {
+    ifGenerationMatch: generationMatchPrecondition,
+  };
+  const [url] = await storage
+    .bucket(CLOUD_STORAGE_BUCKET_NAME)
+    .file(filepath)
+    .delete(deleteOptions);
+}
