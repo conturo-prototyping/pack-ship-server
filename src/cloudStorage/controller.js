@@ -9,6 +9,8 @@ module.exports = { router };
 
 router.post("/upload", generateSignedUploadURL);
 
+const storage = new Storage();
+
 /**
  * Generates a signed upload URL for uploading to Cloud Storage
  */
@@ -16,8 +18,6 @@ async function generateSignedUploadURL(req, res) {
   ExpressHandler(
     async () => {
       let { location } = req.body;
-
-      const storage = new Storage();
 
       const options = {
         version: "v4",
