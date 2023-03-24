@@ -7,7 +7,10 @@ const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const { default: mongoose } = require("mongoose");
 const { GetOrderFulfillmentInfo } = require("../shopQ/controller.js");
 const { BlockNonAdmin } = require("../user/controller.js");
-const { deleteCloudStorageObject } = require("../cloudStorage/controller.js");
+const {
+  deleteCloudStorageObject,
+  getCloudStorageObjectDownloadURL,
+} = require("../cloudStorage/controller.js");
 
 module.exports = {
   router,
@@ -108,6 +111,7 @@ async function GetPopulatedPackingSlips(
               item: { $arrayElemAt: ["$workOrderItem", 0] },
               _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
               qty: "$items.qty",
+              routerUploadFilePath: "$items.routerUploadFilePath",
             },
           },
           label: { $first: "$label" },
@@ -357,9 +361,29 @@ async function searchHistPackingSlips(req, res) {
         true
       );
 
+      const finalPackingSlips = await Promise.all(
+        allPackingSlips[1].packingSlips.map(async (e) => {
+          return {
+            ...e,
+            items: await Promise.all(
+              e.items.map(async (f) => {
+                return {
+                  ...f,
+                  downloadUrl: f.routerUploadFilePath
+                    ? await getCloudStorageObjectDownloadURL(
+                        f?.routerUploadFilePath
+                      )
+                    : undefined,
+                };
+              })
+            ),
+          };
+        })
+      );
+
       return {
         data: {
-          packingSlips: allPackingSlips[1].packingSlips,
+          packingSlips: finalPackingSlips,
           totalCount: allPackingSlips[1]?.totalCount ?? 0,
         },
       };
@@ -553,7 +577,7 @@ async function routerDeletePackingSlip(req, res) {
     async () => {
       const { pid } = req.params;
 
-      await deleteCloudStorageObject().then(() => {
+      await deleteCloudStorageObject().then(async () => {
         await PackingSlip.updateOne(
           { _id: pid },
           {

@@ -5,7 +5,11 @@ const { LogError, ExpressHandler, HTTPError } = require("../utils");
 
 const router = Router();
 
-module.exports = { router };
+module.exports = {
+  router,
+  deleteCloudStorageObject,
+  getCloudStorageObjectDownloadURL,
+};
 
 router.post("/upload", generateSignedUploadURL);
 
@@ -19,26 +23,14 @@ async function generateSignedUploadURL(req, res) {
     async () => {
       let { location } = req.body;
 
-      const options = {
-        version: "v4",
-        action: "write",
-        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-      };
-
-      // Get a v4 signed URL for uploading file
-      const [url] = await storage
-        .bucket(CLOUD_STORAGE_BUCKET_NAME)
-        .file(location)
-        .getSignedUrl(options);
-
-      return { data: { url } };
+      return { data: { url: await generateSignedURL("write", location) } };
     },
     res,
     "fetching packing slips"
   );
 }
 
-export async function deleteCloudStorageObject(filepath) {
+async function deleteCloudStorageObject(filepath) {
   const deleteOptions = {
     ifGenerationMatch: generationMatchPrecondition,
   };
@@ -46,4 +38,24 @@ export async function deleteCloudStorageObject(filepath) {
     .bucket(CLOUD_STORAGE_BUCKET_NAME)
     .file(filepath)
     .delete(deleteOptions);
+}
+
+async function generateSignedURL(action, filepath) {
+  const options = {
+    version: "v4",
+    action: action,
+    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+  };
+
+  // Get a v4 signed URL for uploading file
+  const [url] = await storage
+    .bucket(CLOUD_STORAGE_BUCKET_NAME)
+    .file(filepath)
+    .getSignedUrl(options);
+
+  return url;
+}
+
+async function getCloudStorageObjectDownloadURL(filepath) {
+  return await generateSignedURL("read", filepath);
 }
