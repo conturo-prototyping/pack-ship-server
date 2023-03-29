@@ -30,6 +30,8 @@ router.get("/:sid", getOne);
 router.patch("/:sid", BlockNonAdmin, editOne);
 router.delete("/:sid", BlockNonAdmin, deleteOne);
 
+router.patch("/:sid/pending", editOne);
+
 /**
  * Compute a search of shipment documents that match either a given order or a given part.
  * Further, results should be paginated according to the parameters
