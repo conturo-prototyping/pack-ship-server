@@ -367,14 +367,23 @@ async function searchHistPackingSlips(req, res) {
             ...e,
             items: await Promise.all(
               e.items.map(async (f) => {
-                return {
-                  ...f,
-                  downloadUrl: f.routerUploadFilePath
-                    ? await getCloudStorageObjectDownloadURL(
-                        f?.routerUploadFilePath
-                      )
-                    : undefined,
-                };
+                if (f.routerUploadFilePath) {
+                  const [url, type] = await getCloudStorageObjectDownloadURL(
+                    f?.routerUploadFilePath
+                  );
+                  return {
+                    ...f,
+                    item: {
+                      ...f.item,
+                      downloadUrl: url,
+                      contentType: type,
+                    },
+                  };
+                } else {
+                  return {
+                    ...f,
+                  };
+                }
               })
             ),
           };
@@ -576,17 +585,32 @@ async function routerDeletePackingSlip(req, res) {
   ExpressHandler(
     async () => {
       const { pid } = req.params;
+      const { itemId } = req.body;
 
-      await deleteCloudStorageObject().then(async () => {
-        await PackingSlip.updateOne(
-          { _id: pid },
-          {
-            $unset: {
-              routerUploadPath: 1,
-            },
-          }
-        );
+      const packingSlip = await PackingSlip.findById(pid);
+
+      if (!packingSlip) return HTTPError("Packing slip doesn't exist.", 404);
+
+      const foundItems = packingSlip.items.filter((e) => {
+        return e._id.toString() === itemId;
       });
+
+      const item = foundItems[0];
+
+      if (!item) return HTTPError("Item doesn't exist for packingSlip.", 404);
+
+      await deleteCloudStorageObject(item.routerUploadFilePath).then(
+        async () => {
+          await PackingSlip.updateOne(
+            { _id: pid, "items._id": itemId },
+            {
+              $unset: {
+                "items.$.routerUploadFilePath": 1,
+              },
+            }
+          );
+        }
+      );
     },
     res,
     "Router packing slip delete"

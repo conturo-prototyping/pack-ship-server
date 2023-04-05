@@ -31,20 +31,14 @@ async function generateSignedUploadURL(req, res) {
 }
 
 async function deleteCloudStorageObject(filepath) {
-  const deleteOptions = {
-    ifGenerationMatch: generationMatchPrecondition,
-  };
-  const [url] = await storage
-    .bucket(CLOUD_STORAGE_BUCKET_NAME)
-    .file(filepath)
-    .delete(deleteOptions);
+  await storage.bucket(CLOUD_STORAGE_BUCKET_NAME).file(filepath).delete();
 }
 
 async function generateSignedURL(action, filepath) {
   const options = {
     version: "v4",
     action: action,
-    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+    expires: Date.now() + 60 * 60 * 1000, // 60 minutes
   };
 
   // Get a v4 signed URL for uploading file
@@ -56,6 +50,18 @@ async function generateSignedURL(action, filepath) {
   return url;
 }
 
+async function getCloudStorageObjectMetadata(filepath) {
+  const [metadata] = await storage
+    .bucket(CLOUD_STORAGE_BUCKET_NAME)
+    .file(filepath)
+    .getMetadata();
+
+  return metadata;
+}
+
 async function getCloudStorageObjectDownloadURL(filepath) {
-  return await generateSignedURL("read", filepath);
+  const metadata = await getCloudStorageObjectMetadata(filepath);
+  const url = await generateSignedURL("read", filepath);
+
+  return [url, metadata.contentType];
 }
