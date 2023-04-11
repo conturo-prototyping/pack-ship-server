@@ -26,7 +26,7 @@ async function generateSignedUploadURL(req, res) {
       return { data: { url: await generateSignedURL("write", location) } };
     },
     res,
-    "fetching packing slips"
+    "generate signed upload"
   );
 }
 
