@@ -35,6 +35,12 @@ const schema = new Schema({
       // this determins which router step the item was packed for
       // for example: 3"00 - SHIP TO VENDOR" will be "VENDOR-300"
       destinationCode: String,
+
+      // Upload URL for router documents
+      routerUploadURL: String,
+
+      // Upload ID for router documents
+      routerUploadId: String,
     },
   ],
 
