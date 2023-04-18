@@ -7,6 +7,10 @@ const { LogError, ExpressHandler, HTTPError } = require("../utils");
 const { default: mongoose } = require("mongoose");
 const { GetOrderFulfillmentInfo } = require("../shopQ/controller.js");
 const { BlockNonAdmin } = require("../user/controller.js");
+const {
+  deleteCloudStorageObject,
+  getCloudStorageObjectDownloadURL,
+} = require("../cloudStorage/controller.js");
 
 module.exports = {
   router,
@@ -24,6 +28,9 @@ router.post("/merge", mergePackingSlips);
 router.get("/:pid", getPackingSlip);
 router.patch("/:pid", editPackingSlip);
 router.delete("/:pid", BlockNonAdmin, deletePackingSlip);
+
+router.patch("/routerUpload/:pid", routerUploadPackingSlip);
+router.delete("/routerUpload/:pid", BlockNonAdmin, routerDeletePackingSlip);
 
 router.post("/pdf", getAsPDF);
 
@@ -104,6 +111,7 @@ async function GetPopulatedPackingSlips(
               item: { $arrayElemAt: ["$workOrderItem", 0] },
               _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
               qty: "$items.qty",
+              routerUploadFilePath: "$items.routerUploadFilePath",
             },
           },
           label: { $first: "$label" },
@@ -353,9 +361,38 @@ async function searchHistPackingSlips(req, res) {
         true
       );
 
+      const finalPackingSlips = await Promise.all(
+        allPackingSlips[1].packingSlips.map(async (e) => {
+          return {
+            ...e,
+            items: await Promise.all(
+              e.items.map(async (f) => {
+                if (f.routerUploadFilePath) {
+                  const [url, type] = await getCloudStorageObjectDownloadURL(
+                    f?.routerUploadFilePath
+                  );
+                  return {
+                    ...f,
+                    item: {
+                      ...f.item,
+                      downloadUrl: url,
+                      contentType: type,
+                    },
+                  };
+                } else {
+                  return {
+                    ...f,
+                  };
+                }
+              })
+            ),
+          };
+        })
+      );
+
       return {
         data: {
-          packingSlips: allPackingSlips[1].packingSlips,
+          packingSlips: finalPackingSlips,
           totalCount: allPackingSlips[1]?.totalCount ?? 0,
         },
       };
@@ -514,6 +551,69 @@ async function deletePackingSlip(req, res) {
     },
     res,
     "deleting packing slip"
+  );
+}
+
+/**
+ * Stores file location of packing slip router
+ */
+async function routerUploadPackingSlip(req, res) {
+  ExpressHandler(
+    async () => {
+      const { pid } = req.params;
+
+      const { filePath } = req.body;
+
+      await PackingSlip.updateOne(
+        { _id: pid },
+        {
+          $set: {
+            routerUploadPath: filePath,
+          },
+        }
+      );
+    },
+    res,
+    "Router packing slip upload URL"
+  );
+}
+
+/**
+ * Deletes the router from the packing slip
+ */
+async function routerDeletePackingSlip(req, res) {
+  ExpressHandler(
+    async () => {
+      const { pid } = req.params;
+      const { itemId } = req.body;
+
+      const packingSlip = await PackingSlip.findById(pid);
+
+      if (!packingSlip) return HTTPError("Packing slip doesn't exist.", 404);
+
+      const foundItems = packingSlip.items.filter((e) => {
+        return e._id.toString() === itemId;
+      });
+
+      const item = foundItems[0];
+
+      if (!item) return HTTPError("Item doesn't exist for packingSlip.", 404);
+
+      await deleteCloudStorageObject(item.routerUploadFilePath).then(
+        async () => {
+          await PackingSlip.updateOne(
+            { _id: pid, "items._id": itemId },
+            {
+              $unset: {
+                "items.$.routerUploadFilePath": 1,
+              },
+            }
+          );
+        }
+      );
+    },
+    res,
+    "Router packing slip delete"
   );
 }
 
