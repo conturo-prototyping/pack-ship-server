@@ -7,6 +7,7 @@ const cookieSession = require("cookie-session");
 
 require("dotenv").config();
 require("./config.passport")(passport);
+require("./jwt/controller.authjwt")(passport);
 
 const app = express();
 
