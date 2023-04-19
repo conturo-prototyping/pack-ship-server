@@ -32,14 +32,3 @@ router.get(
   }),
   (_req, res) => res.sendStatus(200)
 );
-
-// router.get(
-//   "/jwt",
-//   passport.authenticate("jwt", { session: false }, () =>
-//     console.log("GOT HERE INSTEAD")
-//   ),
-//   (_req, res) => {
-//     console.log("TRYING HERE");
-//     res.sendStatus(200);
-//   }
-// );
