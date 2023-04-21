@@ -47,6 +47,7 @@ app.use("/packingSlips", require("./packingSlip/controller").router);
 app.use("/incomingDeliveries", require("./incomingDelivery/controller").router);
 app.use("/workOrders", require("./workOrder/controller").router);
 app.use("/users", require("./user/controller").router);
+app.use("/qrCode", require("./qrCode/controller").router);
 
 app.use("/storage", require("./cloudStorage/controller").router);
 
