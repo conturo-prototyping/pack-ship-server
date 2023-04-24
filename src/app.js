@@ -39,7 +39,10 @@ if (process.env.NODE_ENV === "DEBUG") {
 app.use("/auth", require("./router.auth"));
 app.all("*", function (req, res, next) {
   if (req.isAuthenticated()) return next();
-  else res.redirect(req.baseUrl + "/auth/google");
+  else if (req.headers["authorization"]) {
+    passport.authenticate("jwt", { session: false });
+    return next();
+  } else res.redirect(req.baseUrl + "/auth/jwt");
 });
 
 app.use("/shipments", require("./shipment/controller"));
