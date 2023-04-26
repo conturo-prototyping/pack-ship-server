@@ -42,7 +42,7 @@ app.all("*", function (req, res, next) {
   else if (req.headers["authorization"]) {
     passport.authenticate("jwt", { session: false });
     return next();
-  } else res.redirect(req.baseUrl + "/auth/jwt");
+  } else res.redirect(req.baseUrl + "/auth/google");
 });
 
 app.use("/shipments", require("./shipment/controller"));
