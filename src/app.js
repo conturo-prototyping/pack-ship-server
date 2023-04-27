@@ -40,8 +40,16 @@ app.use("/auth", require("./router.auth"));
 app.all("*", function (req, res, next) {
   if (req.isAuthenticated()) return next();
   else if (req.headers["authorization"]) {
-    passport.authenticate("jwt", { session: false });
-    return next();
+    passport.authenticate("jwt", (err, user, _info, _status) => {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        return res.send(401);
+      }
+      req.user = user;
+      return next();
+    })(req, res, next);
   } else res.redirect(req.baseUrl + "/auth/google");
 });
 
