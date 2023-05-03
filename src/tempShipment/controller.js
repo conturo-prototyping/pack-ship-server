@@ -2,10 +2,12 @@ const { Router } = require("express");
 const router = Router();
 const TempShipment = require("./model");
 const { ExpressHandler, HTTPError } = require("../utils");
+const { BlockNonAdmin } = require("../user/controller");
 
 module.exports = router;
 
 router.put("/", createOne);
+router.delete("/:tsid", BlockNonAdmin, deleteOne);
 
 /**
  * Create a new temp shipment given a manifest
@@ -31,5 +33,21 @@ async function createOne(req, res) {
     },
     res,
     "creating temp shipment"
+  );
+}
+
+/**
+ * Create a new temp shipment given a manifest
+ */
+async function deleteOne(req, res) {
+  ExpressHandler(
+    async () => {
+      const { tsid } = req.params;
+
+      // delete temp shipment
+      await TempShipment.deleteOne({ _id: tsid });
+    },
+    res,
+    "deleting temp shipment"
   );
 }
