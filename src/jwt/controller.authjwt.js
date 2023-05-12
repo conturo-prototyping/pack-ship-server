@@ -13,17 +13,17 @@ module.exports = function (passport) {
         jwtFromRequest: ExtractJwt.fromHeader("authorization"),
         secretOrKey: process.env.JWT_SECRET,
       },
-      (payload, done) => {
-        UserModel.findById(payload.id, (err, user) => {
-          if (err) {
-            return done(err, false);
-          }
-          if (user) {
-            return done(null, user);
+      async (payload, done) => {
+        try {
+          const user = await UserModel.findOne({ _id: payload.id });
+          if (!user) {
+            done(null, null);
           } else {
-            return done(null, false);
+            done(null, user);
           }
-        });
+        } catch (e) {
+          done(e);
+        }
       }
     )
   );

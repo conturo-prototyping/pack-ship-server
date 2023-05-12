@@ -39,7 +39,18 @@ if (process.env.NODE_ENV === "DEBUG") {
 app.use("/auth", require("./router.auth"));
 app.all("*", function (req, res, next) {
   if (req.isAuthenticated()) return next();
-  else res.redirect(req.baseUrl + "/auth/google");
+  else if (req.headers["authorization"]) {
+    passport.authenticate("jwt", (err, user, _info, _status) => {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        return res.send(401);
+      }
+      req.user = user;
+      return next();
+    })(req, res, next);
+  } else res.redirect(req.baseUrl + "/auth/google");
 });
 
 app.use("/shipments", require("./shipment/controller"));
@@ -47,7 +58,8 @@ app.use("/packingSlips", require("./packingSlip/controller").router);
 app.use("/incomingDeliveries", require("./incomingDelivery/controller").router);
 app.use("/workOrders", require("./workOrder/controller").router);
 app.use("/users", require("./user/controller").router);
-
+app.use("/qrCode", require("./qrCode/controller").router);
+app.use("/tempShipments", require("./tempShipment/controller"));
 app.use("/storage", require("./cloudStorage/controller").router);
 
 app.all("*", (_req, res) => res.sendStatus(404));
