@@ -10,7 +10,7 @@ module.exports = {
   generateTempShipmentUploadQRCode,
 };
 
-router.get("/getTempShipCode", generateTempShipmentUploadQRCode);
+router.post("/getTempShipCode", generateTempShipmentUploadQRCode);
 
 /**
  * Generates a signed upload URL for uploading to Cloud Storage
