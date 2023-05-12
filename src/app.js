@@ -59,7 +59,7 @@ app.use("/incomingDeliveries", require("./incomingDelivery/controller").router);
 app.use("/workOrders", require("./workOrder/controller").router);
 app.use("/users", require("./user/controller").router);
 app.use("/qrCode", require("./qrCode/controller").router);
-
+app.use("/tempShipments", require("./tempShipment/controller"));
 app.use("/storage", require("./cloudStorage/controller").router);
 
 app.all("*", (_req, res) => res.sendStatus(404));
