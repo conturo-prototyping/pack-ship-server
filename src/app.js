@@ -41,7 +41,7 @@ const io = new Server(server, {
     credentials: true,
     origin: process.env.CORS_CLIENT_URL,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
-    exposedHeaders: ["Cookie"],
+    exposedHeaders: ["Cookie", "Authorization"],
   },
 });
 
@@ -52,20 +52,34 @@ io.use(wrap(passport.session()));
 io.use((socket, next) => {
   if (socket.request.user) {
     next();
+  } else if (socket.request.headers["authorization"]) {
+    passport.authenticate("jwt", (err, user, _info, _status) => {
+      if (err) {
+        return next(err);
+      }
+
+      if (!user) {
+        socket.disconnect(true);
+        next(new Error("Unauthorized"));
+      }
+      socket.request.user = user;
+      return next();
+    })(socket.request, {}, next);
   } else {
     socket.disconnect(true);
     next(new Error("Unauthorized"));
   }
 });
 
-const { joinTemp, uploadDone } = require("./shipmentRouterUpload/controller")(
-  io
-);
+const { joinTemp, uploadDone, deleteUpload } =
+  require("./shipmentRouterUpload/controller")(io);
 
-io.on("connection", (socket) => {
+io.sockets.on("connection", (socket) => {
   socket.on("joinTemp", joinTemp);
 
   socket.on("uploadDone", uploadDone);
+
+  socket.on("deleteUpload", deleteUpload);
 });
 
 if (process.env.NODE_ENV === "DEBUG") {

@@ -19,4 +19,4 @@ const schema = new Schema({
   ],
 });
 
-module.exports = model("tempShipment", schema);
+module.exports = model("tempShipment", schema, "tempShipments");
