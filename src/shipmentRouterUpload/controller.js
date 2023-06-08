@@ -14,12 +14,14 @@ module.exports = (io) => {
       io.to(payload.tempShipmentId).emit("joinedRoom", {
         tempShipmentId: payload.tempShipmentId,
         imagePaths: tempShipment?.shipmentImages,
-        imageUrls: await Promise.all(
-          tempShipment.shipmentImages.map(async (e) => {
-            const data = await getCloudStorageObjectDownloadURL(e);
-            return { url: data[0], type: data[1], path: e };
-          })
-        ),
+        imageUrls: tempShipment
+          ? await Promise.all(
+              tempShipment?.shipmentImages.map(async (e) => {
+                const data = await getCloudStorageObjectDownloadURL(e);
+                return { url: data[0], type: data[1], path: e };
+              })
+            )
+          : [],
       });
     }
   };
@@ -46,6 +48,7 @@ module.exports = (io) => {
   };
 
   const deleteUpload = async function (payload) {
+    const socket = this;
     const tempShipmentId = payload.tempShipmentId;
 
     await TempShipment.findByIdAndUpdate(tempShipmentId, {
@@ -54,9 +57,15 @@ module.exports = (io) => {
 
     const tempShipment = await TempShipment.findById(tempShipmentId);
 
-    io.to(tempShipmentId).emit("newUploads", {
+    socket.broadcast.to(tempShipmentId).emit("newDeletions", {
       tempShipmentId,
       imagePaths: tempShipment.shipmentImages,
+      imageUrls: await Promise.all(
+        tempShipment.shipmentImages.map(async (e) => {
+          const data = await getCloudStorageObjectDownloadURL(e);
+          return { url: data[0], type: data[1], path: e };
+        })
+      ),
     });
   };
 
