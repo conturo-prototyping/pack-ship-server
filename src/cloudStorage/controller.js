@@ -21,9 +21,14 @@ const storage = new Storage();
 async function generateSignedUploadURL(req, res) {
   ExpressHandler(
     async () => {
-      let { location } = req.body;
+      const { location } = req.body;
+      const url = await generateSignedURL("write", location);
 
-      return { data: { url: await generateSignedURL("write", location) } };
+      return {
+        data: {
+          url
+        }
+      };
     },
     res,
     "generate signed upload"
