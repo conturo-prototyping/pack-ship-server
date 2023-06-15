@@ -29,14 +29,16 @@ router.put("/", createOne);
 router.put("/fromTemp", createFromTemp);
 
 router.get("/search", searchShipments);
-
 router.get("/queue", getQueue);
+router.get("/pending", getPending);
 
 router.post("/pdf", getAsPdf);
 
 router.get("/:sid", getOne);
 router.patch("/:sid", BlockNonAdmin, editOne);
 router.delete("/:sid", BlockNonAdmin, deleteOne);
+
+router.patch("/:sid/pending", editOne);
 
 /**
  * Compute a search of shipment documents that match either a given order or a given part.
@@ -94,7 +96,7 @@ async function searchShipments(req, res) {
       const sortFunc = (a, b) => {
         let testVal;
         if (sortBy === "CUSTOMER") {
-          testVal = a.label.localeCompare(b.label);
+          testVal = a.label?.localeCompare(b.label);
         } else testVal = a.dateCreated.getTime() - b.dateCreated.getTime();
 
         if (testVal * sortOrder < 1) return -1;
@@ -160,6 +162,131 @@ async function getAll(_req, res) {
     },
     res,
     "fetching shipments"
+  );
+}
+
+async function getPending(_req, res) {
+  ExpressHandler(
+    async () => {
+      const agg = [
+        {
+          $match: {
+            $or: [
+              {
+                // shipment.deliveryMethod === "CARRIER" &&
+                // (!shipment.deliverySpeed || !shipment.trackingNumber || shipment.cost == null | undefined)
+                $and: [
+                  {
+                    isPastVersion: false,
+                  },
+                  {
+                    deliveryMethod: "CARRIER",
+                  },
+                  {
+                    $or: [
+                      {
+                        $or: [{ deliverySpeed: { $eq: null } }],
+                      },
+                      {
+                        $or: [{ trackingNumber: { $eq: null } }],
+                      },
+                      {
+                        $or: [{ cost: { $eq: null } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                // If( PICKUP or DROPOFF ) &  customerHandoffName not set
+                $and: [
+                  {
+                    isPastVersion: false,
+                  },
+                  {
+                    $or: [
+                      {
+                        deliveryMethod: "PICKUP",
+                      },
+                      {
+                        deliveryMethod: "DROPOFF",
+                      },
+                    ],
+                  },
+                  {
+                    $or: [
+                      {
+                        customerHandoffName: { $eq: null },
+                      },
+                      {
+                        customerHandoffName: "",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          $lookup: {
+            from: "packingSlips",
+            localField: "manifest",
+            foreignField: "_id",
+            as: "_manifest",
+          },
+        },
+        { $unwind: "$_manifest" },
+        { $unwind: "$_manifest.items" },
+        {
+          $lookup: {
+            from: "workorders",
+            let: {
+              workOrderItemId: "$_manifest.items.item",
+            },
+            pipeline: [
+              { $unwind: "$Items" },
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$Items._id", "$$workOrderItemId"],
+                  },
+                },
+              },
+            ],
+            as: "_manifest.items.item",
+          },
+        },
+        { $unwind: "$_manifest.items.item" },
+        {
+          $group: {
+            _id: "$_manifest.shipment",
+            orderNumber: { $first: "$_manifest.orderNumber" },
+            label: { $first: "$label" },
+            customer: { $first: "$customer" },
+            customerHandoffName: { $first: "$customerHandoffName" },
+            trackingNumber: { $first: "$trackingNumber" },
+            dateCreated: { $first: "$dateCreated" },
+            destination: { $first: "$destination" },
+            shipment: { $first: "$_manifest.shipment" },
+            destination: { $first: "$_manifest.destination" },
+            deliveryMethod: { $first: "$deliveryMethod" },
+            carrier: { $first: "$carrier" },
+            deliverySpeed: { $first: "$deliverySpeed" },
+            items: { $push: "$_manifest.items" },
+          },
+        },
+      ];
+      const shipments = await Shipment.aggregate(agg);
+
+      return {
+        data: {
+          shipments,
+        },
+      };
+    },
+    res,
+    "fetching pending shipments"
   );
 }
 
@@ -727,7 +854,6 @@ async function deleteOne(req, res) {
   ExpressHandler(
     async () => {
       const { sid } = req.params;
-
       await updateShipmentTrackingHistory(sid);
 
       // delete shipment
