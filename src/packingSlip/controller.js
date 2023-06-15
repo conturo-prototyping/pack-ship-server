@@ -25,6 +25,7 @@ router.get("/histSearch", searchHistPackingSlips);
 
 router.post("/merge", mergePackingSlips);
 
+router.get("/pending", getPendingPackingSlips);
 router.get("/:pid", getPackingSlip);
 router.patch("/:pid", editPackingSlip);
 router.delete("/:pid", BlockNonAdmin, deletePackingSlip);
@@ -48,7 +49,8 @@ async function GetPopulatedPackingSlips(
   limit = undefined,
   offset = 0,
   sort = undefined,
-  groupByOrderNum = true
+  groupByOrderNum = true,
+  getPending = false
 ) {
   try {
     const pipeline = [
@@ -204,6 +206,21 @@ async function GetPopulatedPackingSlips(
           },
         });
       }
+    }
+
+    if (getPending) {
+      pipeline.push({
+        $match: {
+          $or: [
+            {
+              shipment: { $eq: null },
+            },
+            {
+              shipment: { $exists: false },
+            },
+          ],
+        },
+      });
     }
 
     pipeline.push({
@@ -419,6 +436,66 @@ async function getAllPackingSlips(_req, res) {
     },
     res,
     "fetching packing slips"
+  );
+}
+
+/**
+ * Get a list of all packing slips
+ */
+async function getPendingPackingSlips(_req, res) {
+  ExpressHandler(
+    async () => {
+      const [e, { packingSlips }] = await GetPopulatedPackingSlips(
+        false,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        undefined,
+        0,
+        undefined,
+        true,
+        true
+      );
+      if (e) return HTTPError("Error fetching pending packing slips.");
+
+      const finalPackingSlips = await Promise.all(
+        packingSlips?.map(async (e) => {
+          return {
+            ...e,
+            items: await Promise.all(
+              e.items.map(async (f) => {
+                if (f.routerUploadFilePath) {
+                  const [url, type] = await getCloudStorageObjectDownloadURL(
+                    f?.routerUploadFilePath
+                  );
+                  return {
+                    ...f,
+                    item: {
+                      ...f.item,
+                      downloadUrl: url,
+                      contentType: type,
+                    },
+                  };
+                } else {
+                  return {
+                    ...f,
+                  };
+                }
+              })
+            ),
+          };
+        })
+      );
+
+      return {
+        data: {
+          packingSlips: finalPackingSlips,
+        },
+      };
+    },
+    res,
+    "fetching pending packing slips"
   );
 }
 
