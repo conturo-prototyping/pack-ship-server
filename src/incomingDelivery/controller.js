@@ -223,7 +223,20 @@ async function CreateNew(
 /**
  * Fetch all incoming deliveries ever created.
  */
-function getAll(req, res) {}
+function getAll(req, res) {
+  ExpressHandler(
+    async () => {
+      console.log('------------------  ---------------');
+      console.log(req.body)
+      console.log(req.user)
+      const data = { message: 'worked getting all incoming deliveries' };
+      
+      return { data };
+    },
+    res,
+    'getting all incoming deliveries'
+  );
+}
 
 /**
  * Create a single incoming delivery.
