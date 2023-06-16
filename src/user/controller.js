@@ -5,7 +5,8 @@ const router = express.Router();
 
 module.exports = {
   router,
-  BlockNonAdmin
+  BlockNonAdmin,
+  CheckUserId,
 };
 
 /**
@@ -36,3 +37,19 @@ router.get('/me', async (req, res) => {
     res.status(500).send(e);
   }
 });
+
+// check if user id is valid, used for requests from Workflow app
+async function CheckUserId ( authUserId ) {
+  try {
+    if ( !authUserId ) res.status(400).send('No user Id provided.');
+
+    const user = await User.findOne({ _id: authUserId })
+      .lean()
+      .exec();
+
+    return [null, !!user];
+  } 
+  catch (e) {
+    return [e];
+  }
+}
