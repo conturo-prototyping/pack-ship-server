@@ -717,6 +717,7 @@ async function editOne(req, res) {
         isDueBack, //for incomingDeliveries
         isDueBackOn, //for incomingDeliveries
         shipmentImages,
+        routerUploadFilePath,
       } = req.body;
 
       const p_deleted =
@@ -750,6 +751,9 @@ async function editOne(req, res) {
         );
 
         updateDict = { ...updateDict, shipmentImages };
+      }
+      if (routerUploadFilePath) {
+        updateDict = { ...updateDict, routerUploadFilePath };
       }
 
       // Update

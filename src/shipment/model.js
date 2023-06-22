@@ -63,6 +63,8 @@ const schema = new Schema({
       type: String,
     },
   ],
+
+  routerUploadFilePath: String,
 });
 
 const Model = model("shipment", schema, "shipments");
