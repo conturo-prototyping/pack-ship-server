@@ -546,7 +546,6 @@ async function createShipment(
 async function createFromTemp(req, res) {
   ExpressHandler(
     async () => {
-      console.log("STARTING");
       const {
         tempShipmentId,
         customer,
