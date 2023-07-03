@@ -37,7 +37,7 @@ const schema = new Schema({
       destinationCode: String,
 
       // Upload URL for router documents
-      routerUploadFilePath: String,
+      confirmShipmentFilePath: String,
     },
   ],
 
