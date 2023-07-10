@@ -316,7 +316,7 @@ async function createShipment(
 
     await Promise.all(
       packingSlip.items.map((item) => {
-        itemNoRouter |= item.confirmShipmentFilePath === undefined;
+        itemNoRouter |= item.routerUploadFilePath === undefined;
       })
     );
   });
