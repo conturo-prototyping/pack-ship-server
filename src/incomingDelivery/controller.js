@@ -270,15 +270,17 @@ function createOne(req, res) {
 function CreateConsumablePO( req, res ) {
   ExpressHandler(
     async () => {
-
-      const { sourcePOId, poNumber, isDueBackOn } = req.body;
+      const { sourcePOId, poNumber } = req.body;
       if ( !sourcePOId ) return HTTPError( 'Source doc Id not provided found.', 400 );
       if ( !poNumber ) return HTTPError( 'PO number not provided found.', 400 );
 
+      // TODO: need to make this some way to default to 10 business days
+      const isDueBackOn = req.body.isDueBackOn || '12-31-2023';
+      
       const userId = req?.user?._id || req?.body?.authUserId;
 
       if ( !userId ) return HTTPError( 'No userId found, cannot complete creating consumable PO.', 400 );
-      const label = poNumber + '-R';
+      const label = 'PO' + poNumber + '-R';
 
       const autoIncomingDelivery = new IncomingDelivery({
         label,
@@ -294,7 +296,7 @@ function CreateConsumablePO( req, res ) {
         newIncomingDelivery: autoIncomingDelivery,
         message: `Incoming delivery ${label} has been created.`
       };
-      
+
       return { data };
     },
     res,
@@ -328,9 +330,13 @@ function getQueue(req, res) {
       ]).exec();
 
       for (let i = 0; i < workOrderPOQueue.length; i++) {
+        if ( workOrderPOQueue.length === 0 ) continue;
+
         const lines = workOrderPOQueue[i].po[0]?.lines;
 
-        for (let j = 0; j < lines?.length || []; j++) {
+        for (let j = 0; j < lines?.length || 0; j++) {
+          if ( !lines || lines?.length === 0 ) continue;
+          
           const line = lines[j];
 
           const [packingSlip, workorderItem] = await Promise.all([
@@ -360,7 +366,8 @@ function getQueue(req, res) {
       const consumablePOQueue = await IncomingDelivery.aggregate([
         {
           $match: {
-            sourcePoType: POTypes.Consumable,
+            // sourcePoType: POTypes.Consumable,    // OLD CODE
+            sourcePoType: 'purchaseOrders',
             receivedOn: { $exists: false },
             $or: [{ canceled: false }, { canceled: undefined }],
           },
