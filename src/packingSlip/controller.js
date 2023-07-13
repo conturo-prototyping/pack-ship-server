@@ -113,7 +113,7 @@ async function GetPopulatedPackingSlips(
               item: { $arrayElemAt: ["$workOrderItem", 0] },
               _id: { $arrayElemAt: ["$workOrderItem.rowId", 0] },
               qty: "$items.qty",
-              confirmShipmentFilePath: "$items.confirmShipmentFilePath",
+              routerUploadFilePath: "$items.routerUploadFilePath",
             },
           },
           label: { $first: "$label" },
@@ -384,9 +384,9 @@ async function searchHistPackingSlips(req, res) {
             ...e,
             items: await Promise.all(
               e.items.map(async (f) => {
-                if (f.confirmShipmentFilePath) {
+                if (f.routerUploadFilePath) {
                   const [url, type] = await getCloudStorageObjectDownloadURL(
-                    f?.confirmShipmentFilePath
+                    f?.routerUploadFilePath
                   );
                   return {
                     ...f,
@@ -465,9 +465,9 @@ async function getPendingPackingSlips(_req, res) {
             ...e,
             items: await Promise.all(
               e.items.map(async (f) => {
-                if (f.confirmShipmentFilePath) {
+                if (f.routerUploadFilePath) {
                   const [url, type] = await getCloudStorageObjectDownloadURL(
-                    f?.confirmShipmentFilePath
+                    f?.routerUploadFilePath
                   );
                   return {
                     ...f,
@@ -676,13 +676,13 @@ async function routerDeletePackingSlip(req, res) {
 
       if (!item) return HTTPError("Item doesn't exist for packingSlip.", 404);
 
-      await deleteCloudStorageObject(item.confirmShipmentFilePath).then(
+      await deleteCloudStorageObject(item.routerUploadFilePath).then(
         async () => {
           await PackingSlip.updateOne(
             { _id: pid, "items._id": itemId },
             {
               $unset: {
-                "items.$.confirmShipmentFilePath": 1,
+                "items.$.routerUploadFilePath": 1,
               },
             }
           );
