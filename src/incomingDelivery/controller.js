@@ -258,7 +258,9 @@ function CreateConsumablePO( req, res ) {
       if ( !sourcePOId ) return HTTPError( 'Source doc Id not provided found.', 400 );
       if ( !poNumber ) return HTTPError( 'PO number not provided found.', 400 );
 
-      const userId = req.user._id;
+      const userId = req?.user?._id || req?.body?.authUserId;
+
+      if ( !userId ) return HTTPError( 'No userId found, cannot complete creating consumable PO.', 400 );
       const label = poNumber + '-R';
 
       const autoIncomingDelivery = new IncomingDelivery({
@@ -271,7 +273,11 @@ function CreateConsumablePO( req, res ) {
       
       await autoIncomingDelivery.save();
 
-      const data = { newIncomingDelivery: autoIncomingDelivery };
+      const data = { 
+        newIncomingDelivery: autoIncomingDelivery,
+        message: `Incoming delivery ${label} has been created.`
+      };
+      
       return { data };
     },
     res,
