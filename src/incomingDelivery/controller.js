@@ -14,6 +14,7 @@ const { BlockNonAdmin } = require("../user/controller");
 
 router.get("/", getAll);
 router.put("/", createOne);
+router.put( '/autoGen', autoGenOne );
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
 
@@ -246,6 +247,35 @@ function createOne(req, res) {
     },
     res,
     "creating an incoming delivery"
+  );
+}
+
+function autoGenOne( req, res ) {
+  ExpressHandler(
+    async () => {
+
+      const { sourcePOId, poNumber, isDueBackOn } = req.body;
+      if ( !sourcePOId ) return HTTPError( 'Source doc Id not provided found.', 400 );
+      if ( !poNumber ) return HTTPError( 'PO number not provided found.', 400 );
+
+      const userId = req.user._id;
+      const label = poNumber + '-R';
+
+      const autoIncomingDelivery = new IncomingDelivery({
+        label,
+        createdBy: userId,
+        sourcePoType: 'purchaseOrders',
+        sourcePOId,
+        isDueBackOn,    // this might be undefined
+      });
+      
+      await autoIncomingDelivery.save();
+
+      const data = { newIncomingDelivery: autoIncomingDelivery };
+      return { data };
+    },
+    res,
+    'auto generating incoming delivery for PO'
   );
 }
 
