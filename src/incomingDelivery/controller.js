@@ -14,7 +14,7 @@ const { BlockNonAdmin } = require("../user/controller");
 
 router.get("/", getAll);
 router.put("/", createOne);
-router.put( '/autoGen', autoGenOne );
+router.put( '/autoGen', CreateConsumablePO );
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
 
@@ -250,7 +250,7 @@ function createOne(req, res) {
   );
 }
 
-function autoGenOne( req, res ) {
+function CreateConsumablePO( req, res ) {
   ExpressHandler(
     async () => {
 
