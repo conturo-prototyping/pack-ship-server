@@ -12,6 +12,8 @@ const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
 const { BlockNonAdmin } = require("../user/controller");
 
+const DEFAULT_BUSINESS_DAYS = 10;
+
 router.get("/", getAll);
 router.put("/", createOne);
 router.put( '/autoGen', CreateConsumablePO );
@@ -275,7 +277,7 @@ function CreateConsumablePO( req, res ) {
       if ( !poNumber ) return HTTPError( 'PO number not provided found.', 400 );
 
       // TODO: need to make this some way to default to 10 business days
-      const isDueBackOn = req.body.isDueBackOn || '12-31-2023';
+      const isDueBackOn = req.body.isDueBackOn || addBusinessDays(DEFAULT_BUSINESS_DAYS, true);
       
       const userId = req?.user?._id || req?.body?.authUserId;
 
@@ -727,4 +729,24 @@ async function checkId(res, next, model, id) {
       next();
     }
   }
+}
+
+
+
+function addBusinessDays( days, dateStringOnly ) {
+  const date = new Date();
+  let i = days;
+  while( i > 0 ) {
+    const day = date.getDay();
+    if ( ![0, 6].includes(day) ) {
+      i --;
+    }
+    date.setDate( date.getDate() + 1 );
+  }
+
+  if ( dateStringOnly ) {
+    return date.toISOString().split('T')[0]
+  }
+
+  return date;
 }
