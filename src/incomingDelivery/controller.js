@@ -733,7 +733,6 @@ async function checkId(res, next, model, id) {
 }
 
 
-
 function addBusinessDays( days, dateStringOnly ) {
   const date = new Date();
   let i = days;
@@ -746,7 +745,8 @@ function addBusinessDays( days, dateStringOnly ) {
   }
 
   if ( dateStringOnly ) {
-    return date.toISOString().split('T')[0]
+    const [year, month, day] = date.toISOString().split('T')[0].split('-');
+    return `${month}/${day}/${year}`;
   }
 
   return date;
