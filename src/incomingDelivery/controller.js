@@ -290,6 +290,7 @@ function CreateConsumablePO( req, res ) {
         sourcePoType: 'purchaseOrders',
         sourcePOId,
         isDueBackOn,    // this might be undefined
+        linesReceived: [],
       });
       
       await autoIncomingDelivery.save();
