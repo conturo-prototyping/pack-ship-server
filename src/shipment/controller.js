@@ -5,6 +5,7 @@ const PackingSlip = require("../packingSlip/model");
 const Customer = require("../customer/model");
 const WorkOrder = require("../workOrder/model");
 const IncomingDelivery = require("../incomingDelivery/model");
+const TempShipment = require("../tempShipment/model");
 const { CreateNew } = require("../incomingDelivery/controller");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
 const { ExpressHandler, HTTPError, LogError } = require("../utils");
@@ -14,11 +15,18 @@ const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 const currency = require("currency.js");
 const { SetAirTableFields, FIELD_NAMES } = require("../service.airtable");
 const { BlockNonAdmin } = require("../user/controller");
+const {
+  moveCloudStorageObject,
+  getCloudStorageObjectDownloadURL,
+  deleteCloudStorageObject,
+} = require("../cloudStorage/controller");
+const { v4: uuidv4 } = require("uuid");
 
 module.exports = router;
 
 router.get("/", getAll);
 router.put("/", createOne);
+router.put("/fromTemp", createFromTemp);
 
 router.get("/search", searchShipments);
 router.get("/queue", getQueue);
@@ -282,6 +290,327 @@ async function getPending(_req, res) {
   );
 }
 
+async function createShipment(
+  manifest,
+  customer,
+  trackingNumber,
+  cost,
+  deliveryMethod,
+  carrier,
+  deliverySpeed,
+  customerAccount,
+  customerHandoffName,
+  shippingAddress,
+  isDueBack,
+  isDueBackOn,
+  userId
+) {
+  if (isDueBack && !isDueBackOn) {
+    return HTTPError("Return due date is missing.");
+  }
+
+  let itemNoRouter = false;
+
+  const checkPromises = manifest.map(async (x) => {
+    const packingSlip = await PackingSlip.findOne({ _id: x });
+
+    await Promise.all(
+      packingSlip.items.map((item) => {
+        itemNoRouter |= item.routerUploadFilePath === undefined;
+      })
+    );
+  });
+
+  await Promise.all(checkPromises);
+
+  if (itemNoRouter)
+    return HTTPError(
+      "Packing Slip not ready for Shipment. No router found.",
+      428
+    );
+
+  const customerDoc = await Customer.findOne({ _id: customer });
+  if (!customerDoc) return HTTPError("Customer not found.");
+  const { tag, numShipments } = customerDoc;
+
+  const label = `SHIP-${tag}-${numShipments + 1}`;
+
+  const shipment = new Shipment({
+    customer,
+    label,
+    manifest,
+
+    deliveryMethod,
+    customerHandoffName,
+    carrier,
+    deliverySpeed,
+    customerAccount,
+    trackingNumber,
+    cost,
+
+    createdBy: userId,
+    specialShippingAddress: shippingAddress,
+  });
+
+  await shipment.save();
+
+  const lines = await Promise.all(
+    shipment.manifest.map(async (e) => {
+      const packingSlip = await PackingSlip.findById(e).lean().exec();
+      return packingSlip.items.map((m) => {
+        return {
+          packingSlipId: packingSlip._id,
+          itemId: m.item,
+          qtyRequested: m.qty,
+        };
+      });
+    })
+  );
+
+  if (isDueBack) {
+    const [workedOrderReturnErr, workOrderPO] = await CreateNewWorkOrderPO(
+      undefined,
+      userId,
+      lines.flat()
+    );
+
+    if (!workedOrderReturnErr) {
+      const [returnErr] = await CreateNew(
+        undefined,
+        userId,
+        isDueBackOn,
+        shipment._id,
+        workOrderPO.workOrderPO._id
+      );
+
+      if (returnErr) {
+        await shipment.delete();
+        return returnErr;
+      }
+    } else {
+      await shipment.delete();
+      return workedOrderReturnErr;
+    }
+  }
+
+  const orderNumbers = new Set();
+  let customerId;
+  const itemsShipped = [];
+
+  // update all packing slips in manifest w/ this shipment's id
+  const promises = manifest.map(async (x) => {
+    const packingSlip = await PackingSlip.findOne({ _id: x });
+
+    orderNumbers.add(packingSlip.orderNumber);
+    if (customerId === undefined) customerId = packingSlip.customer.toString();
+
+    //build itemsShipped object
+    for (const i of packingSlip.items) {
+      itemsShipped.push(i.item.toString());
+    }
+
+    packingSlip.shipment = shipment.id;
+    packingSlip.save();
+  });
+
+  customerDoc.numShipments = numShipments + 1;
+  promises.push(customerDoc.save());
+
+  await Promise.all(promises);
+  const orderNumbersArr = Array.from(orderNumbers);
+
+  // aggregation used to determine if items on the new packing slip are fully completed ...
+  // ... and need are ready for EPP or ready to be shipped. Data is then used to ...
+  // ... set AirTable fields as needed ('Ready 2 Ship' and 'Ready 4 EPP').
+  const agg = [
+    {
+      $match: {
+        customer: new ObjectId(customerId),
+        isPastVersion: { $ne: true },
+      },
+    },
+    { $unwind: "$manifest" },
+    {
+      $lookup: {
+        from: "packingSlips",
+        localField: "manifest",
+        foreignField: "_id",
+        as: "_manifest",
+      },
+    },
+    { $unwind: "$_manifest" },
+    {
+      $match: {
+        $expr: {
+          $in: ["$_manifest.orderNumber", orderNumbersArr],
+        },
+      },
+    },
+    { $unwind: "$_manifest.items" },
+    {
+      $match: {
+        $expr: {
+          $in: [{ $toString: "$_manifest.items.item" }, itemsShipped],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: "$_manifest.items.item",
+        orderNumber: { $first: "$_manifest.orderNumber" },
+        qtyShippedCustomer: {
+          $sum: {
+            $cond: [
+              { $eq: ["$_manifest.destination", "CUSTOMER"] },
+              "$_manifest.items.qty",
+              0,
+            ],
+          },
+        },
+        qtyShippedVendor: {
+          $sum: {
+            $cond: [
+              { $eq: ["$_manifest.destination", "VENDOR"] },
+              "$_manifest.items.qty",
+              0,
+            ],
+          },
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "workorders",
+        let: { id: { $toString: "$_id" } },
+        pipeline: [
+          { $unwind: "$Items" },
+          {
+            $match: {
+              $expr: {
+                $eq: ["$$id", { $toString: "$Items._id" }],
+              },
+            },
+          },
+          {
+            $project: {
+              "Items.Quantity": 1,
+              "Items.calcItemId": 1,
+            },
+          },
+        ],
+        as: "_workOrder",
+      },
+    },
+    { $unwind: "$_workOrder" },
+    {
+      $addFields: {
+        totalQty: "$_workOrder.Items.Quantity",
+        calcItemId: "$_workOrder.Items.calcItemId",
+      },
+    },
+    {
+      $project: {
+        _workOrder: 0,
+      },
+    },
+  ];
+
+  const jobShippingData = await Shipment.aggregate(agg);
+
+  //loop through pipeline data and check if AT fields need set
+  for (x of jobShippingData) {
+    const fields = {};
+    const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } = x;
+
+    if (qtyShippedCustomer >= totalQty) {
+      //set fields key/value to be set in AT
+      fields[FIELD_NAMES.READY_TO_SHIP] = true;
+      fields[FIELD_NAMES.SHIPPED] = true;
+    }
+
+    //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
+    if (qtyShippedVendor >= totalQty) {
+      //set fields key/value to be set in AT
+      fields[FIELD_NAMES.READY_FOR_EPP] = true;
+    }
+
+    //set AirTable fields (if needed)
+    if (Object.keys(fields).length > 0) {
+      SetAirTableFields(calcItemId, fields);
+    }
+  }
+
+  return shipment;
+}
+
+async function createFromTemp(req, res) {
+  ExpressHandler(
+    async () => {
+      const {
+        tempShipmentId,
+        customer,
+        trackingNumber,
+        cost,
+        deliveryMethod,
+        carrier,
+        deliverySpeed,
+        customerAccount,
+        customerHandoffName,
+        shippingAddress,
+        isDueBack,
+        isDueBackOn,
+      } = req.body;
+
+      const tempShipment = await TempShipment.findById(tempShipmentId);
+
+      const shipment = await createShipment(
+        tempShipment.manifest,
+        customer,
+        trackingNumber,
+        cost,
+        deliveryMethod,
+        carrier,
+        deliverySpeed,
+        customerAccount,
+        customerHandoffName,
+        shippingAddress,
+        isDueBack,
+        isDueBackOn,
+        req.user._id
+      );
+
+      // If we hit an error, don't do anything and just return the error
+      if ("status" in shipment && "data" in shipment) return shipment;
+
+      shipment.manifest = tempShipment.manifest;
+
+      const newPaths = await Promise.all(
+        tempShipment.shipmentImages.map(async (e) => {
+          const newPath = `${shipment._id}/realShipment/router-${uuidv4()}`;
+
+          await moveCloudStorageObject(e, newPath);
+
+          return newPath;
+        })
+      );
+
+      shipment.shipmentImages = newPaths;
+
+      await shipment.save();
+
+      await TempShipment.findByIdAndDelete(tempShipmentId);
+
+      return {
+        data: {
+          shipment,
+        },
+      };
+    },
+    res,
+    "creating shipment from temp"
+  );
+}
+
 /**
  * Create a new shipment given an orderNumber & manifest
  * trackingNumber & cost are optional at this stage
@@ -304,242 +633,24 @@ async function createOne(req, res) {
         isDueBackOn,
       } = req.body;
 
-      if (isDueBack && !isDueBackOn) {
-        return HTTPError("Return due date is missing.");
-      }
-
-      let itemNoRouter = false;
-
-      const checkPromises = manifest.map(async (x) => {
-        const packingSlip = await PackingSlip.findOne({ _id: x });
-
-        await Promise.all(
-          packingSlip.items.map((item) => {
-            itemNoRouter |= item.routerUploadFilePath === undefined;
-          })
-        );
-      });
-
-      await Promise.all(checkPromises);
-
-      if (itemNoRouter)
-        return HTTPError(
-          "Packing Slip not ready for Shipment. No router found.",
-          428
-        );
-
-      const customerDoc = await Customer.findOne({ _id: customer });
-      if (!customerDoc) return HTTPError("Customer not found.");
-      const { tag, numShipments } = customerDoc;
-
-      const label = `SHIP-${tag}-${numShipments + 1}`;
-
-      const shipment = new Shipment({
-        customer,
-        label,
+      const shipment = await createShipment(
         manifest,
-
+        customer,
+        trackingNumber,
+        cost,
         deliveryMethod,
-        customerHandoffName,
         carrier,
         deliverySpeed,
         customerAccount,
-        trackingNumber,
-        cost,
-
-        createdBy: req.user._id,
-        specialShippingAddress: shippingAddress,
-      });
-
-      await shipment.save();
-
-      const lines = await Promise.all(
-        shipment.manifest.map(async (e) => {
-          const packingSlip = await PackingSlip.findById(e).lean().exec();
-          return packingSlip.items.map((m) => {
-            return {
-              packingSlipId: packingSlip._id,
-              itemId: m.item,
-              qtyRequested: m.qty,
-            };
-          });
-        })
+        customerHandoffName,
+        shippingAddress,
+        isDueBack,
+        isDueBackOn,
+        req.user._id
       );
 
-      if (isDueBack) {
-        const [workedOrderReturnErr, workOrderPO] = await CreateNewWorkOrderPO(
-          undefined,
-          req.user._id,
-          lines.flat()
-        );
-
-        if (!workedOrderReturnErr) {
-          const [returnErr] = await CreateNew(
-            undefined,
-            req.user._id,
-            isDueBackOn,
-            shipment._id,
-            workOrderPO.workOrderPO._id
-          );
-
-          if (returnErr) {
-            await shipment.delete();
-            return returnErr;
-          }
-        } else {
-          await shipment.delete();
-          return workedOrderReturnErr;
-        }
-      }
-
-      const orderNumbers = new Set();
-      let customerId;
-      const itemsShipped = [];
-
-      // update all packing slips in manifest w/ this shipment's id
-      const promises = manifest.map(async (x) => {
-        const packingSlip = await PackingSlip.findOne({ _id: x });
-
-        orderNumbers.add(packingSlip.orderNumber);
-        if (customerId === undefined)
-          customerId = packingSlip.customer.toString();
-
-        //build itemsShipped object
-        for (const i of packingSlip.items) {
-          itemsShipped.push(i.item.toString());
-        }
-
-        packingSlip.shipment = shipment.id;
-        packingSlip.save();
-      });
-
-      customerDoc.numShipments = numShipments + 1;
-      promises.push(customerDoc.save());
-
-      await Promise.all(promises);
-      const orderNumbersArr = Array.from(orderNumbers);
-
-      // aggregation used to determine if items on the new packing slip are fully completed ...
-      // ... and need are ready for EPP or ready to be shipped. Data is then used to ...
-      // ... set AirTable fields as needed ('Ready 2 Ship' and 'Ready 4 EPP').
-      const agg = [
-        {
-          $match: {
-            customer: new ObjectId(customerId),
-            isPastVersion: { $ne: true },
-          },
-        },
-        { $unwind: "$manifest" },
-        {
-          $lookup: {
-            from: "packingSlips",
-            localField: "manifest",
-            foreignField: "_id",
-            as: "_manifest",
-          },
-        },
-        { $unwind: "$_manifest" },
-        {
-          $match: {
-            $expr: {
-              $in: ["$_manifest.orderNumber", orderNumbersArr],
-            },
-          },
-        },
-        { $unwind: "$_manifest.items" },
-        {
-          $match: {
-            $expr: {
-              $in: [{ $toString: "$_manifest.items.item" }, itemsShipped],
-            },
-          },
-        },
-        {
-          $group: {
-            _id: "$_manifest.items.item",
-            orderNumber: { $first: "$_manifest.orderNumber" },
-            qtyShippedCustomer: {
-              $sum: {
-                $cond: [
-                  { $eq: ["$_manifest.destination", "CUSTOMER"] },
-                  "$_manifest.items.qty",
-                  0,
-                ],
-              },
-            },
-            qtyShippedVendor: {
-              $sum: {
-                $cond: [
-                  { $eq: ["$_manifest.destination", "VENDOR"] },
-                  "$_manifest.items.qty",
-                  0,
-                ],
-              },
-            },
-          },
-        },
-        {
-          $lookup: {
-            from: "workorders",
-            let: { id: { $toString: "$_id" } },
-            pipeline: [
-              { $unwind: "$Items" },
-              {
-                $match: {
-                  $expr: {
-                    $eq: ["$$id", { $toString: "$Items._id" }],
-                  },
-                },
-              },
-              {
-                $project: {
-                  "Items.Quantity": 1,
-                  "Items.calcItemId": 1,
-                },
-              },
-            ],
-            as: "_workOrder",
-          },
-        },
-        { $unwind: "$_workOrder" },
-        {
-          $addFields: {
-            totalQty: "$_workOrder.Items.Quantity",
-            calcItemId: "$_workOrder.Items.calcItemId",
-          },
-        },
-        {
-          $project: {
-            _workOrder: 0,
-          },
-        },
-      ];
-
-      const jobShippingData = await Shipment.aggregate(agg);
-
-      //loop through pipeline data and check if AT fields need set
-      for (x of jobShippingData) {
-        const fields = {};
-        const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } =
-          x;
-
-        if (qtyShippedCustomer >= totalQty) {
-          //set fields key/value to be set in AT
-          fields[FIELD_NAMES.READY_TO_SHIP] = true;
-          fields[FIELD_NAMES.SHIPPED] = true;
-        }
-
-        //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
-        if (qtyShippedVendor >= totalQty) {
-          //set fields key/value to be set in AT
-          fields[FIELD_NAMES.READY_FOR_EPP] = true;
-        }
-
-        //set AirTable fields (if needed)
-        if (Object.keys(fields).length > 0) {
-          SetAirTableFields(calcItemId, fields);
-        }
-      }
+      // If we hit an error, don't do anything and just return the error
+      if ("status" in shipment && "data" in shipment) return shipment;
 
       return {
         data: {
@@ -604,6 +715,8 @@ async function editOne(req, res) {
         shippingAddress,
         isDueBack, //for incomingDeliveries
         isDueBackOn, //for incomingDeliveries
+        shipmentImages,
+        confirmShipmentFilePath,
       } = req.body;
 
       const p_deleted =
@@ -617,6 +730,8 @@ async function editOne(req, res) {
 
       let updateDict = {};
 
+      let deletedPaths = [];
+
       if (deliveryMethod) updateDict = { ...updateDict, deliveryMethod };
       if (cost) updateDict = { ...updateDict, cost };
       if (carrier) updateDict = { ...updateDict, carrier };
@@ -627,6 +742,18 @@ async function editOne(req, res) {
         updateDict = { ...updateDict, customerHandoffName };
       if (shippingAddress)
         updateDict = { ...updateDict, specialShippingAddress: shippingAddress };
+      if (shipmentImages) {
+        const shipment = await Shipment.findById(sid);
+
+        deletedPaths = shipment.shipmentImages.filter(
+          (e) => !shipmentImages.includes(e)
+        );
+
+        updateDict = { ...updateDict, shipmentImages };
+      }
+      if (confirmShipmentFilePath) {
+        updateDict = { ...updateDict, confirmShipmentFilePath };
+      }
 
       // Update
       await Shipment.updateOne(
@@ -642,6 +769,11 @@ async function editOne(req, res) {
           },
         }
       );
+
+      if (shipmentImages)
+        await Promise.all(
+          deletedPaths.map(async (e) => await deleteCloudStorageObject(e))
+        );
 
       // then update newPackingSlips otherwise a conflict will occur
       const updatedShipment = await Shipment.findOneAndUpdate(
@@ -959,7 +1091,28 @@ async function getPopulatedShipmentData(label = undefined) {
 
     const allShipments = await Shipment.aggregate(pipeline);
 
-    return [null, { allShipments }];
+    const adjustedShipments = await Promise.all(
+      allShipments.map(async (e) => {
+        return {
+          ...e,
+          confirmShipmentFileUrl:
+            e.confirmShipmentFilePath &&
+            (await getCloudStorageObjectDownloadURL(e.confirmShipmentFilePath)),
+          shipmentImageUrls: await Promise.all(
+            e.shipmentImages.map(async (f) => {
+              const data = await getCloudStorageObjectDownloadURL(f);
+              return {
+                path: f,
+                url: data[0],
+                type: data[1],
+              };
+            })
+          ),
+        };
+      })
+    );
+
+    return [null, { allShipments: adjustedShipments }];
   } catch (e) {
     LogError(e);
     return [e];
