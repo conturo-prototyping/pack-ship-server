@@ -57,6 +57,14 @@ const schema = new Schema({
   },
 
   specialShippingAddress: String,
+
+  shipmentImages: [
+    {
+      type: String,
+    },
+  ],
+
+  confirmShipmentFilePath: String,
 });
 
 const Model = model("shipment", schema, "shipments");

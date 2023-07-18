@@ -9,6 +9,7 @@ module.exports = {
   router,
   deleteCloudStorageObject,
   getCloudStorageObjectDownloadURL,
+  moveCloudStorageObject,
 };
 
 router.post("/upload", generateSignedUploadURL);
@@ -37,6 +38,10 @@ async function generateSignedUploadURL(req, res) {
 
 async function deleteCloudStorageObject(filepath) {
   await storage.bucket(CLOUD_STORAGE_BUCKET_NAME).file(filepath).delete();
+}
+
+async function moveCloudStorageObject(source, dest) {
+  await storage.bucket(CLOUD_STORAGE_BUCKET_NAME).file(source).move(dest);
 }
 
 async function generateSignedURL(action, filepath) {
