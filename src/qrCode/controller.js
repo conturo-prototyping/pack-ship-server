@@ -37,7 +37,7 @@ async function generateTempShipmentUploadQRCode(req, res) {
 
       let dataURL = `${
         process.env.CORS_CLIENT_URL
-      }/?${encodedParams.toString()}`;
+      }/shipmentsUpload?${encodedParams.toString()}`;
 
       let srcImage = await QRCode.toDataURL(dataURL);
 

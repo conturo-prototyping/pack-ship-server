@@ -27,7 +27,9 @@
     "passport": "^0.5.2",
     "passport-google-oauth2": "^0.2.0",
     "passport-jwt": "^4.0.1",
-    "qrcode": "^1.5.1"
+    "qrcode": "^1.5.1",
+    "socket.io": "^4.6.1",
+    "uuid": "^9.0.0"
   },
   "scripts": {
     "dev": "nodemon ./src/app.js",
