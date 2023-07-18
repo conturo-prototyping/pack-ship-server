@@ -15,7 +15,11 @@ const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 const currency = require("currency.js");
 const { SetAirTableFields, FIELD_NAMES } = require("../service.airtable");
 const { BlockNonAdmin } = require("../user/controller");
-const { moveCloudStorageObject } = require("../cloudStorage/controller");
+const {
+  moveCloudStorageObject,
+  getCloudStorageObjectDownloadURL,
+  deleteCloudStorageObject,
+} = require("../cloudStorage/controller");
 const { v4: uuidv4 } = require("uuid");
 
 module.exports = router;
@@ -542,7 +546,6 @@ async function createShipment(
 async function createFromTemp(req, res) {
   ExpressHandler(
     async () => {
-      console.log("STARTING");
       const {
         tempShipmentId,
         customer,
@@ -712,6 +715,8 @@ async function editOne(req, res) {
         shippingAddress,
         isDueBack, //for incomingDeliveries
         isDueBackOn, //for incomingDeliveries
+        shipmentImages,
+        confirmShipmentFilePath,
       } = req.body;
 
       const p_deleted =
@@ -725,6 +730,8 @@ async function editOne(req, res) {
 
       let updateDict = {};
 
+      let deletedPaths = [];
+
       if (deliveryMethod) updateDict = { ...updateDict, deliveryMethod };
       if (cost) updateDict = { ...updateDict, cost };
       if (carrier) updateDict = { ...updateDict, carrier };
@@ -735,6 +742,18 @@ async function editOne(req, res) {
         updateDict = { ...updateDict, customerHandoffName };
       if (shippingAddress)
         updateDict = { ...updateDict, specialShippingAddress: shippingAddress };
+      if (shipmentImages) {
+        const shipment = await Shipment.findById(sid);
+
+        deletedPaths = shipment.shipmentImages.filter(
+          (e) => !shipmentImages.includes(e)
+        );
+
+        updateDict = { ...updateDict, shipmentImages };
+      }
+      if (confirmShipmentFilePath) {
+        updateDict = { ...updateDict, confirmShipmentFilePath };
+      }
 
       // Update
       await Shipment.updateOne(
@@ -750,6 +769,11 @@ async function editOne(req, res) {
           },
         }
       );
+
+      if (shipmentImages)
+        await Promise.all(
+          deletedPaths.map(async (e) => await deleteCloudStorageObject(e))
+        );
 
       // then update newPackingSlips otherwise a conflict will occur
       const updatedShipment = await Shipment.findOneAndUpdate(
@@ -1067,7 +1091,28 @@ async function getPopulatedShipmentData(label = undefined) {
 
     const allShipments = await Shipment.aggregate(pipeline);
 
-    return [null, { allShipments }];
+    const adjustedShipments = await Promise.all(
+      allShipments.map(async (e) => {
+        return {
+          ...e,
+          confirmShipmentFileUrl:
+            e.confirmShipmentFilePath &&
+            (await getCloudStorageObjectDownloadURL(e.confirmShipmentFilePath)),
+          shipmentImageUrls: await Promise.all(
+            e.shipmentImages.map(async (f) => {
+              const data = await getCloudStorageObjectDownloadURL(f);
+              return {
+                path: f,
+                url: data[0],
+                type: data[1],
+              };
+            })
+          ),
+        };
+      })
+    );
+
+    return [null, { allShipments: adjustedShipments }];
   } catch (e) {
     LogError(e);
     return [e];

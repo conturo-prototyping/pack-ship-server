@@ -27,6 +27,7 @@ module.exports = (io) => {
   };
 
   const uploadDone = async function (payload) {
+    const socket = this;
     const tempShipmentId = payload.tempShipmentId;
 
     await TempShipment.findByIdAndUpdate(tempShipmentId, {
@@ -35,7 +36,7 @@ module.exports = (io) => {
 
     const tempShipment = await TempShipment.findById(tempShipmentId);
 
-    io.to(tempShipmentId).emit("newUploads", {
+    socket.broadcast.to(tempShipmentId).emit("newUploads", {
       tempShipmentId,
       imagePaths: tempShipment.shipmentImages,
       imageUrls: await Promise.all(

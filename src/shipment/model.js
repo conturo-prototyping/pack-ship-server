@@ -63,6 +63,8 @@ const schema = new Schema({
       type: String,
     },
   ],
+
+  confirmShipmentFilePath: String,
 });
 
 const Model = model("shipment", schema, "shipments");
