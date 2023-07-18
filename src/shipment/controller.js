@@ -717,7 +717,7 @@ async function editOne(req, res) {
         isDueBack, //for incomingDeliveries
         isDueBackOn, //for incomingDeliveries
         shipmentImages,
-        routerUploadFilePath,
+        confirmShipmentFilePath,
       } = req.body;
 
       const p_deleted =
@@ -752,8 +752,8 @@ async function editOne(req, res) {
 
         updateDict = { ...updateDict, shipmentImages };
       }
-      if (routerUploadFilePath) {
-        updateDict = { ...updateDict, routerUploadFilePath };
+      if (confirmShipmentFilePath) {
+        updateDict = { ...updateDict, confirmShipmentFilePath };
       }
 
       // Update
@@ -1096,6 +1096,9 @@ async function getPopulatedShipmentData(label = undefined) {
       allShipments.map(async (e) => {
         return {
           ...e,
+          confirmShipmentFileUrl:
+            e.confirmShipmentFilePath &&
+            (await getCloudStorageObjectDownloadURL(e.confirmShipmentFilePath)),
           shipmentImageUrls: await Promise.all(
             e.shipmentImages.map(async (f) => {
               const data = await getCloudStorageObjectDownloadURL(f);
