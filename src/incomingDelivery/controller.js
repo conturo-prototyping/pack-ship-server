@@ -277,7 +277,7 @@ function getQueue(req, res) {
       for (let i = 0; i < workOrderPOQueue.length; i++) {
         const lines = workOrderPOQueue[i].po[0]?.lines;
 
-        for (let j = 0; j < lines?.length || []; j++) {
+        for (let j = 0; j < lines?.length; j++) {
           const line = lines[j];
 
           const [packingSlip, workorderItem] = await Promise.all([
