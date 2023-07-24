@@ -13,7 +13,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: [process.env.CORS_CLIENT_URL, process.env.SHOP_URL],
+    origin: [process.env.CORS_CLIENT_URL, process.env.SHOPQ_URL],
     credentials: true,
   })
 );
