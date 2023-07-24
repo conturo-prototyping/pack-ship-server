@@ -1,3 +1,9 @@
+/**
+ * Searches have been extremly slow in production.
+ * This might be due to a number of different reasons,
+ * but the easiest to address is indexing commonly used fields.
+ */
+
 module.exports = {
   async up(db, client) {
     await db.collection("workorders").createIndex({ "Items._id": 1 });
