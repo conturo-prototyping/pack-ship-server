@@ -213,7 +213,9 @@ async function CreateNew(
     const newIncomingDelivery = new IncomingDelivery(deliveryInfo);
     await newIncomingDelivery.save();
 
-    return [, { incomingDelivery: newIncomingDelivery }];
+    const message = `New incoming delivery (${newIncomingDelivery.label}) created.`
+
+    return [, { incomingDelivery: newIncomingDelivery, message }];
   } catch (error) {
     LogError(error);
     return [HTTPError("Unexpected error creating incoming delivery.")];
@@ -223,7 +225,19 @@ async function CreateNew(
 /**
  * Fetch all incoming deliveries ever created.
  */
-function getAll(req, res) {}
+function getAll(req, res) {
+  ExpressHandler(
+    async () => {
+
+      return HTTPError('Route not implemented.')
+      const data = { message: 'worked getting all incoming deliveries' };
+      
+      return { data };
+    },
+    res,
+    'getting all incoming deliveries'
+  );
+}
 
 /**
  * Create a single incoming delivery.
@@ -235,9 +249,12 @@ function createOne(req, res) {
       const { internalPurchaseOrderNumber, isDueBackOn, sourceShipmentId } =
         req.body;
 
+      // for external requests
+      const { authUserId } = req.locals;
+
       const [err, data] = await CreateNew(
         internalPurchaseOrderNumber,
-        req.user._id,
+        req.user?._id || authUserId,
         isDueBackOn,
         sourceShipmentId
       );
