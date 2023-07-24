@@ -12,8 +12,11 @@ const Shipment = require("../shipment/model");
 const dayjs = require("dayjs");
 const { BlockNonAdmin } = require("../user/controller");
 
+const DEFAULT_BUSINESS_DAYS = 10;
+
 router.get("/", getAll);
 router.put("/", createOne);
+router.put( '/autoGen', CreateConsumablePO );
 router.get("/queue", getQueue);
 router.post("/receive", setReceived);
 
@@ -266,6 +269,44 @@ function createOne(req, res) {
   );
 }
 
+function CreateConsumablePO( req, res ) {
+  ExpressHandler(
+    async () => {
+      const { sourcePOId, poNumber } = req.body;
+      if ( !sourcePOId ) return HTTPError( 'Source doc Id not provided found.', 400 );
+      if ( !poNumber ) return HTTPError( 'PO number not provided found.', 400 );
+
+      // TODO: need to make this some way to default to 10 business days
+      const isDueBackOn = req.body.isDueBackOn || addBusinessDays(DEFAULT_BUSINESS_DAYS, true);
+      
+      const userId = req?.user?._id || req?.body?.authUserId;
+
+      if ( !userId ) return HTTPError( 'No userId found, cannot complete creating consumable PO.', 400 );
+      const label = 'PO' + poNumber + '-R';
+
+      const autoIncomingDelivery = new IncomingDelivery({
+        label,
+        createdBy: userId,
+        sourcePoType: 'purchaseOrders',
+        sourcePOId,
+        isDueBackOn,    // this might be undefined
+        linesReceived: [],
+      });
+      
+      await autoIncomingDelivery.save();
+
+      const data = { 
+        newIncomingDelivery: autoIncomingDelivery,
+        message: `Incoming delivery ${label} has been created.`
+      };
+
+      return { data };
+    },
+    res,
+    'auto generating incoming delivery for PO'
+  );
+}
+
 /**
  * Get the queue of incoming deliveries that have not yet been received.
  */
@@ -292,9 +333,13 @@ function getQueue(req, res) {
       ]).exec();
 
       for (let i = 0; i < workOrderPOQueue.length; i++) {
+        if ( workOrderPOQueue.length === 0 ) continue;
+
         const lines = workOrderPOQueue[i].po[0]?.lines;
 
-        for (let j = 0; j < lines?.length || []; j++) {
+        for (let j = 0; j < lines?.length || 0; j++) {
+          if ( !lines || lines?.length === 0 ) continue;
+          
           const line = lines[j];
 
           const [packingSlip, workorderItem] = await Promise.all([
@@ -324,7 +369,8 @@ function getQueue(req, res) {
       const consumablePOQueue = await IncomingDelivery.aggregate([
         {
           $match: {
-            sourcePoType: POTypes.Consumable,
+            // sourcePoType: POTypes.Consumable,    // OLD CODE
+            sourcePoType: 'purchaseOrders',
             receivedOn: { $exists: false },
             $or: [{ canceled: false }, { canceled: undefined }],
           },
@@ -684,4 +730,24 @@ async function checkId(res, next, model, id) {
       next();
     }
   }
+}
+
+
+function addBusinessDays( days, dateStringOnly ) {
+  const date = new Date();
+  let i = days;
+  while( i > 0 ) {
+    const day = date.getDay();
+    if ( ![0, 6].includes(day) ) {
+      i --;
+    }
+    date.setDate( date.getDate() + 1 );
+  }
+
+  if ( dateStringOnly ) {
+    const [year, month, day] = date.toISOString().split('T')[0].split('-');
+    return `${month}/${day}/${year}`;
+  }
+
+  return date;
 }
