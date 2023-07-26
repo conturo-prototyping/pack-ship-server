@@ -1093,21 +1093,22 @@ async function getPopulatedShipmentData(label = undefined) {
 
     const adjustedShipments = await Promise.all(
       allShipments.map(async (e) => {
+        const shipmentImages =
+          e.shipmentImages?.map(async (f) => {
+            const data = await getCloudStorageObjectDownloadURL(f);
+            return {
+              path: f,
+              url: data[0],
+              type: data[1],
+            };
+          }) ?? [];
+
         return {
           ...e,
           confirmShipmentFileUrl:
             e.confirmShipmentFilePath &&
             (await getCloudStorageObjectDownloadURL(e.confirmShipmentFilePath)),
-          shipmentImageUrls: await Promise.all(
-            e.shipmentImages.map(async (f) => {
-              const data = await getCloudStorageObjectDownloadURL(f);
-              return {
-                path: f,
-                url: data[0],
-                type: data[1],
-              };
-            })
-          ),
+          shipmentImageUrls: await Promise.all(shipmentImages),
         };
       })
     );
