@@ -459,9 +459,38 @@ async function getPendingPackingSlips(_req, res) {
       );
       if (e) return HTTPError("Error fetching pending packing slips.");
 
+      const finalPackingSlips = await Promise.all(
+        packingSlips?.map(async (e) => {
+          return {
+            ...e,
+            items: await Promise.all(
+              e.items.map(async (f) => {
+                if (f.routerUploadFilePath) {
+                  const [url, type] = await getCloudStorageObjectDownloadURL(
+                    f?.routerUploadFilePath
+                  );
+                  return {
+                    ...f,
+                    item: {
+                      ...f.item,
+                      downloadUrl: url,
+                      contentType: type,
+                    },
+                  };
+                } else {
+                  return {
+                    ...f,
+                  };
+                }
+              })
+            ),
+          };
+        })
+      );
+
       return {
         data: {
-          packingSlips,
+          packingSlips: finalPackingSlips,
         },
       };
     },
