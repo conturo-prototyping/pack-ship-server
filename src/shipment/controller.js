@@ -14,6 +14,7 @@ const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 const currency = require("currency.js");
 const { SetAirTableFields, FIELD_NAMES, GetAirTableRecordsByCalcItemIds } = require("../service.airtable");
 const { BlockNonAdmin } = require("../user/controller");
+const moment = require('moment-timezone');
 
 module.exports = router;
 
@@ -545,6 +546,12 @@ async function createOne(req, res) {
 
       // this means we need notifiy the machinists that line items have been completed
       if ( completedCalcItemIds.length ) {
+
+        const localTime = moment
+          .utc( Date.now() )
+          .tz('America/New_York')
+          .format('YYYY-MM-DD HH:mm:ss z');
+
         const [err, records] = await GetAirTableRecordsByCalcItemIds( completedCalcItemIds );
         if ( err ) {
           // TODO: add something with error, we want to continue with the operation
@@ -571,6 +578,7 @@ async function createOne(req, res) {
 
           // generate emails
           for ( const [email, stringArr] of Object.entries( emailMap ) ) {
+            // create email body
             let body = `
             <div>
               <h4>Jobs that no longer need setups on machines.</h4>
@@ -579,7 +587,11 @@ async function createOne(req, res) {
             stringArr.forEach( s => body += `<li>${s}</li>` );
             body += '</ul></div>';
 
-            SendMailTo(email, 'Jobs have been shipped.', undefined, body);
+            // subject
+            const subject = `[ShopQ] Jobs have been completed ${localTime}`;
+
+            // send
+            SendMailTo(email, subject, undefined, body);
           }
         }
       }
