@@ -570,7 +570,7 @@ async function createOne(req, res) {
                 emailMap[email] = [];
               }
     
-              const string = `Order Number: ${Job} - PN: ${Part} - Rev: ${Rev} - Batch: ${Batch} has been fully shipped. This setup can be taken down.`;
+              const string = `Order Number: ${Job} - PN: ${Part} - Rev: ${Rev} - Batch: ${Batch} has been fully shipped.`;
 
               emailMap[email].push( string );
             } );
