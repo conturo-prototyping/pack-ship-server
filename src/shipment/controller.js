@@ -7,14 +7,13 @@ const WorkOrder = require("../workOrder/model");
 const IncomingDelivery = require("../incomingDelivery/model");
 const { CreateNew } = require("../incomingDelivery/controller");
 const { GetPopulatedPackingSlips } = require("../packingSlip/controller");
-const { ExpressHandler, HTTPError, LogError, SendMailTo } = require("../utils");
+const { ExpressHandler, HTTPError, LogError } = require("../utils");
 const { CreateNewWorkOrderPO } = require("../workOrderPO/controller");
 const ObjectId = require("mongodb").ObjectId;
 const { GetOrderFulfillmentInfo } = require("../../src/shopQ/controller");
 const currency = require("currency.js");
-const { SetAirTableFields, FIELD_NAMES, GetAirTableRecordsByCalcItemIds } = require("../service.airtable");
+const { SetAirTableFields, FIELD_NAMES } = require("../service.airtable");
 const { BlockNonAdmin } = require("../user/controller");
-const moment = require('moment-timezone');
 
 module.exports = router;
 
@@ -519,7 +518,6 @@ async function createOne(req, res) {
       const jobShippingData = await Shipment.aggregate(agg);
 
       //loop through pipeline data and check if AT fields need set
-      const completedCalcItemIds = [];
       for (x of jobShippingData) {
         const fields = {};
         const { qtyShippedCustomer, qtyShippedVendor, totalQty, calcItemId } =
@@ -529,7 +527,6 @@ async function createOne(req, res) {
           //set fields key/value to be set in AT
           fields[FIELD_NAMES.READY_TO_SHIP] = true;
           fields[FIELD_NAMES.SHIPPED] = true;
-          completedCalcItemIds.push( calcItemId );
         }
 
         //NOTE: might have issues here if there are multiple vendor shipments, could do a check before hand maybe?
@@ -541,58 +538,6 @@ async function createOne(req, res) {
         //set AirTable fields (if needed)
         if (Object.keys(fields).length > 0) {
           SetAirTableFields(calcItemId, fields);
-        }
-      }
-
-      // this means we need notifiy the machinists that line items have been completed
-      if ( completedCalcItemIds.length ) {
-
-        const localTime = moment
-          .utc( Date.now() )
-          .tz('America/New_York')
-          .format('YYYY-MM-DD HH:mm:ss z');
-
-        const [err, records] = await GetAirTableRecordsByCalcItemIds( completedCalcItemIds );
-        if ( err ) {
-          // TODO: add something with error, we want to continue with the operation
-          // no need to return anything
-        }
-        else {
-
-          // gen email map
-          const emailMap = {};
-          records.forEach( r => {
-            const { Machinists, Job, Part, Rev, Batch } = r.fields;
-    
-            Machinists.forEach( m => {
-              const { email } = m;
-              if ( !Object.keys( emailMap ).includes( email ) ) {
-                emailMap[email] = [];
-              }
-    
-              const string = `Order Number: ${Job} - PN: ${Part} - Rev: ${Rev} - Batch: ${Batch} has been fully shipped.`;
-
-              emailMap[email].push( string );
-            } );
-          } );
-
-          // generate emails
-          for ( const [email, stringArr] of Object.entries( emailMap ) ) {
-            // create email body
-            let body = `
-            <div>
-              <h4>Jobs that no longer need setups on machines.</h4>
-              <ul>
-            `;
-            stringArr.forEach( s => body += `<li>${s}</li>` );
-            body += '</ul></div>';
-
-            // subject
-            const subject = `[ShopQ] Jobs have been completed ${localTime}`;
-
-            // send
-            SendMailTo(email, subject, undefined, body);
-          }
         }
       }
 
