@@ -92,7 +92,7 @@ const LogError = (error) => {
 </div>`;
 
   const subject = `Pack-Ship Error on ${new Date().toLocaleString()}`;
-  SendMailTo( process.env.ERRORS_ADDR,  subject, '', messageHtml);
+  sendMailTo( process.env.ERRORS_ADDR,  subject, '', messageHtml);
 }
 
 /**
@@ -102,7 +102,7 @@ const LogError = (error) => {
  * @param {string} text 
  * @param {string} html The HTML content to send
  */
-async function SendMailTo(toAddr, subject, text, html) {
+async function sendMailTo(toAddr, subject, text, html) {
   const mailOptions = {
     from: process.env.MAILER_ADDR,
     to: toAddr,
@@ -161,6 +161,5 @@ module.exports = {
   ExpressHandler,
   HTTPError,
   LogError,
-  MyRetry,
-  SendMailTo
+  MyRetry
 };
