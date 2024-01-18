@@ -11,7 +11,8 @@ const FIELD_NAMES = {
 
 module.exports = {
   SetAirTableFields,
-  FIELD_NAMES
+  FIELD_NAMES,
+  GetAirTableRecordsByCalcItemIds,
 }
 
 /**
@@ -54,5 +55,36 @@ async function SetAirTableFields(calcItemId, fields) {
   }
   catch (e) {
     LogError(e)
+  }
+}
+
+/**
+ * Used to get records from AirTable
+ * @param {Array} calcItemIds An array of strings for each calcItemId you want to find
+ * @returns 
+ */
+async function GetAirTableRecordsByCalcItemIds( calcItemIds ) {
+  try {
+    //setup airtable
+    const base = new AirTable({ apiKey: AIRTABLE_API_KEY })
+      .base(AIRTABLE_BASE_ID);
+
+    let filterByFormula = 'OR(';
+
+    filterByFormula += calcItemIds
+      .map( calcItemId => ` {ShopQ Item Id} = '${calcItemId}' ` )
+      .join(',');
+
+    filterByFormula += ')';
+
+    const records = await base(AIRTABLE_TABLE_NAME)
+      .select( { filterByFormula })
+      .all();
+
+    return [ null, records ];
+  } 
+  catch (e) {
+    LogError(e);
+    return [e];
   }
 }
