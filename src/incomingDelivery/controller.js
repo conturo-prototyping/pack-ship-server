@@ -14,6 +14,7 @@ const { BlockNonAdmin } = require("../user/controller");
 
 const DEFAULT_BUSINESS_DAYS = 10;
 
+
 router.get("/", getAll);
 router.put("/", createOne);
 router.put( '/autoGen', CreateConsumablePO );
