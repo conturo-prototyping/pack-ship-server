@@ -540,7 +540,7 @@ async function createOne(req, res) {
 
         //set AirTable fields (if needed)
         if (Object.keys(fields).length > 0) {
-          SetAirTableFields(calcItemId, fields);
+          SetAirTableFields(calcItemId, fields, req.user);
         }
       }
 
@@ -552,7 +552,7 @@ async function createOne(req, res) {
           .tz('America/New_York')
           .format('YYYY-MM-DD HH:mm:ss z');
 
-        const [err, records] = await GetAirTableRecordsByCalcItemIds( completedCalcItemIds );
+        const [err, records] = await GetAirTableRecordsByCalcItemIds( completedCalcItemIds, req.user );
         if ( err ) {
           // TODO: add something with error, we want to continue with the operation
           // no need to return anything
