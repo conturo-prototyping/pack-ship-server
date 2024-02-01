@@ -12,6 +12,13 @@ const schema = new Schema({
     email: String
   },
 
+  airTable: {
+    access_token: String,
+    refresh_token: String,
+    expiresAt: Number,   // used to avoid hitting AT to check that token is not expired
+    refreshExpiresAt: Number, // used to generate new auth & refresh tokens if needed
+  },
+
   UserName: { type: String, required: true },
 
   // String representing what groups the user belongs to
